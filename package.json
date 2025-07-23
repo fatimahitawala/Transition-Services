@@ -1,10 +1,11 @@
 {
-   "name": "user-services",
-   "version": "5.0.1",
-   "description": "User Authentication App for oneShobha",
-   "main": "index.js",
-   "license": "MIT",
+   "name": "transition-services",
+   "version": "1.0.1",
+  "description": "Modular Tenancy Management Backend for Sobha Smart FM. Includes MoveIn, MoveOut, Renewal, Documents, Integration, and Webhook modules with full API documentation.",
+   "main": "dist/index.js",
    "prettier": "@company/prettier-config",
+   "author": "Amrishkhan Sheik Abdullah",
+   "license": "ISC",
    "scripts": {
       "start": "ts-node src/index.ts",
       "dev": "nodemon ./src/index.ts",
@@ -16,7 +17,7 @@
       "typeorm:cli": "ts-node ./node_modules/typeorm/cli -f ./src/data-source.ts",
       "migrate": "typeorm migration:run -d dist/Common/data-source.js",
       "migrate:dev": "typeorm-ts-node-commonjs migration:run -d src/Common/data-source.ts",
-      "migrate:generate": "typeorm-ts-node-commonjs migration:generate src/Migration/AuthLogChanges -d src/Common/data-source.ts"
+      "migrate:generate": "typeorm-ts-node-commonjs migration:generate src/Migration/TransitionServiceChanges -d src/Common/data-source.ts"
    },
    "devDependencies": {
       "@types/bcrypt": "5.0.0",
@@ -73,5 +74,18 @@
       "typeorm": "0.3.15",
       "typeorm-naming-strategies": "4.1.0",
       "winston": "3.8.2"
-   }
+   },
+   "repository": {
+      "type": "git",
+      "url": "git+https://github.com/Sobha-Realty/Transition-Services.git"
+   },
+   "keywords": [
+      "transition",
+      "services",
+      "tenancy",
+      "management",
+      "smart-fm",
+      "sobha",
+      "community"
+   ]
 }
