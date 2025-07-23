@@ -26,7 +26,7 @@ defaultRoutes.forEach((route) => {
 const devRoutes = [
     // routes available only in development mode
     {
-        path: '/docs/community',
+        path: '/docs/transition',
         route: swaggerRoute,
     },
 ];

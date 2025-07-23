@@ -3,9 +3,9 @@ import config from '../Common/Config/config';
 const swaggerDef = {
     openapi: '3.0.3',
     info: {
-        title: 'Sobha Smart FM - Tenancy Management Service',
+        title: 'Sobha Smart FM - Transition Services',
         version: "1.0.0",
-        description: 'Independent Tenancy Management API for managing all tenancy types (Owner, Tenant, HHO Company, HHO Owner)'
+        description: 'Independent Transition Management API for managing all transition types (Owner, Tenant, HHO Company, HHO Owner)'
     },
     servers: [
         {
@@ -20,7 +20,12 @@ const swaggerDef = {
                 bearerFormat: 'JWT'
             }
         }
-    }
+    },
+    security: [
+        {
+            bearerAuth: []
+        }
+    ],
 };
 
 export default swaggerDef;
