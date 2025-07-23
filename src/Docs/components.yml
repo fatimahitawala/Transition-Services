@@ -1,0 +1,106 @@
+components:
+  schemas:
+    Test:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          format: email
+        description:
+          type: string
+      example:
+        id: 1
+        name: test
+        description: test
+
+    Error:
+      type: object
+      properties:
+        status:
+          type: boolean
+        message:
+          type: string
+        code:
+          type: string
+
+    Success:
+      type: object
+      properties:
+        status:
+          type: boolean
+        message:
+          type: string
+        code:
+          type: string
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            status: false
+            code: EC011
+            message: Please authenticate
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            status: false
+            code: EC012
+            message: Forbidden
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            status: false
+            message: Not found
+            code: EC009
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            status: false
+            message: Unknown Error
+            code: EC006
+
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            status: false
+            message: Error Message
+            code: EC006
+
+    SuccessResponse:
+      description: Success response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Success"
+          example:
+            status: true
+            message: Success Message
+            code: SC001
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

@@ -1,0 +1,8 @@
+[submodule "Entities"]
+	path = src/Entities
+	url = https://github.com/Sobha-Realty/Database-Entities.git
+	branch = main
+[submodule "Common"]
+	path = src/Common
+	url = https://github.com/Sobha-Realty/Common-Constants.git
+	branch = main

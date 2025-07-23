@@ -1,0 +1,5183 @@
+
+
+
+
+One Sobha Project
+
+
+
+
+
+
+Business Requirement Document
+Move-in, Move-out & Account Renewal
+
+
+
+
+Version 1.0
+
+?
+Document Identification
+Document Name
+BRD – Tenancy-Backoffice
+Version No
+1.0
+Issue date
+
+Document Classification
+Restricted
+
+Techno-Functional Reviewers
+Name
+Area
+Date
+Designation
+Ananth Nallasamy
+Sobha Group
+
+SE - IT
+Akash Lall
+Sobha Group
+
+GM – IT
+
+Approver
+Name
+Area
+Date
+Designation
+Mijo James
+Sobha Group
+
+Head - Community Management
+Akash Lall
+Sobha Group
+
+GM – IT
+Guruswamy 
+Periyasamy
+Sobha Group
+
+CIO
+
+Reviewers
+Name
+Area
+Date
+Designation
+Mohd. Vasanvala
+Techcarrot
+
+Delivery Head
+Sameer Gupta
+Techcarrot
+
+Vice President – Delivery
+
+Distribution
+Name
+Area
+Date
+Designation
+
+
+
+
+
+
+
+
+
+?
+
+Document History
+Date
+Status
+Version
+Author
+Changes
+23/05/2024
+Initial 
+Draft
+0.1
+Deepthi 
+Jangareddi
+Document created 
+24/06/2025
+Updated 
+1.0
+Nitin Sinha
+Document Updated
+
+?
+Table of Contents
+1.	Purpose of the document	1
+1.1.	Scope	1
+1.2.	List of Acronyms and Abbreviations	2
+1.3.	Reference Document(s)	2
+2.	Functional Specification FS-68: Master data set up	3
+2.1.	Use-Case UC-125: Master data set for Community specific recipients	3
+2.1.1.	Process Flow Diagram	3
+2.1.2.	Screen Mock-ups	3
+2.1.3.	Field Level Specification	3
+2.1.4.	Validation	4
+2.1.5.	Business rule	4
+2.1.6.	Processing	4
+2.1.7.	3.1.7. Notification Template	4
+2.1.8.	Integration Requirements	4
+2.1.9.	Acceptance Criteria	4
+3.	Functional Specification FS-69: Dashboard	6
+3.1.	Use-Case UC-126: Back-office Move-in Dashboard	6
+3.1.1.	Process Flow Diagram	8
+3.1.2.	Screen Mock-ups	8
+3.1.3.	Field Level Specification	14
+3.1.4.	Validation	14
+3.1.5.	Business rule	14
+3.1.6.	Processing	14
+3.1.7.	3.1.7. Notification Template	15
+3.1.8.	Integration Requirements	15
+3.1.9.	Acceptance Criteria	15
+3.2.	Use-Case UC-127: Back-office Account Renewal Dashboard	15
+3.2.1.	Process Flow Diagram	16
+3.2.2.	Screen Mock-ups	16
+3.2.3.	Field Level Specification	22
+3.2.4.	Validation	22
+3.2.5.	Business rule	22
+3.2.6.	Processing	22
+3.2.7.	3.1.7. Notification Template	22
+3.2.8.	Integration Requirements	22
+3.2.9.	Acceptance Criteria	22
+3.3.	Use-Case UC-128: Back-office Move-Out Dashboard	23
+3.3.1.	Process Flow Diagram	24
+3.3.2.	Screen Mock-ups	25
+3.3.3.	Field Level Specification	28
+3.3.4.	Validation	28
+3.3.5.	Business rule	28
+3.3.6.	Processing	29
+3.3.7.	3.1.7. Notification Template	29
+3.3.8.	Integration Requirements	29
+3.3.9.	Acceptance Criteria	29
+4.	Functional Specification FS-15: Move in Request	30
+4.1.	Use-Case UC-129: Move-In on behalf of Owner	30
+4.1.1.	Process Flow Diagram	32
+4.1.2.	Screen Mock-ups	33
+4.1.3.	Field Level Specification	35
+4.1.4.	Validation	36
+4.1.5.	Business rule	37
+4.1.6.	Processing	37
+4.1.7.	Notification Template	37
+4.1.8.	Integration Requirements	38
+4.1.9.	Acceptance Criteria	38
+4.2.	Use-Case UC-130: Move-In on behalf of Tenant	38
+4.2.1.	Process Flow Diagram	40
+4.2.2.	Screen Mock-ups	40
+4.2.3.	Field Level Specification	44
+4.2.4.	Validation	46
+4.2.5.	Business rule	46
+4.2.6.	Processing	47
+4.2.7.	Notification Template	47
+4.2.8.	Integration Requirements	47
+4.2.9.	Acceptance Criteria	47
+4.3.	Use-Case UC-131: Move-In on behalf of HHO Unit	48
+4.3.1.	Process Flow Diagram	49
+4.3.2.	Screen Mock-ups	50
+4.3.3.	Field Level Specification	52
+4.3.4.	Validation	53
+4.3.5.	Business rule	53
+4.3.6.	Processing	54
+4.3.7.	Notification Template	54
+4.3.8.	Integration Requirements	55
+4.3.9.	Acceptance Criteria	55
+4.4.	Use-Case UC-132: Move-In on behalf of HHO Company	55
+4.4.1.	Process Flow Diagram	57
+4.4.2.	Screen Mock-ups	58
+4.4.3.	Field Level Specification	61
+4.4.4.	Validation	63
+4.4.5.	Business rule	63
+4.4.6.	Processing	63
+4.4.7.	Notification Template	64
+4.4.8.	Integration Requirements	64
+4.4.9.	Acceptance Criteria	64
+5.	Functional Specification FS-70: Approve Move in Request	65
+5.1.	Use-Case UC-133: RFI for Move-in request raised by Owner/Tenant/HHO	65
+5.1.1.	Process Flow Diagram	66
+5.1.2.	Screen Mock-ups	67
+5.1.3.	Field Level Specification	67
+5.1.4.	Validation	67
+5.1.5.	Business rule	67
+5.1.6.	Processing	68
+5.1.7.	Notification Template	68
+5.1.8.	Integration Requirements	68
+5.1.9.	Acceptance Criteria	68
+5.2.	Use-Case UC-134: Approve move-in request raised by Owner/Tenant/HHO	69
+5.2.1.	Process Flow Diagram	70
+5.2.2.	Screen Mock-ups	71
+5.2.3.	Field Level Specification	71
+5.2.4.	Validation	71
+5.2.5.	Business rule	71
+5.2.6.	Processing	71
+5.2.7.	Notification Template	72
+5.2.8.	Integration Requirements	72
+5.2.9.	Acceptance Criteria	72
+6.	Functional Specification FS-71: Cancel Move in Request by Community admin	73
+6.1.	Use-Case UC-135: Cancel move-in request raised by Owner/Tenant/HHO	73
+6.1.1.	Process Flow Diagram	74
+6.1.2.	Screen Mock-ups	74
+6.1.3.	Field Level Specification	74
+6.1.4.	Validation	74
+6.1.5.	Business rule	74
+6.1.6.	Processing	75
+6.1.7.	Notification Template	75
+6.1.8.	Integration Requirements	75
+6.1.9.	Acceptance Criteria	75
+7.	Functional Specification FS-72: Move in Request Closure	76
+7.1.	Use-Case UC-136: Closure of approved move in request by the security	76
+7.1.1.	Process Flow Diagram	77
+7.1.2.	Screen Mock-ups	77
+7.1.3.	Field Level Specification	77
+7.1.4.	Validation	78
+7.1.5.	Business rule	78
+7.1.6.	Processing	78
+7.1.7.	Notification Template	78
+7.1.8.	Integration Requirements	79
+7.1.9.	Acceptance Criteria	79
+8.	Functional Specification FS-73: Account Renewal Creation from back-office portal	80
+8.1.	Use-Case UC-137: Account Renewal on behalf of Tenant	80
+8.1.1.	Process Flow Diagram	82
+8.1.2.	Screen Mock-ups	82
+8.1.3.	Field Level Specification	85
+8.1.4.	Validation	87
+8.1.5.	Business rule	87
+8.1.6.	Processing	87
+8.1.7.	Notification Template	88
+8.1.8.	Integration Requirements	88
+8.1.9.	Acceptance Criteria	88
+8.2.	Use-Case UC-138: Account Renewal on behalf of HHO Unit	88
+8.2.1.	Process Flow Diagram	90
+8.2.2.	Screen Mock-ups	90
+8.2.3.	Field Level Specification	93
+8.2.4.	Validation	94
+8.2.5.	Business rule	94
+8.2.6.	Processing	94
+8.2.7.	Notification Template	95
+8.2.8.	Integration Requirements	95
+8.2.9.	Acceptance Criteria	95
+8.3.	Use-Case UC-139: Account Renewal on behalf of HHO Company	95
+8.3.1.	Process Flow Diagram	97
+8.3.2.	Screen Mock-ups	97
+8.3.3.	Field Level Specification	101
+8.3.4.	Validation	103
+8.3.5.	Business rule	103
+8.3.6.	Processing	103
+8.3.7.	Notification Template	103
+8.3.8.	Integration Requirements	104
+8.3.9.	Acceptance Criteria	104
+9.	Functional Specification FS-74: Approve Account Renewal	105
+9.1.	Use-Case UC-140: RFI for Account Renewal request raised by Tenant/HHO	105
+9.1.1.	Process Flow Diagram	106
+9.1.2.	Screen Mock-ups	106
+9.1.3.	Field Level Specification	106
+9.1.4.	Validation	106
+9.1.5.	Business rule	107
+9.1.6.	Processing	107
+9.1.7.	Notification Template	107
+9.1.8.	Integration Requirements	107
+9.1.9.	Acceptance Criteria	107
+9.2.	Use-Case UC-141: Approve Account Renewal request raised by Tenant/HHO	108
+9.2.1.	Process Flow Diagram	109
+9.2.2.	Screen Mock-ups	109
+9.2.3.	Field Level Specification	109
+9.2.4.	Validation	109
+9.2.5.	Business rule	110
+9.2.6.	Processing	110
+9.2.7.	Notification Template	110
+9.2.8.	Integration Requirements	110
+9.2.9.	Acceptance Criteria	110
+10.	Functional Specification FS-75: Cancel Account Renewal Request	111
+10.1.	Use-Case UC-142: Account Renewal Request cancelled from the back-office portal	111
+10.1.1.	Process Flow Diagram	112
+10.1.2.	Screen Mock-ups	112
+10.1.3.	Field Level Specification	112
+10.1.4.	Validation	112
+10.1.5.	Business rule	112
+10.1.6.	Processing	113
+10.1.7.	Notification Template	113
+10.1.8.	Integration Requirements	113
+10.1.9.	Acceptance Criteria	113
+11.	Functional Specification FS-29: Move-out Request	114
+11.1.	Use-Case UC-143: Move-Out Requested on behalf of User	114
+11.1.1.	Process Flow Diagram	116
+11.1.2.	Screen Mock-ups	116
+11.1.3.	Field Level Specification	117
+11.1.4.	Validation	118
+11.1.5.	Business rule	118
+11.1.6.	Processing	118
+11.1.7.	Notification Template	119
+11.1.8.	Integration Requirements	119
+11.1.9.	Acceptance Criteria	119
+12.	Functional Specification FS-78: Approve Move-out Request	120
+12.1.	Use-Case UC-144: Approve Move-out request raised by Owner/Tenant/HHO	120
+12.1.1.	Process Flow Diagram	121
+12.1.2.	Screen Mock-ups	121
+12.1.3.	Field Level Specification	121
+12.1.4.	Validation	122
+12.1.5.	Business rule	122
+12.1.6.	Processing	122
+12.1.7.	Notification Template	122
+12.1.8.	Integration Requirements	122
+12.1.9.	Acceptance Criteria	123
+13.	Functional Specification FS-79: Cancel Move-out Request	124
+13.1.	Use-Case UC-145: Cancel the Move-out request from the back office	124
+13.1.1.	Process Flow Diagram	125
+13.1.2.	Screen Mock-ups	125
+13.1.3.	Field Level Specification	125
+13.1.4.	Validation	126
+13.1.5.	Business rule	126
+13.1.6.	Processing	126
+13.1.7.	Notification Template	126
+13.1.8.	Integration Requirements	126
+13.1.9.	Acceptance Criteria	126
+14.	Functional Specification FS-80: Move out Request Closure	127
+14.1.	Use-Case UC-146: Closure of approved move out request by the security	127
+14.1.1.	Process Flow Diagram	128
+14.1.2.	Screen Mock-ups	128
+14.1.3.	Field Level Specification	128
+14.1.4.	Validation	129
+14.1.5.	Business rule	129
+14.1.6.	Processing	129
+14.1.7.	Notification Template	129
+14.1.8.	Integration Requirements	129
+14.1.9.	Acceptance Criteria	129
+15.	General Requirement	130
+15.1.	Reporting Specification	130
+15.2.	Risks / Assumptions / Dependencies / Constraints	130
+15.3.	System Configuration	130
+15.4.	Other System Requirements/ Non-Functional Requirements	130
+Appendix: Index of Table	131
+Appendix: Index of Figures	134
+Approvals	136
+
+
+
+
+1.	Purpose of the document
+This document outlines the functional requirements of the Back-office Portal to support key business 
+operations related to tenancy lifecycle management. It focuses on enabling operational efficiency and 
+consistency for the following core functionalities:
+*	Move-in: Facilitates the onboarding of new tenants or owners into a unit or property.
+*	Account Renewal: Manages the periodic renewal process for active accounts, ensuring 
+continuity of services and compliance.
+*	Move-out: Handles the formal exit process of a tenant or owner from a unit, including final 
+settlements and service deactivation.
+These functionalities are essential to ensure seamless coordination between internal teams and external 
+stakeholders, while maintaining data accuracy, SLA compliance, and transparency across the customer 
+journey. 
+1.1.	Scope
+This scope of this document will be limited to the functional requirements for the below pointers and all 
+other functions will remain out of scope of this document
+Table 1: List of use Case
+Functional 
+Module
+Functionality
+Use Case
+Master 
+Management
+FS-68: Master data 
+set up
+UC-125: Master data set for Community specific recipients
+Dashboard
+FS-69: Dashboard
+UC-126: Back-office Portal Move-in Dashboard
+
+
+UC-127: Back-office Portal Account Renewal Dashboard
+
+
+UC-128: Back-office Portal Move-Out Dashboard
+Move-in 
+FS-15: Move in 
+Request
+UC-129: Move-In on behalf of Owner
+
+
+UC-130: Move-In on behalf of Tenant
+
+
+UC-131: Move-In on behalf of HHO Unit
+
+
+UC-132: Move-In on behalf of HHO Company
+
+FS-70: Approve 
+Move in Request
+UC-133: RFI for Move-in request raised by Owner/Tenant/HHO
+
+
+UC-134: Approve move-in request raised by Owner/Tenant/HHO
+
+FS-71: Cancel 
+Move in by 
+Community admin
+UC-135: Cancel move-in request raised by Owner/Tenant/HHO
+
+FS-72: Move in 
+Request Closure
+UC-136: Closure of approved move in request by the security
+Account 
+Renewal
+FS-73: Account 
+Renewal Creation 
+from back-office 
+portal
+UC-137: Account Renewal on behalf of Tenant
+
+
+UC-138: Account Renewal on behalf of HHO Unit
+
+
+UC-139: Account Renewal on behalf of HHO Company
+
+FS-74: Approve 
+Account Renewal
+UC-140: RFI for Account Renewal request raised by Tenant/HHO
+
+
+UC-141: Approve Account Renewal request raised by 
+Tenant/HHO
+
+FS-75: Cancel 
+Account Renewal 
+Request
+UC-142: Account Renewal Request cancelled from the back-
+office portal
+Move-Out
+FS-29: Move-Out 
+Request Creation
+UC-143: Move-Out Requested on behalf of User
+
+FS-76: Approve 
+Move-out	
+UC-144: Approve Move-out request raised by 
+Owner/Tenant/HHO
+
+FS-77: Cancel 
+Move-out request
+UC-145: Cancel the Move-out request from the back office
+
+FS-78: Move out 
+Request Closure
+UC-146: Closure of approved move out request by the security
+
+1.2.	List of Acronyms and Abbreviations
+Table 2: List of Acronyms and Abbreviations
+Abbreviation
+Description
+API
+Application Programming Interface
+BRD
+Business Requirement Document
+HHO
+Holiday Home Operator
+SOW
+Scope of work
+SG
+Sobha Group
+
+1.3.	Reference Document(s)
+Table 3: List of Reference Documents
+Document
+Description
+
+
+2.	Functional Specification FS-68: Master data set up
+2.1.	Use-Case UC-125: Master data set for Community specific recipients
+Table 4: UC-125 Master data set up for Community specific recipients
+Use Case  
+Master data set up for community specific recipients
+Primary Actor(s)
+Super Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+
+Pre-conditions
+Super Admin logins to the back-office portal
+Post-conditions
+Configures community specific recipients for the move in and move 
+out approval process
+Main Success Scenario
+*	Super admin has access to the dashboard 
+*	Configure the email recipients ·
+o	Master community
+o	Community 
+o	Tower
+o	Email recipients
+o	Permit Approval Type (MIP or MOP)
+Alternate Flow
+
+Priority
+High
+Special Requirements
+No
+System
+Back-office portal
+
+2.1.1.	 Process Flow Diagram
+NA
+2.1.2.	Screen Mock-ups
+NA
+2.1.3.	Field Level Specification
+
+Table 5: UC-125 Form Field Specification
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Master 
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Master 
+Communities
+-
+2
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Communities
+-
+3
+Tower
+Drop 
+Down
+ID
+M
+Y
+LOV of Tower
+-
+4
+Move-in 
+Recipient Email
+Textbox
+Alphanumeric 
+(100)
+M
+Y
+-
+-
+5
+Move-out 
+Recipient Email
+Textbox
+Alphanumeric 
+(100)
+M
+Y
+-
+-
+6 
+Status
+Drop 
+Down
+
+M
+Y
+Active/In-active
+Active
+
+2.1.4.	Validation
+*	Mandatory field validation for Mandatory fields
+*	Email id validation as per email standard regex
+2.1.5.	Business rule
+*	Super Admin should have permission to configure the community specific email recipients
+*	Only one recipient per community 
+*	Duplicate entry should not be allowed
+2.1.6.	Processing
+*	All validations & business rules should be successfully met.
+*	In case any of the validation conditions are not met, admin should display an appropriate error 
+message.
+2.1.7.	3.1.7. Notification Template
+NA
+2.1.8.	Integration Requirements
+NA
+2.1.9.	Acceptance Criteria
+Table 6: UC-125 Acceptance Criteria
+S. No.
+Criteria
+1
+Super admin should be allowed to configure the email recipients 
+2
+Notifications should be triggered based on the scenarios Move in or move out approval. 
+
+3.	Functional Specification FS-69: Dashboard
+3.1.	Use-Case UC-126: Back-office Move-in Dashboard
+Table 7: UC-126 Back-office Portal - Move-in Dashboard
+Use Case  
+Back-office Portal - Move-in Dashboard 
+Primary Actor(s)
+Community Admin & Security
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+A move-in request is submitted by a customer through the front-end 
+portal or One-App. This action notifies the Community Admin in the 
+back-office portal.
+Pre-conditions
+*	Community Admin and Security must be logged in to the Back-
+office Portal.
+*	Role-based access is configured to show relevant dashboard 
+views for each user.
+Post-conditions
+*	Community Admin and Security can view and act on move-in 
+requests.
+*	All actions and transitions are captured in the request history 
+for audit and traceability.
+Main Success Scenario
+*	A customer submits a move-in request.
+*	The Community Admin is notified via the back-office portal.
+*	Upon Community Admin approval, the Security Team is 
+notified and can access the request.
+*	Both Community Admin and Security access the Move-in 
+Dashboard, customized based on their roles:
+o	Community Admin sees all submitted requests.
+o	Security sees only requests approved by the Community 
+Admin.
+*	The dashboard displays the following details per request:
+o	Request ID
+o	Move-in Type (Owner / Tenant / HHO-Unit / HHO-
+Company)
+o	Master Community
+o	Community
+o	Tower
+o	Unit
+o	Created Date
+o	Move-in Date
+o	Request Status
+o	View action
+*	Additional dashboard features:
+o	Export (CSV or Excel)
+o	Pagination
+o	Search
+o	Filter (by property, request status, date, etc.)
+o	Create New Request (if allowed for Community admin 
+role)
+*	On selecting a request (View), the user is taken to the Move-in 
+Request Detail Page.
+*	From the details page:
+o	Community Admin can:
+?	Raise RFI (Request for Information)
+?	Approve the request
+?	Cancel the request
+o	Security Team can:
+o	Close the request (only after it’s approved by the 
+Community Admin)
+o	All actions are tracked in the History Panel
+Alternate Flow
+
+Priority
+High
+Special Requirements
+No
+System
+Back-office portal
+
+3.1.1.	 Process Flow Diagram
+NA
+3.1.2.	Screen Mock-ups
+*	Back-Office Dashboard 
+ 
+Figure 1: UC-126 Back-office Dashboard
+?
+*	Move-in request list
+ 
+Figure 2: UC-126 Move-In Request list
+
+?
+*	Move-in Details (Owner)
+ 
+Figure 3: UC-126 Move-in Details (Owner)
+?
+*	Move-in Details (Tenant)
+ 
+Figure 4: UC-126 Move-in Details (Tenant)
+
+?
+*	Move-in Details (HHO-Unit)
+ 
+Figure 5: UC-126 Move-in Details (HHO-unit)
+?
+*	Move-in Details (HHO-Company)
+ 
+Figure 6: UC-126 Move-in Details (HHO-Company)
+?
+*	Move-in History
+ 
+Figure 7: UC-126 Move-in History
+3.1.3.	Field Level Specification
+NA
+3.1.4.	Validation
+The system must enforce the following validation logic to ensure correct access and actions:
+*	Role-based Data Visibility:
+o	Community Admin must be able to view all move-in requests regardless of status.
+o	Security Team must only be able to view requests that are approved by the Community 
+Admin.
+*	Role-based Action Control:
+o	The available actions on the request detail page must be dynamically rendered based on 
+the user’s role:
+?	Community Admin: Can perform RFI, Approve, or Cancel actions.
+?	Security Team: Can only perform Close Request action, and only if the request has 
+been approved. 
+3.1.5.	Business rule
+NA
+3.1.6.	Processing
+NA
+3.1.7.	3.1.7. Notification Template
+NA
+3.1.8.	Integration Requirements
+NA
+3.1.9.	Acceptance Criteria
+Table 8: UC-126 Acceptance Criteria
+S. No.
+Criteria
+1
+Community Admin should be able to get all the move-in requests.
+2
+Security team should get approved request only
+
+3.2.	Use-Case UC-127: Back-office Account Renewal Dashboard
+Table 9: UC-127 Back-office Portal Account Renewal Dashboard
+Use Case  
+Back-office Portal Account Renewal Dashboard 
+Primary Actor(s)
+Community Admin 
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+A customer submits an Account Renewal request through the front-
+end portal or One-App, triggering a notification to the Community 
+Admin in the back-office porta
+Pre-conditions
+*	Community Admin must be logged into the Back-office Portal.
+Post-conditions
+*	Community Admin is able to view, track, and act on Account 
+Renewal requests.
+*	All actions are logged in the history panel for traceability.
+Main Success Scenario
+*	A customer submits an Account Renewal request.
+*	The Community Admin is notified within the portal.
+*	The Community Admin navigates to: Account Renewal > View 
+All
+*	The system displays a list of renewal requests with the 
+following columns:
+o	Request ID
+o	Account Renewal Type (Tenant / HHO-Unit / HHO-
+Company)
+o	Master Community
+o	Community
+o	Tower
+o	Unit
+o	Create Date
+o	Account Renewal Date
+o	Request Status
+o	View
+*	Dashboard capabilities include:
+o	Export (CSV/Excel)
+o	Pagination
+o	Search
+o	Create New Request
+o	Filter by property, status, date, etc.
+*	Upon selecting a record (View), the user is navigated to the 
+Request Details Page.
+*	Community Admin can perform the following actions:
+o	Raise RFI (Request for Information)
+o	Approve the renewal
+o	Cancel the request
+*	All actions are tracked in the History Panel
+Alternate Flow
+
+Priority
+High
+Special Requirements
+No
+System
+Back-office portal
+
+3.2.1.	Process Flow Diagram
+NA
+3.2.2.	Screen Mock-ups
+*	Back-Office Dashboard 
+ 
+Figure 8: UC-127 Back-office Dashboard
+?
+*	Account Renewal request list
+ 
+Figure 9: UC-127 Account Renewal Request list
+
+?
+*	Account Renewal Details (Tenant)
+ 
+Figure 10: UC-127 Account Renewal Details (Tenant)
+
+?
+*	Account Renewal Details (HHO-Unit)
+ 
+Figure 11: UC-127 Account Renewal Details (HHO-unit)
+?
+*	Account Renewal Details (HHO-Company)
+ 
+Figure 12: UC-127 Account Renewal Details (HHO-Company)
+?
+*	Account Renewal History
+ 
+Figure 13: UC-127 Account Renewal History
+3.2.3.	Field Level Specification
+NA
+3.2.4.	Validation
+*	Only users with Community Admin role can view and act on Account Renewal requests.
+*	Actions (RFI, Approve, Cancel) should be enabled based on request status (e.g., pending).
+*	All actions must be captured in the history panel
+*	File upload or remarks should be required based on action type (e.g., mandatory comment on 
+cancellation).
+3.2.5.	Business rule
+NA
+3.2.6.	Processing
+NA
+3.2.7.	3.1.7. Notification Template
+NA
+3.2.8.	Integration Requirements
+NA
+3.2.9.	Acceptance Criteria
+Table 10: UC-127 Acceptance Criteria
+S. No.
+Criteria
+1
+Community Admin should be able to get all the move-in requests.
+
+3.3.	Use-Case UC-128: Back-office Move-Out Dashboard
+Table 11: UC-128 Back-office Portal Move-out Dashboard
+Use Case  
+Back-office Portal Move-Out Dashboard 
+Primary Actor(s)
+Community Admin & Security
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+A Move-out Request is submitted by a customer via the front-end 
+portal or One-App, triggering a notification to the Community Admin
+Pre-conditions
+*	Community Admin and Security users must be logged into the 
+Back-office Portal.
+*	Requests should be routed based on role-based access
+Post-conditions
+*	Community Admin and Security users can view and act on 
+move-out requests.
+*	Request status is updated, and all actions are logged in the 
+request history.
+Main Success Scenario
+*	A customer submits a Move-out Request.
+*	Community Admin is notified on the back-office portal.
+*	Once the request is approved by the Community Admin, the 
+Security Team is notified.
+*	Both Community Admin and Security access the Move-out 
+Dashboard, tailored to their roles:
+o	Community Admin sees all requests.
+o	Security Team sees only approved requests.
+*	The dashboard displays a list of requests with the following 
+details:
+o	Request ID
+o	Move-out Type (Owner / Tenant / HHO-Unit / HHO-
+Company)
+o	Master Community
+o	Community
+o	Tower
+o	Unit
+o	Create Date
+o	Move-out Date
+o	Request Status
+o	View
+*	Dashboard capabilities:
+o	Export
+o	Pagination
+o	Search
+o	Filter (by property, status, dates, etc.)
+o	Create New Request (if applicable)
+*	On selecting View, the user is navigated to the Request Detail 
+Page.
+*	Role-based actions:
+o	Community Admin can:
+?	Approve
+?	Cancel
+o	Security Team can:
+?	Close Request (only for requests approved by the 
+Community Admin)
+*	All actions are captured in the History Panel
+Alternate Flow
+
+Priority
+High
+Special Requirements
+No
+System
+Back-office portal
+
+3.3.1.	 Process Flow Diagram
+NA
+3.3.2.	Screen Mock-ups
+*	Back-Office Dashboard 
+ 
+Figure 14: UC-128 Back-office Dashboard
+*	Move-in request list
+ 
+Figure 15: UC-128 Move-Out Request list
+
+*	Move-Out Details 
+ 
+Figure 16: UC-128 Move-out Details
+?
+*	Move-out History
+ 
+Figure 17: UC-128 Move-out History
+3.3.3.	Field Level Specification
+NA
+3.3.4.	Validation
+*	Role-based Visibility:
+o	Community Admin must view all move-out requests.
+o	Security Team must view only requests approved by Community Admin.
+*	Role-based Actions:
+o	Community Admin can approve or cancel.
+o	Security can only close approved requests.
+*	All actions must be captured in the history panel 
+*	
+3.3.5.	Business rule
+NA
+3.3.6.	Processing
+NA
+3.3.7.	3.1.7. Notification Template
+NA
+3.3.8.	Integration Requirements
+NA
+3.3.9.	Acceptance Criteria
+Table 12: UC-128 Acceptance Criteria
+S. No.
+Criteria
+1
+Community Admin should be able to get all the move-in requests.
+2
+Security team should get approved request only
+
+4.	Functional Specification FS-15: Move in Request 
+The Move-In module enables customers to initiate their move into the community by submitting a move-
+in request to obtain a move-in permit. This request can be raised via the mobile application and is routed 
+to the Community Admin through the Backoffice Portal for review and processing.
+For detailed use cases related to the move-in request process via the mobile app, please refer to the 
+Functional Specification under BRD FM-04 Move-In:
+*	FS-15: Move-In Creation
+o	UC-10: Move-In Request as Owner / HHO
+o	UC-11: Move-In Request as Tenant / HHC
+This request is process in SmartFM and based on move-in request approval access to unit is granted to 
+user (Owner, tenant, HHO-Owner, HHO-Company).
+As per the new requirement, move-in request will be processed in OneSobha back-office portal. Along 
+with this, Community Admin should be able to input the details given by the customer and raise a 
+request for move-in on behalf of the customer from the back-office portal
+*	UC-129: Move-In on behalf of Owner
+*	UC-130: Move-In on behalf of Tenant
+*	UC-131: Move-In on behalf of HHO Unit
+*	UC-132: Move-In on behalf of HHO Company
+4.1.	Use-Case UC-129: Move-In on behalf of Owner
+Table 13: UC-129 Move-In on behalf of Owner
+Use Case  
+Create Move-in request for Owner from back-office portal
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+A Community Admin initiates the creation of a Move-in Request for a 
+registered Owner from the back-office portal.
+Pre-conditions
+*	Owner is registered in the One App and has received login 
+credentials.
+*	The selected unit is vacant, i.e., no active or pending move-in 
+request exists for the unit.
+*	The Community Admin is authenticated and has access to the 
+Back-office Portal.
+Post-conditions
+*	A move-in request is created and auto-approved.
+*	A move-in permit is generated.
+*	Notifications are triggered to both the owner and the relevant 
+community recipients.
+*	The request appears in both the admin dashboard and the 
+mobile app with a generated Move-in Request ID.
+Main Success Scenario
+*	Community Admin logs into the Back-office Portal.
+*	Navigates to the Move-in Dashboard and clicks "Create 
+Request".
+*	On the Create Move-in Request screen:
+o	Selects Move-in Type = Owner
+*	Enters or selects Property Details:
+o	Master Community
+o	Community
+o	Tower / Street
+o	Unit Number
+*	System auto-fetches and displays Owner details from the 
+master record (non-editable fields):
+o	First Name
+o	Middle Name
+o	Last Name
+o	Mobile Number
+o	Email ID
+*	Admin selects the Move-in Date.
+*	Admin fills out the following additional details:
+o	Number of Adults
+o	Number of Children
+o	Number of Household Staff
+o	People of Determination (Yes/No)
+o	Pets (Yes/No)
+*	Admin clicks Submit.
+*	The system:
+o	Validates the request (refer to validations & business 
+rules)
+o	Creates the request in Approved status
+o	Logs the action in the history panel
+Alternate Flow
+If the Owner has not registered:
+*	Community Admin guides the tenant to:
+o	Download and register on the One App
+o	Submit a move-in request via the app
+*	Admin reviews the submitted request in the portal and 
+approves it post-verification.
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+4.1.1.	 Process Flow Diagram
+ 
+Figure 18: UC-129 Process flow - Move-In as an Owner
+4.1.2.	Screen Mock-ups
+*	Move-in request list
+ 
+Figure 19: UC-129 Move-In Request list
+*	Create Request -> Select user type (Owner)
+ 
+Figure 20: UC-129 Move-In as an Owner
+*	Create Request
+ 
+Figure 21: UC-129 Move-In Request form - Owner
+
+4.1.3.	Field Level Specification
+Table 14: UC-129 Form Field Specification - Move-in Owner
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Master 
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Master 
+Communities
+-
+2
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Communities
+-
+3
+Tower
+Drop 
+Down
+ID
+M
+Y
+LOV of Tower
+-
+4
+Unit
+Drop 
+Down
+ID
+M
+Y
+LOV of Unit
+-
+5
+First Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+6 
+Middle Name
+Textbox
+varchar (35)
+O
+N
+Auto Populated
+-
+7
+Last Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+8
+Mobile 
+Number
+Textbox
+Numeric (20)
+M
+N
+Auto Populated
+-
+9
+Email ID
+Textbox
+Alphanumeric 
+(100)
+M
+N
+Auto Populated
+-
+10
+Move-in Date
+Date 
+picker
+DD/MM/YYYY
+Y
+Y
+It should be > today’s 
+date.
+-
+11
+Adults
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+Minimum 1 
+Maximum 6
+-
+12
+Children
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+Minimum 0 
+Maximum 6
+-
+13
+Household 
+staff(s)
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+Minimum 0 
+Maximum 4
+-
+14
+Pets
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+Minimum 0 
+Maximum 6
+-
+15
+People of 
+determination
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+
+-
+16
+People of 
+determination 
+details
+Textbox
+
+O
+Y
+Minimum 0 
+Maximum 6
+-
+
+4.1.4.	Validation
+*	All required fields must be filled before submission.
+*	If another move-in request exists for the same unit with overlapping move-in dates and is not 
+Cancelled or Rejected, admin cannot proceed.
+*	Notification must be sent to the owner and relevant community team upon successful creation.
+*	All actions (create, approve) must be logged in the history panel.
+*	UI validations (e.g., date formats, numeric fields) must align with those implemented in the 
+mobile app.
+*	Upon creation, a move-in permit must be generated 
+4.1.5.	Business rule
+*	Only users with Community Admin role can create move-in requests.
+*	Requests can be raised regardless of any move-out requests in any status for the same unit.
+*	Requests can be created regardless of requests raised by other customers.
+*	If a customer has a non-cancelled/non-rejected request for the same unit within overlapping 
+time, they cannot submit another.
+*	All submission confirmation popups must display the Move-in Request Number.
+*	If overlapping move-in requests (excluding cancelled/rejected) exist, a popup with their count 
+must be shown to the Community Admin.
+*	If the unit is technically vacant but has an active move-in request, admin must manually mark 
+the older request as "Move-out" before submitting the new one.
+*	There cannot be two approved move-in requests for the same unit with overlapping dates.
+*	System must block approval if overlapping active requests exist.
+*	On actual move-in, the resident shows the permit to the security, who closes the request, 
+marking the unit as occupied.
+4.1.6.	Processing
+*	The system performs all validation and business rule checks before allowing submission.
+*	If any condition fails, the admin interface must display clear and contextual error messages.
+*	A Move-in Request ID must be generated and visible in both the admin portal and mobile app 
+immediately after submission.
+*	When a request is opened for processing, the system should show a popup if other move-in 
+requests for the same unit and time range exist.
+*	Upon successful request creation, the system must generate and display a move-in permit 
+PDF/document that the resident can present to the Security Team at the time of move-in.
+4.1.7.	Notification Template
+Table 15 UC-129 Notification Templates Move-in Owner 
+Step
+Customer
+Mode
+Template
+Move in 
+request 
+Owner
+Push notification
+A new move-in request (<Reference ID>) has 
+been created and approved by Community 
+Admin. Tap here to view your request.
+Move in 
+request 
+Community 
+Recipients
+Email notification
+Business to Provide
+4.1.8.	Integration Requirements
+NA
+4.1.9.	Acceptance Criteria
+Table 16: UC-129 Acceptance Criteria
+S. No.
+Criteria
+1
+Move-in Permit should be generated only after the admin approve the move request
+2
+It should be possible to execute all the processing steps as described in this use case 
+above. 
+3
+Notifications should be triggered.
+
+4.2.	Use-Case UC-130: Move-In on behalf of Tenant
+Table 17: UC-130 Move-In on behalf of Tenant
+Use Case  
+Create Move-in request for Tenant from back-office portal
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+
+Pre-conditions
+*	Tenant must be registered in the One App and have received 
+login credentials.
+*	The selected unit must be vacant — i.e., no active move-in 
+request exists for the same unit with overlapping dates.
+*	Community Admin is logged into the Back-office Portal.
+Post-conditions
+*	A move-in request is created for the tenant and auto-
+approved.
+*	A move-in permit is generated.
+*	Notifications are triggered to the tenant and community team.
+*	All actions are logged in the history panel.
+Main Success Scenario
+*	Community Admin logs in to the Back-office Portal.
+*	Navigates to Move-in Dashboard > Create Request.
+*	Selects Move-in Type = Tenant.
+*	Selects Property Details:
+o	Master Community
+o	Community
+o	Tower / Street
+o	Unit Number
+*	Enter the Tenant's Email ID and clicks Search.
+*	System auto-fetches and displays Tenant Details (non-
+editable):
+o	Email ID
+o	First Name
+o	Middle Name
+o	Last Name
+o	Mobile Number
+*	Enters Move-in Details:
+o	Emirates ID Number
+o	Emirates ID Expiry Date
+o	Move-in Date
+o	Tenancy Contract Number
+o	Contract Start Date
+o	Contract End Date
+o	Adults
+o	Children
+o	Household Staff
+o	People of Determination
+o	Pets
+*	Required documents:
+o	Emirates ID (Front)
+o	Emirates ID (Back)
+o	Ejari Certificate
+*	Submits the request.
+*	The system validates all inputs, checks for conflicts, auto-
+approves the request, generates a Move-in Permit, and 
+displays a Move-in Request ID.
+Alternate Flow
+If the tenant has not registered:
+*	Community Admin guides the tenant to:
+o	Download and register on the One App
+o	Submit a move-in request via the app
+*	Admin reviews the submitted request in the portal and 
+approves it post-verification.
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+4.2.1.	 Process Flow Diagram
+ 
+Figure 22: UC-130 Process flow - Move-In as a Tenant
+4.2.2.	Screen Mock-ups
+*	Move-in request list
+ 
+Figure 23: UC-130 Move-In Request list
+*	Create Request -> Select user type (tenant)
+ 
+Figure 24: UC-130 Move-In as a Tenant
+*	Create Request
+ 
+Figure 25: UC-130 Move-In Request form - Tenant
+*	Document Upload
+ 
+Figure 26: UC-130 Tenant Move-in - Document Upload
+4.2.3.	Field Level Specification
+Table 18: UC-130 Form Field Specification - Move-in Tenant
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Master 
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Master 
+Communities
+-
+2
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Communities
+-
+3
+Tower
+Drop 
+Down
+ID
+M
+Y
+LOV of Tower
+-
+4
+Unit
+Drop 
+Down
+ID
+M
+Y
+LOV of Unit
+-
+5
+First Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+6 
+Middle Name
+Textbox
+varchar (35)
+O
+N
+Auto Populated
+-
+7
+Last Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+8
+Mobile 
+Number
+Textbox
+Numeric (20)
+M
+N
+Auto Populated
+-
+9
+Email ID
+Textbox
+Alphanumeric 
+(100)
+M
+Y
+For search
+-
+10
+Move-in Date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+It should be > today’s 
+date.
+-
+11
+Emirates ID 
+Number
+Textbox
+Numeric (25)
+M
+Y
+
+-
+12
+Emirates ID 
+Expiry date 
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+13
+Tenancy 
+Contract 
+Number
+Textbox
+Alphanumeric 
+(50)
+M
+Y
+
+-
+14
+Tenancy 
+contracts start 
+date 
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+15
+Tenancy 
+contract end 
+date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+16
+Adults
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+Minimum 1 
+Maximum 6
+-
+17
+Children
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+Minimum 0 
+Maximum 6
+-
+18
+Household 
+staff(s)
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+Minimum 0 
+Maximum 4
+-
+19
+Pets
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+Minimum 0 
+Maximum 6
+-
+20
+People of 
+determination
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+
+-
+21
+People of 
+determination 
+details
+Textbox
+
+O
+Y
+Minimum 0 
+Maximum 6
+-
+22
+Emirates ID 
+Front
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+23
+Emirates ID 
+Back
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+24
+Ejari
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+
+4.2.4.	Validation
+*	All fields marked as mandatory must be validated before submission.
+*	Tenant’s email must be registered in the system and match One App user details.
+*	All inputs must follow the same validation logic as implemented in the mobile app (e.g. date 
+format, number of digits, type checks).
+*	The system must check for any non-cancelled or non-rejected move-in request with overlapping 
+time periods for the same unit.
+*	Upon successful request creation, Tenant and Community Team must be notified.
+*	All actions (create, validate, approve) must be logged in the history panel 
+4.2.5.	Business rule
+*	Only Community Admins can create move-in requests from the back-office.
+*	Move-in requests can be raised even if a move-out request (any status) exists for the same unit.
+*	A new request can be raised even if other customers have move-in requests for the same unit.
+*	A customer cannot have more than one active move-in request for the same unit with 
+overlapping time periods unless earlier requests are Cancelled or Rejected.
+*	On form submission or screen open, a popup must display if there are overlapping move-in 
+requests (excluding cancelled/rejected) for the same unit.
+*	If a valid overlapping request exists, admin must first mark that request as "Move-out" before 
+submitting a new one.
+*	Two move-in requests in Approved status cannot coexist with overlapping time for the same 
+unit.
+*	If conflict exists, system must prevent approval and guide admin to resolve it manually.
+*	At the time of actual move-in, the permit must be presented to Security, who then marks the 
+request as Closed, updating the unit’s status to Occupied.
+*	Should be visible in confirmation pop-up upon submission.
+4.2.6.	Processing
+*	All form-level and business-level validations must pass before submission is accepted.
+*	Clear, contextual error messages must be displayed if any rule or condition fails.
+*	Upon submission:
+o	Move-in Request ID is generated
+o	Status = Approved
+o	History panel is updated
+o	Request is synced to mobile application
+*	While opening a request for processing, a popup alert with count and details of overlapping 
+move-in requests must be displayed.
+*	Move-in permit is generated 
+4.2.7.	Notification Template
+Table 19: UC-130 Notification Templates Move-in Tenant
+Step
+Customer
+Mode
+Template
+Move in 
+request 
+Tenant
+Push notification
+A new move-in request (<Reference ID>) has 
+been created and approved by Community 
+Admin. Tap here to view your request.
+Move in 
+request 
+Community 
+Recipients
+Email notification
+Business to Provide
+4.2.8.	Integration Requirements
+NA
+4.2.9.	Acceptance Criteria
+Table 20: UC-130 Acceptance Criteria
+S. No.
+Criteria
+1
+Move-in Permit should be generated only after the admin approve the move request
+2
+It should be possible to execute all the processing steps as described in this use case 
+above. 
+3
+Notifications should be triggered.
+
+4.3.	Use-Case UC-131: Move-In on behalf of HHO Unit
+Table 21: UC-131 Move-In on behalf of HHO Unit
+Use Case  
+Create Move-in request for HHO-Unit from back-office portal
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Community Admin initiates a Move-in Request for an HHO-Unit 
+(Company-owned Unit) via the Back-office Portal.
+Pre-conditions
+*	The HHO owner is registered in One App and has login 
+credentials.
+*	The unit is vacant, with no active move-in request (of any type) 
+for overlapping dates.
+*	Community Admin is authenticated in the Back-office Portal
+Post-conditions
+*	A Move-in Request for HHO-Unit is successfully created and 
+auto-approved.
+*	A Move-in Permit is generated and visible.
+*	Notifications are sent to the owner and relevant community 
+team.
+*	The request appears in the Move-in Dashboard and is logged 
+in the history panel.
+Main Success Scenario
+*	Community Admin logs into the Back-office Portal.
+*	Navigates to Move-in Dashboard > Create Request.
+*	Selects Move-in Type = HHO-Unit.
+*	Enters Property (Unit) Details:
+o	Master Community
+o	Community
+o	Tower / Street
+o	Unit Number
+*	System auto-populates Owner Details (non-editable):
+o	First Name
+o	Middle Name
+o	Last Name
+o	Mobile Number
+o	Email ID
+*	Admin selects the Move-in Date.
+*	Fills in Unit Permit Details:
+o	Unit Permit Number
+o	Unit Permit Start Date
+o	Unit Permit End Date
+*	Uploads the Unit Permit Document (PDF/JPG/PNG).
+*	Submits the request.
+*	System validates all inputs, checks for overlaps, auto-approves 
+the request, and generates a Move-in Permit and Request ID.
+Alternate Flow
+If the HHO-Unit (Owner) has not registered:
+*	Community Admin guides the tenant to:
+o	Download and register on the One App
+o	Submit a move-in request via the app
+*	Admin reviews the submitted request in the portal and 
+approves it post-verification.
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+4.3.1.	 Process Flow Diagram
+ 
+Figure 27: UC-131 Process flow - Move-In as an HHO-Unit
+4.3.2.	Screen Mock-ups
+*	Move-in request list
+ 
+Figure 28: UC-131 Move-In Request list
+*	Create Request -> Select user type
+ 
+Figure 29: UC-131 Move-In as HHO-Unit
+*	Create Request
+ 
+Figure 30: UC-131 Move-In Request form – HHO Unit
+
+4.3.3.	Field Level Specification
+Table 22: UC-131 Form Field Specification - Move-in HHO-Unit
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Master 
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Master 
+Communities
+-
+2
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Communities
+-
+3
+Tower
+Drop 
+Down
+ID
+M
+Y
+LOV of Tower
+-
+4
+Unit
+Drop 
+Down
+ID
+M
+Y
+LOV of Unit
+-
+5
+First Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+6 
+Middle Name
+Textbox
+varchar (35)
+O
+N
+Auto Populated
+-
+7
+Last Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+8
+Mobile 
+Number
+Textbox
+Numeric (20)
+M
+N
+Auto Populated
+-
+9
+Email ID
+Textbox
+Alphanumeric 
+(100)
+M
+N
+Auto Populated
+-
+10
+Move-in Date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+It should be > today’s 
+date.
+-
+11
+Emirates ID 
+Number
+Textbox
+Numeric (25)
+M
+Y
+
+-
+12
+Emirates ID 
+Expiry date 
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+13
+Unit Permit 
+Number
+Textbox
+Alphanumeric 
+(50)
+M
+Y
+
+-
+14
+Unit Permit 
+start date 
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+15
+Unit Permit 
+end date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+16
+Unit Permit
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+
+4.3.4.	Validation
+*	Mandatory Fields must be filled in, including move-in date and unit permit details.
+*	File Validation for uploaded documents (format, size, mandatory presence).
+*	Notification Trigger: Upon creation, notify:
+o	The HHO-Unit owner (via One App)
+o	Community Recipients 
+*	History Panel Logging
+*	No overlapping active move-in requests should exist for the same unit.
+4.3.5.	Business rule
+*	Only permitted admins can create HHO-unit move-in requests.
+*	Prior move-out status does not block creation.
+*	Admin can raise requests even if other users have pending ones, unless they overlap.
+*	If a move-in request (other than cancelled/rejected) already exists with overlapping dates, new 
+request cannot be approved.
+*	Submission confirmation should display the move-in request number.
+*	Admin should see a popup alert showing count and details of existing overlapping requests 
+before approval.
+*	If unit is vacant but overlapping active move-in exists, admin must manually close/move-out the 
+previous one before submitting.
+*	System must block approval if another approved move-in exists for same unit and dates.
+*	Move-in permit must be presented to security, who will then mark the unit as Occupied by 
+closing the request.
+4.3.6.	Processing
+*	Request cannot proceed unless all system and business logic conditions are satisfied.
+*	User-friendly messages should display reasons for failed submissions (e.g. overlapping request 
+exists).
+*	If validation passes, system:
+o	Automatically approves the request
+o	Updates status
+o	Logs it in history
+o	Generates and attaches permit
+*	Move-in permit (PDF or printable) is generated upon creation.
+*	Request ID and status must be reflected both in:
+o	Admin portal
+o	One App (mobile view)
+*	On processing screen, admin should be alerted if conflicting requests exist (even if they're not 
+blocking creation)..
+4.3.7.	Notification Template
+Table 23: UC-131 Notification Templates Move-in HHO-Unit
+Step
+Customer
+Mode
+Template
+Move in 
+request 
+HHO-Unit
+Push notification
+A new move-in request (<Reference ID>) has 
+been created and approved by Community 
+Admin. Tap here to view your request.
+Move in 
+request 
+Community 
+Recipients
+Email notification
+Business to Provide
+4.3.8.	Integration Requirements
+NA
+4.3.9.	Acceptance Criteria
+Table 24: UC-131 Acceptance Criteria
+S. No.
+Criteria
+1
+Move-in Permit should be generated only after the admin approve the move request
+2
+It should be possible to execute all the processing steps as described in this use case 
+above. 
+3
+Notifications should be triggered.
+
+4.4.	Use-Case UC-132: Move-In on behalf of HHO Company
+Table 25: UC-132 Move-In on behalf of HHO Company
+Use Case  
+Create Move-in request for HHO-Company from back-office portal
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Community Admin initiates a Move-in Request for an HHO-Company 
+(corporate lease/ownership) via the Back-office Portal.
+Pre-conditions
+*	The HHO owner is registered in One App and has valid login 
+credentials.
+*	The unit is vacant, and there is no active move-in request 
+(approved or pending) for the unit in overlapping date range.
+*	Community Admin is logged into the Back-office Portal with 
+valid permissions.
+Post-conditions
+*	A Move-in Request is successfully created and auto-approved 
+for the HHO-Company.
+*	A Move-in Permit is generated.
+*	Notifications are sent to the relevant user and community 
+team.
+*	The request is visible in both the Move-in dashboard and One 
+App and is recorded in the history panel.)
+Main Success Scenario
+*	Community Admin logs into the Back-office Portal.
+*	Navigates to Move-in Dashboard > Create Request.
+*	Selects Move-in Type = HHO-Company.
+*	Enters Property (Unit) Details:
+o	Master Community
+o	Community
+o	Tower / Street
+o	Unit Number
+*	Enters user email ID, which auto-populates:
+o	First Name
+o	Middle Name
+o	Last Name
+o	Mobile Number
+o	Email ID
+*	Fills in Move-in Details:
+o	Representative Name
+o	Company Name
+o	Company Email ID
+o	Office Contact Number (with country code)
+o	Trade License Number
+o	Trade License Expiry Date
+o	Lease Start Date
+o	Lease End Date
+o	Nationality
+o	Emirates ID Number
+o	Emirates ID Expiry Date
+o	DTCM Start Date
+o	DTCM End Date
+*	Selects Move-in Date
+*	Uploads documents:
+o	Emirates ID (Front & Back)
+o	DTCM Certificate
+o	Company Trade License
+*	Submits the request.
+*	System performs validations and:
+o	Auto-approves the request
+o	Generates Move-in Permit
+o	Displays request number
+o	Logs in history panel
+Alternate Flow
+If the HHO-Company has not registered:
+*	Community Admin guides the tenant to:
+o	Download and register on the One App
+o	Submit a move-in request via the app
+*	Admin reviews the submitted request in the portal and 
+approves it post-verification.
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+4.4.1.	 Process Flow Diagram
+ 
+Figure 31: UC-132 Process flow - Move-In as an HHO-Company
+4.4.2.	Screen Mock-ups
+*	Move-in request list
+ 
+Figure 32: UC-132 Move-In Request list
+*	Create Request -> Select user type
+ 
+Figure 33: UC-132 Move-In as an HHO-Company
+*	Create Request
+ 
+Figure 34: UC-132 Move-In Request form - HHO-Company
+*	Document Upload
+ 
+Figure 35: UC-132 HHO-Company Move-in - Document Upload
+4.4.3.	Field Level Specification
+Table 26: UC-132 Form Field Specification – Move-in HHO-Company
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Master 
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Master 
+Communities
+-
+2
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Communities
+-
+3
+Tower
+Drop 
+Down
+ID
+M
+Y
+LOV of Tower
+-
+4
+Unit
+Drop 
+Down
+ID
+M
+Y
+LOV of Unit
+-
+5
+First Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+6 
+Middle Name
+Textbox
+varchar (35)
+O
+N
+Auto Populated
+-
+7
+Last Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+8
+Mobile 
+Number
+Textbox
+Numeric (20)
+M
+N
+Auto Populated
+-
+9
+Email ID
+Textbox
+Alphanumeric 
+(100)
+M
+Y
+For search
+-
+10
+Move-in Date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+It should be > today’s 
+date.
+-
+11
+Emirates ID 
+Number
+Textbox
+Numeric (25)
+M
+Y
+
+-
+12
+Emirates ID 
+Expiry date 
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+13
+Trade license 
+number
+Textbox
+Alphanumeric 
+(50)
+M
+Y
+
+-
+14
+Trade license 
+expiry date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+15
+Lease start 
+date 
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+16
+Lease end date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+
+17
+Representative 
+Name
+Textbox
+varchar (100)
+M
+Y
+
+
+18
+Company 
+Textbox
+varchar (100)
+M
+Y
+
+
+19
+Company 
+email ID
+Textbox
+Alphanumeric 
+(100)
+M
+Y
+
+
+20
+office number
+
+
+M
+Y
+
+
+21
+Nationality
+Drop 
+Down
+
+M
+Y
+
+
+22
+DTCM Start 
+Date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+
+23
+DTCM End 
+Date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+
+24
+Emirates ID 
+Front
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+25
+Emirates ID 
+Back
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+26
+Ejari
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+27
+Company 
+Trade License
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+
+4.4.4.	Validation
+*	Mandatory field validation must be enforced for all required inputs.
+*	HHO-Company user and relevant community recipients should receive notification upon request 
+creation.
+*	All transactions must be recorded in the history panel
+*	Form field validation should mirror the logic implemented in the mobile app.
+*	System must detect and block move-in creation if any overlapping approved/pending requests 
+already exist (excluding canceled/rejected).
+4.4.5.	Business rule
+*	Only authorized Community Admins can create HHO-Company move-in requests.
+*	Move-in requests can be initiated regardless of any move-out status.
+*	Requests by different users for the same unit are allowed, but only if they do not overlap in time.
+*	If a user has an existing request (not cancelled/rejected) with overlapping dates, the system 
+blocks creation of a new one.
+*	Each move-in request should display its unique request number in all submission and status 
+dialogs.
+*	On approval, a pop-up must display the count of other overlapping move-in requests (excluding 
+rejected/cancelled).
+*	If overlapping exists, Community Admin must first manually mark previous request as ‘Move-
+out’ before creating a new one.
+*	System must prevent two Approved move-in requests for the same unit and date range.
+*	System should not allow approval if any active move-in exists for the same unit and date range.
+*	At time of physical move-in, the Move-in Permit is presented to security, who then closes the 
+request, marking the unit as occupied.
+4.4.6.	Processing
+*	All validations and business rules must be passed before the system allows the move-in request 
+to be raised.
+*	If validation fails, system must display appropriate, clear error messages (e.g., “Overlapping 
+request exists for same unit/date”).
+*	Upon successful submission:
+o	Move-in request ID is generated
+o	Request becomes visible in both Admin and One App
+*	On request screen open, the system should display pop-up with count and details of existing 
+overlapping move-in requests.
+*	A Move-in Permit must be generated immediately upon successful creation.
+*	Permit details and request status should be synced across mobile and portal interfaces.
+4.4.7.	Notification Template
+Table 27: UC-132 Notification Templates Move-in HHO-Company 
+Step
+Customer
+Mode
+Template
+Move in 
+request 
+HHO-
+Company
+Push notification
+A new move-in request (<Reference ID>) has 
+been created and approved by Community 
+Admin. Tap here to view your request.
+Move in 
+request 
+Community 
+Recipients
+Email notification
+
+4.4.8.	Integration Requirements
+NA
+4.4.9.	Acceptance Criteria
+Table 28: UC-132 Acceptance Criteria
+S. No.
+Criteria
+1
+Move-in Permit should be generated only after the admin approve the move request
+2
+It should be possible to execute all the processing steps as described in this use case 
+above. 
+3
+Notifications should be triggered.
+
+5.	Functional Specification FS-70: Approve Move in Request
+When a move-in request is raised by a customer (Owner, Tenant, HHO-Unit, or HHO-Company) via the 
+One App, it is received by the Community Admin through the Back-office Portal. The Community Admin 
+is responsible for reviewing the request and taking appropriate action, such as Request for Information 
+(RFI) or Approval.
+*	UC-133: RFI - Move-in request raised by Owner/Tenant/HHO 
+RFI (Request for Information) – If additional details or clarification are needed from the 
+customer.
+
+*	UC-134: Approve move-in request raised by Owner/Tenant/HHO
+Approval – Once all required information is verified, the move-in request is approved.
+
+5.1.	Use-Case UC-133: RFI for Move-in request raised by Owner/Tenant/HHO
+Table 29: UC-133 RFI for Move-in request raised by Owner/Tenant/HHO
+Use Case  
+RFI of the move-in request raised by Owner/Tenant/HHO/HHC
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Community Admin identifies incomplete or unclear information in a 
+submitted move-in request and initiates RFI (Request for Information).
+Pre-conditions
+*	Customer has submitted a move-in request via One App.
+*	Requests are available and visible to Community Admin via the 
+Back-office Portal.
+*	Community Admin is logged in and has permission to perform 
+RFI actions.
+Post-conditions
+*	Request is marked as RFI Pending.
+*	Customer receives an in-app notification about the RFI.
+*	Customer modifies the request and re-submits ? request 
+status becomes RFI Submitted.
+*	Community Admin is notified of the re-submission.
+Main Success Scenario
+*	Community Admin logs into the Back-office Portal.
+*	Navigates to Move-in Dashboard ? selects Move-in Requests.
+*	Filters/searches requests based on status, property, or date 
+range.
+*	Opens a request that requires further clarification.
+*	Selects the “Mark as RFI” option.
+*	Adds remarks/comments requesting additional information or 
+documentation.
+*	System:
+o	Updates request status to RFI Pending
+o	Sends notification to the customer via One App
+o	Logs the RFI action in the history panel
+*	Customer receives the RFI alert and opens the request in the 
+One App.
+*	Customer updates the fields (all except unit details) and re-
+submits.
+*	System:
+o	Changes request status to RFI Submitted
+o	Send a notification to Community Admin
+o	Logs re-submission in the history panel
+Alternate Flow
+*	NA
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+5.1.1.	 Process Flow Diagram
+ 
+Figure 36: UC-133 Process flow - RFI of the move-in request
+5.1.2.	Screen Mock-ups
+NA
+5.1.3.	Field Level Specification
+Table 30: UC-133 Form Field Specification – RFI of the move-in request
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Comments/Re
+mark
+Textbox
+varchar (35)
+M
+Y
+
+-
+5.1.4.	Validation
+*	RFI can only be triggered for requests in submitted status (not cancelled, rejected, or already 
+approved).
+*	Community Admin must provide remarks when raising an RFI.
+*	Customer can edit all fields except Unit Details.
+*	All transactions must be recorded in the history panel
+5.1.5.	Business rule
+*	Only Community Admin has the authority to raise RFI.
+*	A request should not be proceeded to approval until RFI is satisfactorily addressed.
+*	Status transition must follow:
+o	Submitted ? RFI Pending ? RFI Submitted ? Approved
+*	Requests should not be editable in any other status except RFI Pending by the customer.
+*	Notifications must be sent automatically to all relevant stakeholders on both RFI creation and 
+submission.
+5.1.6.	Processing
+*	System must enforce all validation rules before allowing RFI action
+*	Upon re-submission by the customer:
+o	Status is updated to RFI Submitted
+o	Community Admin is notified automatically
+*	Upon opening the request, Admin/customer should see a clear status badge ("RFI Submitted") 
+and can now review and proceed with approval or further action
+*	App notification should be sent to Customer once the Community admin marks the status as RFI 
+pending 
+*	Customer will update the request and resubmit. App notification should be triggered to the 
+admin notifying for RFI submitted.
+5.1.7.	Notification Template
+Table 31: UC-133 RFI of the move-in request Notification Templates
+Step
+Customer
+Mode
+Template
+RFI Pending 
+Owner 
+/HHO/HHC
+Push notification
+"Your Move-in request (<Reference ID >) 
+requires further information. Tap to view 
+details. "
+RFI Submitted
+Community 
+Admin
+In-App notification
+Move-in request (<Reference ID >) has been 
+updated and waits your approval. 
+5.1.8.	Integration Requirements
+NA
+5.1.9.	Acceptance Criteria
+Table 32: UC-133 Acceptance Criteria
+S. No.
+Criteria
+1
+Community admin should be able to mark the status of the request as RFI pending and the 
+customer is notified 
+2
+Customer should be able to resubmit the request and status is marked as RFI submitted, 
+and the community admin is notified 
+
+5.2.	Use-Case UC-134: Approve move-in request raised by Owner/Tenant/HHO
+Table 33: UC-134 Approve move-in request raised by Owner/Tenant/HHO
+Use Case  
+Approve move-in request raised by Owner/Tenant/HHO/HHC
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Community Admin completes review and validation of move-in 
+request raised via One App.
+Pre-conditions
+*	Customer has submitted a move-in request 
+(Owner/Tenant/HHO/HHC) via One App.
+*	The request is visible in the Back-office Portal.
+*	No active overlapping move-in request exists for the same 
+unit.
+*	Community Admin has necessary permissions to approve.
+Post-conditions
+*	Move-in request is approved.
+*	Move-In Permit (MIP) is generated and valid for 30 days.
+*	Customers and respective community recipients receive 
+notifications.
+*	At time of move-in, security marks request as Closed and unit 
+is linked to the user and marked as occupied
+Main Success Scenario
+*	Community Admin logs in to the Back-office Portal.
+*	Navigates to Move-in dashboard and filters/selects a request.
+*	Opens the move-in request details.
+*	Reviews:
+o	Property/unit details
+o	Customer and supporting documentation
+o	Request status and any RFI submissions
+o	Move-in date and associated metadata
+*	If all validations pass, select Approve.
+*	System:
+o	Updates status to Approved
+o	Generates MIP (valid for 30 days)
+o	Sends app notification to customers
+o	Notifies community recipients
+o	Logs action in history panel
+*	Security team accesses request and marks it as Closed after 
+verifying MIP.
+*	Unit is then linked to the customer and marked as occupied in 
+the system.
+*	If the MIP is not used within 30 days, the system automatically 
+cancels the move-in request
+Alternate Flow
+*	NA
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+5.2.1.	 Process Flow Diagram
+ 
+Figure 37: UC 134 Process flow – Approve move-in request
+5.2.2.	Screen Mock-ups
+NA
+5.2.3.	Field Level Specification
+Table 34: UC-134  Form Field Specification – RFI of the move-in request
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Comments/Re
+mark
+Textbox
+varchar (35)
+M
+Y
+
+-
+5.2.4.	Validation
+*	The status must be updated to Approved upon approval.
+*	MIP must be generated and remain valid for 30 days only.
+*	On the date of actual move-in, the unit must be linked to the user.
+*	All actions must be captured in the history panel:
+*	If any active overlapping move-in request exists, approval is blocked.
+5.2.5.	Business rule
+*	Only one request can be approved for the same unit with overlapping move-in periods.
+*	If an overlapping request exists:
+o	Admin must manually mark previous as Move-out before proceeding.
+o	System must validate that unit is vacant on the requested move-in date.
+*	If move-in periods do not overlap, multiple requests can be approved.
+*	Customer is allowed to raise a move-in request:
+o	Not earlier than 30 days before the move-in date.
+o	Within 30 days after the move-in date.
+*	Once a new move-in request is approved:
+*	All amenity bookings and access cards linked to the previous resident are automatically 
+cancelled.
+5.2.6.	Processing
+*	On approval:
+o	Request status is set to Approved.
+o	MIP is generated and sent to the customer.
+*	App notification must be sent immediately upon approval.
+*	Request becomes visible to Security for closure.
+*	Upon closure, the unit is:
+o	Marked as Occupied
+o	Linked to the new customer
+o	Previous tenant’s access is revoked (access cards/amenities)
+5.2.7.	Notification Template
+Table 35: UC-134 Approve move-in request Notification Templates
+Step
+Customer
+Mode
+Template
+Approve
+Owner/tenant/HHO/HHC
+Push notification
+Your Move-in request has been 
+approved by admin.
+Approve 
+Community Recipients
+Email notification
+
+5.2.8.	Integration Requirements
+NA
+5.2.9.	Acceptance Criteria
+Table 36: UC-134 Acceptance Criteria
+S. No.
+Criteria
+1
+Community admin should be able to approve the request and the customer is notified 
+
+6.	Functional Specification FS-71: Cancel Move in Request by Community admin
+6.1.	Use-Case UC-135: Cancel move-in request raised by Owner/Tenant/HHO
+Table 37: UC-135 Cancel move-in request raised by Owner/Tenant/HHO
+Use Case  
+Cancel move-in request raised by Owner/Tenant/HHO/HHC
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Community Admin identifies an invalid, duplicated, or unqualified 
+move-in request submitted through One App and chooses to cancel it
+Pre-conditions
+*	A move-in request must have been submitted by the customer 
+and is available in the Back-office Portal.
+*	Community Admin is logged in and authorized to perform the 
+cancellation
+Post-conditions
+*	Move-in request is canceled.
+*	Status is updated to Cancelled.
+*	Customer receives a notification with cancellation remarks.
+*	Action is logged in the history panel.
+Main Success Scenario
+*	Community Admin logs into the Back-office Portal.
+*	Navigates to the Move-in dashboard.
+*	Applies filters to locate the relevant move-in request.
+*	Opens the request detail page.
+*	Reviews request details (unit info, customer type, dates, 
+documents).
+*	Selects Cancel option and provides mandatory Cancellation 
+Remarks.
+*	System prompts confirmation via a Yes/No pop-up.
+*	On confirmation:
+o	Status changes to Cancelled
+o	Customer is notified through app/email
+o	Transaction is recorded in the history panel
+Alternate Flow
+*	NA
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+6.1.1.	Process Flow Diagram
+ 
+Figure 38: UC 135 Process flow – Cancel move-in request
+6.1.2.	Screen Mock-ups
+NA
+6.1.3.	Field Level Specification
+Table 38: UC-135 Form Field Specification – Cancel move-in request
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Cancellation 
+Remarks
+Textbox
+varchar (100)
+M
+Y
+
+-
+6.1.4.	Validation
+*	Only requests in Submitted, RFI Submitted, or Approved status can be canceled.
+*	Cancellation Remarks are mandatory before confirming the cancellation.
+*	Confirmation pop-up must be displayed with Yes/No options.
+*	Notification must be sent to customer and reflected in One App
+6.1.5.	Business rule
+*	A request marked Cancelled cannot be modified or re-approved.
+*	A customer may raise a new move-in request for the same unit if the previous one was canceled.
+6.1.6.	Processing
+*	On clicking Cancel, a confirmation pop-up is shown.
+*	Admin must enter remarks and confirm.
+*	System:
+o	Updates status to Cancelled
+o	Sends notification to customer
+*	Logs transaction in history panel
+*	Request is locked from further edits or approvals post-cancellation
+6.1.7.	Notification Template
+Table 39: UC-135 Cancel move-in request Notification Templates
+Step
+Customer
+Mode
+Template
+RFI Pending 
+Owner/tenant 
+/HHO/HHC
+Push notification
+Your Move-in request (<Reference ID >) has 
+been cancelled. 
+6.1.8.	Integration Requirements
+NA
+6.1.9.	Acceptance Criteria
+Table 40: UC-135 Acceptance Criteria
+S. No.
+Criteria
+1
+Community admin should be able to mark the status of the request as cancelled
+
+7.	Functional Specification FS-72: Move in Request Closure
+7.1.	Use-Case UC-136: Closure of approved move in request by the security
+Table 41: UC-136 Closure of Approved move in request by the security
+Use Case  
+Closure of approved move in request by the security team
+Primary Actor(s)
+Security
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Customer arrives at the site for move-in and presents the approved 
+Move-In Permit (MIP) to the security team
+Pre-conditions
+*	The move-in request has been approved by the Community 
+Admin.
+*	The customer presents a valid Move-In Permit to the security 
+team.
+*	The security team has access to the Back-office Portal.
+Post-conditions
+*	The move-in request status is updated to Closed.
+*	The unit is linked to the user.
+*	Any previous user's request is automatically cancelled or 
+invalidated.
+o	Access cards
+o	Amenity bookings
+o	Outstanding move-in/move-out requests
+Main Success Scenario
+*	Security logs in to the Back-office Portal.
+*	Navigates to the Move-in dashboard.
+*	Applies filters (property, status, dates, etc.) to locate the 
+Approved move-in request.
+*	Opens the relevant request detail page.
+*	Verifies request details and MIP.
+*	Select Close option.
+*	A confirmation pop-up with Yes/No options is displayed.
+*	On confirming, request status changes to Closed.
+o	Links the unit to the user.
+o	Marks the unit as Occupied.
+o	Cancel any previous resident’s:
+?	Access cards
+?	Amenity bookings
+?	Open move-in/out requests
+Alternate Flow
+*	NA
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+7.1.1.	 Process Flow Diagram
+ 
+Figure 39: UC-136 Process flow – Close move-in request
+7.1.2.	Screen Mock-ups
+NA
+7.1.3.	Field Level Specification
+Table 42: UC-136  Form Field Specification – Cancel move-in request
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Closure 
+Remarks
+Textbox
+varchar (100)
+M
+Y
+
+-
+7.1.4.	Validation
+*	Closure is permitted only for requests in "Approved" status.
+*	Confirmation pop-up with Yes/No must be presented before closing.
+*	The Move-In Permit must be:
+o	Valid (within 30 days of approval)
+o	Matched with request details
+*	The system must prevent closure of already closed or expired requests
+*	The record should be ordered based on the descending order of the creation date.
+*	All transactions should be captured in the history panel
+7.1.5.	Business rule
+*	Once the move-in request is closed:
+*	It cannot be modified or reprocessed.
+*	The unit is permanently linked to the customer until a move-out occurs.
+*	All previously assigned access cards and amenity bookings (if any) for the same unit must be 
+revoked.
+*	If MIP is expired (older than 30 days), request must be auto cancelled and not be available for 
+closure.
+7.1.6.	Processing
+*	Upon clicking Close, system displays confirmation dialog.
+*	If confirmed:
+o	Status is set to Closed
+o	History is updated
+o	Unit is linked to the user
+o	Prior user access is invalidated
+o	Unit status marked as Occupied by the <Resident Type>
+*	No further action is permitted on the same request.
+*	Security team should be able to view all the approved move-in requests in the back-office portal.
+7.1.7.	Notification Template
+NA
+7.1.8.	Integration Requirements
+NA
+7.1.9.	Acceptance Criteria
+Table 43: UC-136 Acceptance Criteria
+S. No.
+Criteria
+1
+Site security should be able to mark the status of the request as closed
+
+8.	Functional Specification FS-73: Account Renewal Creation from back-office portal
+The Account Renewal module enables customers to extend their access to a community by submitting 
+an account renewal request. This request can be initiated via the OneSobha mobile application and is 
+routed to the Community Admin for review and approval.
+Currently, these requests are processed through SmartFM, and upon approval, access to the respective 
+unit is extended for the user (Owner, Tenant, HHO–Owner, or HHO–Company).
+As per the new requirement, account renewal requests will now be managed within the OneSobha back-
+office portal. Additionally, the Community Admin will have the ability to log a renewal request on behalf 
+of the customer, based on the information shared by the customer.
+*	UC-137: Account Renewal on behalf of Tenant
+*	UC-138: Account Renewal on behalf of HHO Unit
+*	UC-139: Account Renewal on behalf of HHO Company
+8.1.	Use-Case UC-137: Account Renewal on behalf of Tenant
+Table 44: UC-137 Account Renewal on behalf of Tenant
+Use Case  
+Create Account Renewal on behalf of Tenant from back-office portal
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Tenant is due for lease renewal and Community Admin creates the 
+account renewal request from the back-office portal
+Pre-conditions
+*	Tenant is registered in the One App.
+*	Tenant has valid login credentials.
+*	The unit is already linked to the tenant.
+*	Community Admin is logged in and authorized in the Back-
+office Portal
+Post-conditions
+*	The account renewal request is created with status as 
+Approved.
+*	Unit-linking duration is extended based on new tenancy 
+contract.
+*	The unit remains in occupied status
+Main Success Scenario
+*	Community Admin logs into the Back-office Portal.
+*	Navigates to the Account Renewal dashboard.
+*	Clicks on Create Request.
+*	Selects Account Renewal as Tenant.
+*	Selects Unit Details:
+o	Master Community
+o	Community
+o	Tower/Street
+o	Unit Number
+*	System fetches and displays Tenant Details (non-editable):
+o	Email ID
+o	First Name
+o	Middle Name
+o	Last Name
+o	Mobile Number
+*	Admin fills in new lease and resident information:
+o	New Tenancy Contract End Date
+o	Number of Adults
+o	Children
+o	Household Staff
+o	People of Determination
+o	Pets
+*	Uploads Ejari document.
+*	Submits the request.
+*	Request is auto approved
+*	Unit-linking duration is updated
+*	Occupancy status remains active
+Alternate Flow
+If the tenant has not registered:
+*	Community Admin guides the tenant to:
+o	Download and register on the One App
+o	Submit an Account Renewal request via the app
+*	Admin reviews the submitted request in the portal and 
+approves it post-verification.
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+8.1.1.	 Process Flow Diagram
+ 
+Figure 40: UC-137 Process flow – Account Renewal as a Tenant
+8.1.2.	Screen Mock-ups
+*	Account Renewal Request list
+ 
+Figure 41: UC-137 Account Renewal Request list
+*	Create Request -> Select user type (tenant)
+ 
+Figure 42: UC-137 Account Renewal as a Tenant
+*	Create Request
+ 
+Figure 43: UC-137 Account Renewal Request form - Tenant
+8.1.3.	Field Level Specification
+Table 45: UC-137 Form Field Specification - Move-in Tenant
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Master 
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Master 
+Communities
+-
+2
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Communities
+-
+3
+Tower
+Drop 
+Down
+ID
+M
+Y
+LOV of Tower
+-
+4
+Unit
+Drop 
+Down
+ID
+M
+Y
+LOV of Unit
+-
+5
+First Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+6 
+Middle Name
+Textbox
+varchar (35)
+O
+N
+Auto Populated
+-
+7
+Last Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+8
+Mobile 
+Number
+Textbox
+Numeric (20)
+M
+N
+Auto Populated
+-
+9
+Email ID
+Textbox
+Alphanumeric 
+(100)
+M
+Y
+Auto Populated
+-
+10
+Tenancy 
+contract end 
+date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+11
+Adults
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+Minimum 1 
+Maximum 6
+-
+12
+Children
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+Minimum 0 
+Maximum 6
+-
+13
+Household 
+staff(s)
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+Minimum 0 
+Maximum 4
+-
+14
+Pets
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+Minimum 0 
+Maximum 6
+-
+15
+People of 
+determination
+Increment 
+or 
+decremen
+t option
+Number
+O
+Y
+
+-
+16
+People of 
+determination 
+details
+Textbox
+
+O
+Y
+Minimum 0 
+Maximum 6
+-
+17
+Ejari
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+
+8.1.4.	Validation
+*	All required fields must be completed before the request can be submitted.
+*	All form fields should follow the same validation rules as implemented in the mobile application 
+(e.g., format, length, data type).
+*	The unit must already be associated with the tenant requesting the renewal.
+*	A valid Ejari document must be uploaded as part of the request.
+*	The tenant must exist in the system and have an active, valid account.
+*	A Move-Out request must not already exist for the same user and unit; renewal cannot proceed 
+in such cases.
+*	All transactions should be captured in the history panel.
+8.1.5.	Business rule
+*	Only Community Admins with permission can create the request from back-office portal
+*	Renewal date must be after current tenancy end date.
+*	New tenancy end date extends unit-tenant linkage duration.
+*	On submission:
+o	System assigns new tenancy period.
+o	Unit remains occupied.
+o	Tenant continues to access services and features.
+*	A move-in request is not required for renewals.
+*	Notification sent to Tenant
+*	If a customer raises an Account Renewal request and the status of that request is in any other 
+status than cancelled or rejected, it is not possible for him to raise another Account Renewal 
+request for the same unit.
+8.1.6.	Processing
+*	On clicking Submit, system:
+o	Validates inputs
+o	Auto-approves request
+o	Updates unit-tenant mapping
+o	Marks unit as occupied
+*	Logs action in history panel
+*	Record is created in Account Renewal dashboard
+*	Notification is triggered to tenant 
+8.1.7.	Notification Template
+Table 46: UC-137 Tenant Move-in Notification Templates
+Step
+Customer
+Mode
+Template
+Account 
+Renewal 
+Tenant
+Push notification
+A new account renewal request (<Reference 
+ID>) has been Created. Tap here to view your 
+request.
+8.1.8.	Integration Requirements
+NA
+8.1.9.	Acceptance Criteria
+Table 47: UC-137 Acceptance Criteria
+S. No.
+Criteria
+1
+Community Admin should be able to create the account renewal request from the back-
+office portal only when all the validations and business rules described above is met
+2
+It should be possible to execute all the processing steps as described in this use case 
+above.
+3
+Notifications should be triggered.
+
+8.2.	Use-Case UC-138: Account Renewal on behalf of HHO Unit
+Table 48: UC-138 Account Renewal on behalf of HHO Unit
+Use Case  
+Admin request for Account Renewal on behalf of HHO-unit
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+HHO-Unit renewal is due, and the Community Admin initiates the 
+process through the back-office porta
+Pre-conditions
+*	HHO-Unit (Owner) is registered in the One App.
+*	HHO-Unit (Owner) has valid login credentials.
+*	Unit is not vacant and linked to HHO-Unit.
+*	Community Admin has access to the Back-office Portal.
+Post-conditions
+*	Account Renewal request is created with Approved status.
+*	Unit permit end date is updated in the system.
+*	The unit remains in Occupied status
+Main Success Scenario
+*	Community Admin logs into the Back-office Portal.
+*	Navigates to the Account Renewal Dashboard.
+*	Clicks on Create Request.
+*	Selects Account Renewal as HHO-Unit.
+*	Selects the unit:
+o	Master Community
+o	Community
+o	Tower/Street
+o	Unit Number
+*	System auto-populates Owner Details (non-editable):
+o	First Name
+o	Middle Name
+o	Last Name
+o	Mobile Number
+o	Email ID
+*	Admin selects the New Move-in Date (effective renewal date).
+*	Provides updated Unit Permit End Date
+*	Uploads Unit Permit
+*	Clicks Submit.
+*	Request is auto approved
+*	Unit remains active and linked
+Alternate Flow
+If the HHO-unit (Owner) has not registered:
+*	Community Admin guides the tenant to:
+o	Download and register on the One App
+o	Submit a account Renewal request via the app
+*	Admin reviews the submitted request in the portal and 
+approves it post-verification.
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+8.2.1.	 Process Flow Diagram
+ 
+Figure 44: UC-138 Process flow – Account Renewal as an HHO-Unit
+8.2.2.	Screen Mock-ups
+*	Account Renewal Request list
+ 
+Figure 45: UC-138 Account Renewal Request list
+*	Create Request -> Select user type (HHO-Unit)
+ 
+Figure 46: UC-138 Account Renewal as an HHO-Unit
+*	Create Request
+ 
+Figure 47: UC-138 Move-In Request form - HHO-Unit
+
+8.2.3.	Field Level Specification
+Table 49: UC-138 Form Field Specification - Move-in HHO-Unit
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Master 
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Master 
+Communities
+-
+2
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Communities
+-
+3
+Tower
+Drop 
+Down
+ID
+M
+Y
+LOV of Tower
+-
+4
+Unit
+Drop 
+Down
+ID
+M
+Y
+LOV of Unit
+-
+5
+First Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+6 
+Middle Name
+Textbox
+varchar (35)
+O
+N
+Auto Populated
+-
+7
+Last Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+8
+Mobile 
+Number
+Textbox
+Numeric (20)
+M
+N
+Auto Populated
+-
+9
+Email ID
+Textbox
+Alphanumeric 
+(100)
+M
+N
+Auto Populated
+-
+10
+Unit Permit 
+end date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+11
+Unit Permit
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+
+8.2.4.	Validation
+*	All mandatory fields must be filled.
+*	HHO-Unit must be linked to the unit.
+*	Uploaded document must meet format and completeness checks.
+*	Admin user must have permission to act on behalf of HHO-Unit.
+*	Move-Out requests should not be created by the same user for the same unit.
+*	All transactions should be captured in the history panel
+8.2.5.	Business rule
+*	Only Community Admins with permission can initiate renewal from back-office portal.
+*	Unit Permit End Date must be a future date from current expiry.
+*	Renewal extends the valid occupancy period.
+*	Unit status remains Occupied.
+*	App Notification sent to user for successful renewal approval with unique reference number 
+*	If a customer raises an Account Renewal request and the status of that request is in any other 
+status than cancelled or rejected, it is not possible for him to raise another Account Renewal 
+request for the same unit.
+8.2.6.	Processing
+*	On clicking Submit:
+o	Validations and business rules are executed.
+o	Request is created with Approved status.
+o	Unit’s permit date is extended.
+*	Request appears in Account Renewal Dashboard.
+*	Notifications are sent to HHO-Unit Owner 
+8.2.7.	Notification Template
+Table 50: UC-138 HHO-Unit Account Renewal Notification Templates
+Step
+Customer
+Mode
+Template
+Account 
+Renewal 
+HHO Unit
+Push notification
+A new account renewal request (<Reference 
+ID>) has been Created. Tap here to view your 
+request.
+8.2.8.	Integration Requirements
+NA
+8.2.9.	Acceptance Criteria
+Table 51: UC-138 Acceptance Criteria
+S. No.
+Criteria
+1
+Community Admin should be able to create the account renewal request from the back-
+office portal only when all the validations and business rules described above is met
+2
+It should be possible to execute all the processing steps as described in this use case 
+above.
+3
+Notifications should be triggered.
+
+
+8.3.	Use-Case UC-139: Account Renewal on behalf of HHO Company
+Table 52: UC-139 Account Renewal on behalf of HHO Company
+Use Case  
+Admin request for Account Renewal on behalf of HHO Company
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+HHO Company’s lease or license is due for renewal and admin initiates 
+the request via the back-office portal
+Pre-conditions
+*	HHO-Company is registered in the One App.
+*	HHO-Company has valid login credentials.
+*	Unit is linked and not vacant.
+*	Community Admin has access to the Back-office Portal
+Post-conditions
+*	Account Renewal request is successfully created with 
+Approved status.
+*	Unit remains in Occupied status.
+*	Lease, license, and DTCM records are updated in the system
+Main Success Scenario
+*	Community Admin logs into the Back-office Portal.
+*	Navigates to the Account Renewal Dashboard.
+*	Clicks on Create Request.
+*	Selects Account Renewal as HHO Company.
+*	Selects the unit:
+o	Master Community
+o	Community
+o	Tower/Street
+o	Unit Number
+*	System auto-populates HHO Company Details (non-editable):
+o	First Name
+o	Middle Name
+o	Last Name
+o	Mobile Number
+o	Email ID
+*	Enters Renewal Details:
+o	Trade License Expiry Date
+o	Lease End Date
+o	DTCM End Date
+*	Uploads required documents:
+o	DTCM Document
+o	Trade License
+*	Clicks Submit.
+*	Request is created and auto-approved
+*	Unit remains active and assigned
+Alternate Flow
+If the HHO-Company has not registered:
+*	Community Admin guides the tenant to:
+o	Download and register on the One App
+o	Submit an account renewal request via the app
+*	Admin reviews the submitted request in the portal and 
+approves it post-verification.
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+8.3.1.	 Process Flow Diagram
+ 
+Figure 48: UC-139 Process flow – Account Renewal as an HHO-Company
+8.3.2.	Screen Mock-ups
+*	Account Renewal Request list
+ 
+Figure 49: UC-139 Account Renewal Request list
+*	Create Request -> Select user type (HHO-Unit)
+ 
+Figure 50: UC-139 Account Renewal as an HHO-Unit
+*	Create Request
+ 
+Figure 51: UC-139 Account Renewal Request form - HHO-Company
+*	Document Upload
+ 
+Figure 52: UC-139 HHO-Company Move-in - Document Upload
+8.3.3.	Field Level Specification
+Table 53: UC-139 Form Field Specification – Move-in HHO-Company
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Master 
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Master 
+Communities
+-
+2
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Communities
+-
+3
+Tower
+Drop 
+Down
+ID
+M
+Y
+LOV of Tower
+-
+4
+Unit
+Drop 
+Down
+ID
+M
+Y
+LOV of Unit
+-
+5
+First Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+6 
+Middle Name
+Textbox
+varchar (35)
+O
+N
+Auto Populated
+-
+7
+Last Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+8
+Mobile 
+Number
+Textbox
+Numeric (20)
+M
+N
+Auto Populated
+-
+9
+Email ID
+Textbox
+Alphanumeric 
+(100)
+M
+Y
+For search
+-
+10
+Move-in Date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+It should be > today’s 
+date.
+-
+11
+Emirates ID 
+Number
+Textbox
+Numeric (25)
+M
+Y
+
+-
+12
+Emirates ID 
+Expiry date 
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+13
+Trade license 
+number
+Textbox
+Alphanumeric 
+(50)
+M
+Y
+
+-
+14
+Trade license 
+expiry date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+15
+Lease start 
+date 
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+-
+16
+Lease end date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+
+17
+Representative 
+Name
+Textbox
+varchar (100)
+M
+Y
+
+
+18
+Company 
+Textbox
+varchar (100)
+M
+Y
+
+
+19
+Company 
+email ID
+Textbox
+Alphanumeric 
+(100)
+M
+Y
+
+
+20
+office number
+
+
+M
+Y
+
+
+21
+Nationality
+Drop 
+Down
+
+M
+Y
+
+
+22
+DTCM Start 
+Date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+
+23
+DTCM End 
+Date
+Date 
+picker
+DD/MM/YYYY
+M
+Y
+
+
+24
+Emirates ID 
+Front
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+25
+Emirates ID 
+Back
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+26
+Ejari
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+27
+Company 
+Trade License
+File 
+Upload
+Attachment
+M
+Y
+One Sobha APP 
+standard validation
+-
+
+8.3.4.	Validation
+*	Mandatory field checks must be enforced.
+*	Request can only be created for linked and occupied units.
+*	Admin user must have appropriate permission.
+*	All actions must be logged in the history panel.
+*	Move-Out requests should not be created by the same user for the same unit.
+*	All transactions should be captured in the history panel
+*	Form filed validation as implemented in mobile app 
+8.3.5.	Business rule
+*	Community Admins are the only roles allowed to raise renewal for HHO Companies.
+*	System must prevent duplicate active renewal for the same unit with overlapping durations.
+*	System must ensure unit stays in Occupied status post-renewal.
+*	System auto updates duration and maintain status as “occupied” for the unit until next expiry 
+date.
+*	App Notification sent to user for successful renewal approval with unique reference number 
+*	If a customer raises an Account Renewal request and the status of that request is in any other 
+status than cancelled or rejected, it is not possible for him to raise another Account Renewal 
+request for the same unit.
+8.3.6.	Processing
+*	Upon clicking Submit:
+o	Validations and business rules are applied.
+o	Request status is set to Approved.
+*	History panel records transaction.
+*	Request appears in the Account Renewal dashboard.
+*	Notifications are sent accordingly.
+8.3.7.	Notification Template
+Table 54: UC-139 HHO-Unit Account Renewal Notification Templates
+Step
+Customer
+Mode
+Template
+Account 
+Renewal 
+HHO 
+Company
+Push notification
+A new account renewal request (<Reference 
+ID>) has been Created. Tap here to view your 
+request.
+8.3.8.	Integration Requirements
+NA
+8.3.9.	Acceptance Criteria
+Table 55: UC-139 Acceptance Criteria
+S. No.
+Criteria
+1
+Community Admin should be able to create the account renewal request from the back-
+office portal only when all the validations and business rules described above is met
+2
+It should be possible to execute all the processing steps as described in this use case 
+above.
+3
+Notifications should be triggered.
+
+
+
+9.	Functional Specification FS-74: Approve Account Renewal 
+When a Account Renewal request is raised by a customer (Tenant, HHO, or HHC) through the mobile 
+app, it is received by the Community Admin via the Backoffice Portal. The Community Admin then 
+performs the following actions:
+*	UC-140: RFI – Account Renewal request raised by Owner/Tenant/HHO
+*	UC-141: Approve Account Renewal request raised by Tenant/HHO
+9.1.	Use-Case UC-140: RFI for Account Renewal request raised by Tenant/HHO
+Table 56: UC-140 RFI for Account Renewal request raised by Tenant/HHO
+Use Case  
+RFI for Account Renewal request raised by Tenant/HHO
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Admin requires additional clarification or documentation to process 
+the account renewal request
+Pre-conditions
+*	Customer has submitted the Account Renewal request via 
+mobile app.
+*	Community Admin has received and accessed the request via 
+Back-office Portal.
+Post-conditions
+*	Request is marked as RFI Pending.
+*	Notification is sent to the Customer via app.
+*	Customer modifies the necessary information (except unit 
+details) and re-submits.
+*	Request status is updated to RFI Submitted.
+*	Community Admin is notified.
+Main Success Scenario
+*	Community Admin logs in to the Back-office Portal.
+*	Navigates to Account Renewal Dashboard.
+*	Filters and locates the Account Renewal Request.
+*	Reviews the request details.
+*	Identifies missing/incomplete/incorrect information.
+*	Marks the request as RFI Pending and adds comments.
+*	System sends push notification to the customer with RFI status 
+and comments.
+*	Customer logs in to mobile app, views the request in RFI 
+status.
+*	Customer can edit all fields except unit details.
+*	Upon resubmission, the request status becomes RFI 
+Submitted.
+*	Community Admin receives notification for the resubmitted 
+request.
+Alternate Flow
+*	NA
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+9.1.1.	 Process Flow Diagram
+ 
+Figure 53: UC-140 Process flow - RFI of the Account Renewal Request
+9.1.2.	Screen Mock-ups
+NA
+9.1.3.	Field Level Specification
+Table 57: UC-140 Form Field Specification – RFI of the Account Renewal request
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Comments/Re
+mark
+Textbox
+varchar (35)
+M
+Y
+
+-
+9.1.4.	Validation
+*	Admin can only add the comments and mark request as RFI pending.
+*	Admin can mark the status as RFI in case additional information is required
+*	Customer should receive notification when the Community admin marks the status as RFI 
+pending 
+*	All transactions should be captured in the history panel
+*	Resubmitted request should reappear in Admin dashboard with “RFI Submitted” status
+9.1.5.	Business rule
+*	Community Admin can initiate RFI only for requests in Submitted or RFI Submitted status.
+*	Only one active RFI per request is allowed at a time.
+*	Customer must be notified via app.
+*	No auto-approval or auto-rejection while request is in RFI Pending state.
+9.1.6.	Processing
+*	On marking requests as RFI, status of request should be changed to RFI Pending.
+*	This request should be available in app for user with status “RFI Pending” 
+*	App notification should be sent to Customer once the Community admin marks the status as RFI 
+pending 
+*	Customer will update the request and resubmit. App notification should be triggered to the 
+community admin notifying for RFI submitted.
+*	On resubmission, request status is updated to RFI Submitted
+*	
+9.1.7.	Notification Template
+Table 58: UC-140 RFI of the Account Renewal request Notification Templates
+Step
+Customer
+Mode
+Template
+RFI Pending 
+Owner 
+/HHO/HHC
+Push notification
+"Your Account Renewal request (<Reference 
+ID >) requires further information. Tap to view 
+details. "
+RFI Submitted
+Community 
+Admin
+In-App notification
+Account Renewal request (<Reference ID >) 
+has been updated and waits your approval. 
+9.1.8.	Integration Requirements
+NA
+9.1.9.	Acceptance Criteria
+Table 59: UC-140 Acceptance Criteria
+S. No.
+Criteria
+1
+Community admin should be able to mark the status of the request as RFI pending and the 
+customer is notified 
+2
+Customer should be able to resubmit the request and status is marked as RFI submitted, 
+and the community admin is notified 
+
+9.2.	Use-Case UC-141: Approve Account Renewal request raised by Tenant/HHO
+Table 60: UC-141 Approve Account Renewal request raised by Tenant/HHO
+Use Case  
+Approve Account Renewal request raised by Tenant/HHO/HHC
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Customer submits the Account Renewal request through the mobile 
+app.
+Pre-conditions
+*	Customer has submitted the account renewal request via the 
+mobile app.
+*	Community Admin has access to the back-office portal.
+*	Unit is already linked to the customer.
+Post-conditions
+*	Request status is updated to Approved.
+*	Customer is notified via app notification.
+*	Unit linking duration is extended and unit status remains as 
+Occupied.
+*	History panel reflects the approval action.
+Main Success Scenario
+*	Community Admin logs in to the Back-office Portal.
+*	Navigates to the Account Renewal Dashboard.
+*	Applies filters (property, status, dates) to locate the request.
+*	Selects and reviews the Account Renewal Request.
+*	Verifies all mandatory documents and information.
+*	Marks the request as Approved.
+*	System updates the unit linking duration and maintains the 
+unit as Occupied.
+*	System triggers app notification to the customer confirming 
+approval.
+*	Approval action is logged in the history panel.
+Alternate Flow
+*	NA
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+9.2.1.	 Process Flow Diagram
+ 
+Figure 54: UC-141 Process flow – Approve Account Renewal request
+9.2.2.	Screen Mock-ups
+NA
+9.2.3.	Field Level Specification
+Table 61: UC-141 Form Field Specification – RFI of the Account Renewal  request
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Comments/Re
+mark
+Textbox
+varchar (35)
+M
+Y
+
+-
+9.2.4.	Validation
+*	All mandatory fields and documents must be reviewed before approval.
+*	The unit must be in an "Occupied" state and already linked to the customer.
+*	Upon confirmation, the request status must be changed to "Approved."
+*	A push notification should be sent to the customer after approval.
+*	The final status of the request must be marked as "Approved."
+*	The same user must currently occupy the unit to be eligible for renewal.
+*	 Move-Out requests should not exist for the same unit and user.
+*	All interactions must be recorded in the history panel.
+*	Upon approval, the Unit Linking Duration must be updated and the unit’s status retained as 
+“Occupied.”
+9.2.5.	Business rule
+*	Upon approval, the system must automatically update the linking duration and maintain the 
+unit’s status as “Occupied” until the next expiry date.
+9.2.6.	Processing
+*	When a move-in renewal request is marked as approved:
+o	The request status is updated to Approved.
+o	The account renewal process is completed in the system.
+o	A notification is triggered and sent to the customer.
+o	The Unit Linking Duration is updated accordingly, and the unit’s Occupied status is 
+retained.
+9.2.7.	Notification Template
+Table 62: UC-141 Approve Account Renewal Request Notification Templates
+Step
+Customer
+Mode
+Template
+Approve
+Owner/tenant/HHO/HHC
+Push notification
+Your Account Renewal request has 
+been approved by admin.
+9.2.8.	Integration Requirements
+NA
+9.2.9.	Acceptance Criteria
+Table 63: UC-141 Acceptance Criteria
+S. No.
+Criteria
+1
+Community admin should be able to approve the request and the customer is notified 
+
+10.	Functional Specification FS-75: Cancel Account Renewal Request
+Account Renewal Request cancellation deals with the cancellation of the existing request which is in 
+Submitted or not approved status. 
+10.1.	Use-Case UC-142: Account Renewal Request cancelled from the back-office portal
+Table 64: UC-142 Account Renewal Request cancelled from the back-office portal
+Use Case  
+Account Renewal Request cancelled from the back-office portal
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Community Admin reviews and determines that the submitted 
+Account Renewal Request must be cancelled
+Pre-conditions
+*	Customer has submitted the Account Renewal Request.
+*	Community Admin has access to the Back-office Portal.
+*	Request is available and visible in the portal dashboard.
+Post-conditions
+*	The request status is updated to Cancelled.
+*	Customer is notified about the cancellation via app 
+notification.
+*	System logs the cancellation action in the history panel.
+Main Success Scenario
+*	Community Admin logs in to the Back-office Portal.
+*	Navigates to the Account Renewal Dashboard.
+*	Applies filters (property, status, dates) to identify the specific 
+request.
+*	Select the request and review its details.
+*	Select the Cancel action.
+*	A confirmation pop-up (Yes/No) is displayed.
+*	Upon confirmation, the request status is marked as Cancelled.
+*	System sends a notification to the customer regarding the 
+cancellation.
+*	The action is recorded in the history panel
+Alternate Flow
+*	NA
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+10.1.1.	Process Flow Diagram
+ 
+Figure 55: UC-142 Process flow – Cancel Account Renewal request
+10.1.2.	Screen Mock-ups
+NA
+10.1.3.	Field Level Specification
+Table 65: UC-142 Form Field Specification – Cancel Account Renewal request
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Cancellation 
+Remarks
+Textbox
+varchar (100)
+M
+Y
+
+-
+10.1.4.	Validation
+*	Admin can only add the comments and cancel.
+*	Only requests that are not already cancelled or approved can be cancelled.
+*	System should prompt a confirmation pop-up before finalizing cancellation.
+*	Customer must receive a push notification about the cancellation.
+*	Cancel action should update request status to Cancelled across all relevant vie
+*	All transactions should be captured in the history panel
+10.1.5.	Business rule
+*	Only Community Admin roles with necessary permissions can perform cancellation.
+*	Cancelled requests should be read-only and non-editable post-cancellation.
+*	No new request should be auto created upon cancellation; customers need to resubmit 
+manually if required.
+10.1.6.	Processing
+*	On cancellation:
+o	Update request status to Cancelled.
+o	Send notifications to the customer via app.
+*	Ensure cancellation reasons and user action are traceable for audit purposes. 
+10.1.7.	Notification Template
+Table 66: UC-142 Cancel move-in request Notification Templates
+Step
+Customer
+Mode
+Template
+RFI Pending 
+tenant 
+/HHO/HHC
+Push notification
+Your Account Renewal request (<Reference ID 
+>) has been cancelled. 
+10.1.8.	Integration Requirements
+NA
+10.1.9.	Acceptance Criteria
+Table 67: UC-142 Acceptance Criteria
+S. No.
+Criteria
+1
+Community admin should be able to mark the status of the request as cancelled
+
+
+11.	Functional Specification FS-29: Move-out Request 
+The Move-Out module enables customers to formally initiate their departure from the community. The 
+process ensures that unit access is revoked upon approval, maintaining operational and security 
+integrity.
+Customers such as Owners, Tenants, and HHO (Household Occupants) can submit Move-Out requests via 
+the OneSobha mobile application. These requests are received by the Community Admin and processed 
+through the OneSobha Back Office Portal.
+For detailed use cases related to move-out requests from the mobile app, please refer to the functional 
+specification in BRD FM-06: Move-Out:
+*	FS-29: Move-Out Request Creation
+o	UC-55: Move-Out Request Creation by Owner / Tenant / H
+This request is processed in SmartFM and based on move-out request approval, access to unit access is 
+revoked.
+As per the new requirement, move-out request will be processed in OneSobha back-office portal. Along 
+with this, Community Admins must be able to raise a Move-Out request on behalf of the customer from 
+the back-office interface
+*	UC-143: Move-Out Requested on behalf of User
+11.1.	Use-Case UC-143: Move-Out Requested on behalf of User
+Table 68: UC-143 Move-Out Requested on behalf of User
+Use Case  
+Create Move-out request by community admin from back-office portal
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Resident informs Community Admin about the intention to Move Out 
+and requests admin assistance to raise the request from the back-
+office portal
+Pre-conditions
+*	The unit must be occupied (i.e., linked to a user).
+*	Community Admin is authenticated and has portal access.
+*	Customer is a registered user in the system
+Post-conditions
+*	Move-out request is successfully created and auto-approved.
+*	Unit status is flagged for vacancy upon move-out completion.
+*	Customer is notified about the request creation.
+Main Success Scenario
+*	Community Admin logs into the Back-office Portal.
+*	Navigates to the Move-Out Dashboard.
+*	Clicks "Create Request" to initiate a new move-out request.
+*	Fills out the Property (Unit) Details:
+o	Master Community
+o	Community
+o	Tower/Street
+o	Unit Number
+*	System auto-populates Resident Details (non-editable):
+o	First Name
+o	Middle Name
+o	Last Name
+o	Mobile Number
+o	Email ID
+*	Admin selects:
+*	Move-Out Date
+*	Reason for Move-Out (dropdown)
+*	Clicks Submit.
+*	Request is auto-approved, status is updated accordingly.
+*	Notification is sent to the resident, and history is updated
+Alternate Flow
+If the customer has not registered:
+*	Community Admin guides the tenant to:
+o	Download and register on the One App
+o	Submit an move-out request via the app
+*	Community Admin reviews the submitted request in the portal 
+and approves it post-verification
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+11.1.1.	 Process Flow Diagram
+ 
+Figure 56 UC-143 Process flow - Move-Out by Community Admin
+11.1.2.	Screen Mock-ups
+*	Move-Out request list
+ 
+Figure 57: UC-143 Move-Out Request list
+*	Create Request
+ 
+Figure 58: UC-143 Move-Out Request form
+
+11.1.3.	Field Level Specification
+Table 69: UC-143 Form Field Specification – Move Out
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Master 
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Master 
+Communities
+-
+2
+Community
+Drop 
+Down
+ID
+M
+Y
+LOV of Communities
+-
+3
+Tower
+Drop 
+Down
+ID
+M
+Y
+LOV of Tower
+-
+4
+Unit
+Drop 
+Down
+ID
+M
+Y
+LOV of Unit
+-
+5
+First Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+6 
+Middle Name
+Textbox
+varchar (35)
+O
+N
+Auto Populated
+-
+7
+Last Name
+Textbox
+varchar (35)
+M
+N
+Auto Populated
+-
+8
+Mobile 
+Number
+Textbox
+Numeric (20)
+M
+N
+Auto Populated
+-
+9
+Email ID
+Textbox
+Alphanumeric 
+(100)
+M
+N
+Auto Populated
+-
+10
+Move-Out 
+Date
+Date 
+picker
+DD/MM/YYYY
+Y
+Y
+It should be > today’s 
+date.
+-
+11
+Move-out 
+Reason
+Drop 
+Down
+ID
+M
+Y
+
+-
+
+11.1.4.	Validation
+*	Unit must be occupied (linked to an active user).
+*	All mandatory fields (property, resident, move-out date, reason) must be validated.
+*	All transactions are to be captured in the history panel.
+*	Resident should receive push/app notification upon submission.
+*	Form filed validation as implemented in mobile app 
+11.1.5.	Business rule
+*	Only authorized Community Admins may raise move-out requests.
+*	Only one active move-out request is allowed per unit at a time.
+*	Once approved, unit status transitions to Move-out Approved and is available for de-linking post 
+final closure.
+*	The move-out date must not be backdated beyond the current system date.
+*	Approved move-out requests become read-only and editable only by designated roles (e.g., 
+Security for closure)
+11.1.6.	Processing
+*	On submission:
+o	Request is auto approved.
+o	Status is updated to Approved.
+o	Notification is sent to the resident.
+*	The request becomes available in the Security dashboard for final closure
+*	All validations & business rules should be successfully met before raising the move-in Request.
+*	On submission of Move-Out Request, request ID gets created in the mobile application and same 
+is displayed in the admin portal. 
+*	Move-Out permit gets generated when community admin creates the request.
+11.1.7.	Notification Template
+Table 70: UC-143 Move-Out Notification Templates
+Step
+Customer
+Mode
+Template
+Move out 
+request 
+Owner/Tenant 
+/HHO
+Push notification
+A new move-out request (<Reference ID>) 
+has been created and approved by 
+Community Admin. Tap here to view your 
+request.
+Move out 
+request
+Community 
+Recipients
+Email notification
+
+11.1.8.	Integration Requirements
+NA
+11.1.9.	Acceptance Criteria
+Table 71: UC-143 Acceptance Criteria
+S. No.
+Criteria
+1
+Move-out Permit should be generated only after the admin approve the move request
+2
+It should be possible to execute all the processing steps as described in this use case 
+above. 
+3
+Notifications should be triggered.
+
+12.	Functional Specification FS-78: Approve Move-out Request 
+The Move-out request raised by user will be processed in OneSobha back-office portal. 
+*	UC-144: Approve Move-out request raised by Owner/Tenant/HHO
+12.1.	Use-Case UC-144: Approve Move-out request raised by Owner/Tenant/HHO
+Table 72: UC-144 Approve Move-out request raised by Owner/Tenant/HHO
+Use Case  
+Approve Move-out request raised by Owner/Tenant/HHO/HHC
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Customer submits a move-out request via the mobile app or through 
+the community admin.
+Pre-conditions
+*	Unit must be currently occupied (linked to a user).
+*	Customer has successfully submitted the move-out request
+Post-conditions
+*	Move-out request is approved by the Community Admin.
+*	Move-out permit (MOP) is generated.
+*	Customer and community recipients are notified.
+*	Unit status is updated to vacant after closure by security
+Main Success Scenario
+*	Community Admin logs into the Back-office Portal.
+*	Navigates to the Move-Out Dashboard.
+*	Applies filters (property, status, dates, etc.) as required.
+*	Select the move-out request to be processed.
+*	Reviews the request details thoroughly.
+*	Marks the request as Approved.
+*	System generates a Move-Out Permit (MOP) linked to the 
+request.
+*	Customer receives an app notification confirming approval.
+*	At actual move-out, the permit is presented to the security 
+team.
+*	Security team marks the request as Closed.
+*	Unit is de-linked from the user and marked as vacant in the 
+system.
+*	Community recipients receive notification of closure and 
+vacancy update.
+Alternate Flow
+NA
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+12.1.1.	 Process Flow Diagram
+ 
+Figure 59: UC-144 Process flow – Approve Move-Out Request
+12.1.2.	Screen Mock-ups
+NA
+12.1.3.	Field Level Specification
+Table 73: UC-144 Form Field Specification – Approve Move-out Request
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Comments/Re
+mark
+Textbox
+varchar (35)
+M
+Y
+
+-
+12.1.4.	Validation
+*	Mandatory field validation for Mandatory fields
+*	Move-Out request Approval should be successful only if the unit status is “Occupied” 
+*	All transactions should be captured in the history panel
+12.1.5.	Business rule
+*	Admin should have permission to approve the request. 
+*	Move-out date cannot be more than 1 month from date of submission
+12.1.6.	Processing
+*	All validations & business rules should be successfully met before approving Move-out Request.
+*	In case any of the validation conditions are not met, admin should display an appropriate error 
+message.
+*	Push Notification sent to user for successful move-out request approval 
+*	On submission of Move-Out Request, request ID gets created in the mobile application and same 
+is displayed in the admin portal. 
+*	Move-Out permit gets generated
+*	On the actual Move-out date, below steps will be performed by the system.
+o	De link the unit on the date of move out
+o	Cancel all existing amenities
+o	Unit status is changed to vacant 
+o	Any active access cards should be deactivated & card details will not be visible in the UI
+o	Service requests where there is no action taken yet should be cancelled.
+12.1.7.	Notification Template
+Table 74: UC-144 Move-Out Notification Templates
+Step
+Customer
+Mode
+Template
+Move out 
+Approval
+Owner/Tenant 
+/HHO/HHC
+Push notification
+A new move-out request (<Reference ID>) 
+has been approved by Community Admin. 
+Tap here to view your request.
+12.1.8.	Integration Requirements
+NA
+12.1.9.	Acceptance Criteria
+Table 75: UC-144 Acceptance Criteria
+S. No.
+Criteria
+1
+Move-out Permit should be generated only after the admin approve the move request
+2
+It should be possible to execute all the processing steps as described in this use case 
+above. 
+3
+Notifications should be triggered.
+
+13.	Functional Specification FS-79: Cancel Move-out Request 
+Move-in request cancellation deals with the cancellation of the existing move-in request which is in 
+Submitted or not approved status. Both Customer and Admin can initiate the cancellation for move-in 
+request
+*	UC-145: Cancel the Move-out request from the back office
+13.1.	Use-Case UC-145: Cancel the Move-out request from the back office
+Table 76: UC-145 Cancel the Move-out request from the back office
+Use Case  
+Cancel Move-out request raised by Owner/Tenant/HHO/HHC
+Primary Actor(s)
+Community Admin
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Community Admin identifies a move-out request that needs to be 
+cancelled.
+Pre-conditions
+*	Customer has submitted the move-out request
+*	Community admin received the request in the back-office 
+portal
+Post-conditions
+*	The move-out request is marked as cancelled.
+*	Customer is notified about the cancellation with remarks
+Main Success Scenario
+*	Community Admin logs into the back-office portal.
+*	Navigates to the Move-out dashboard.
+*	Accesses the list view of all Move-out requests.
+*	Applies filters as needed (e.g., property, status, dates) to locate 
+the request.
+*	Selects the relevant move-out request.
+*	Reviews the request details.
+*	Chooses to cancel the request and provides cancellation 
+remarks.
+*	A confirmation popup displays with Yes and No buttons.
+*	Community Admin confirms cancellation by clicking Yes.
+*	The system updates the status of the request to Cancelled.
+*	The customer is notified about the cancellation and the 
+provided remarks.
+Alternate Flow
+NA
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+13.1.1.	 Process Flow Diagram
+ 
+Figure 60: UC-145 Process flow – Cancel Move-Out Request
+13.1.2.	Screen Mock-ups
+NA
+13.1.3.	Field Level Specification
+Table 77: UC-145 Form Field Specification – Cancel move-out request
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Comments/Re
+mark
+Textbox
+varchar (35)
+M
+Y
+
+-
+13.1.4.	Validation
+*	Mandatory field validation for Mandatory fields
+*	All transactions should be captured in the history panel
+13.1.5.	Business rule
+*	Only Community Admins, with proper cancellation permissions, are authorized to cancel a 
+move-out request.
+13.1.6.	Processing
+*	All validations and business rules must be successfully verified before the move-out request 
+cancellation is processed.
+*	If any validation or business rule fails, the system must display a clear and appropriate error 
+message to the admin 
+*	Upon successful cancellation, the system must send a push notification to the customer 
+informing them of the move-out request cancellation along with the cancellation remarks. 
+13.1.7.	Notification Template
+Table 78: UC-145 Cancel Move-out Notification Templates
+Step
+Customer
+Mode
+Template
+Move out 
+Approval
+Owner/Tenant
+/HHO/HHC
+Push notification
+Move-out request (<Reference ID>) has 
+been cancelled by Community Admin. Tap 
+here to view your request.
+13.1.8.	Integration Requirements
+NA
+13.1.9.	Acceptance Criteria
+Table 79: UC-145 Acceptance Criteria
+S. No.
+Criteria
+1
+Community admin should be able to cancel the Move-out request only when all the 
+validations and business rules described above is met
+2
+It should be possible to execute all the processing steps as described in this use case 
+above. 
+3
+Notifications should be triggered.
+
+14.	Functional Specification FS-80: Move out Request Closure
+14.1.	Use-Case UC-146: Closure of approved move out request by the security
+Table 80: UC-146 Closure of approved move out request by the security
+Use Case  
+Closure of approved Move-out request by the Security
+Primary Actor(s)
+Security Team
+Secondary Actor(s)
+
+Stakeholders and Interest
+
+Trigger
+Presentation of the move-out permit to the site/security team after 
+community admin approval
+Pre-conditions
+*	Community admin has approved the move-out request.
+*	Move-out permit is presented to the site/security team
+Post-conditions
+*	Move-out request is successfully closed.
+*	The unit is delinked from the occupant.
+*	All existing amenities linked to the unit are canceled.
+*	Unit status is updated to Vacant.
+*	All active access cards are deactivated, and their details are no 
+longer visible in the UI.
+*	Any service requests related to the unit with no action taken 
+yet are canceled.
+Main Success Scenario
+*	Security team logs into the back-office portal.
+*	Security team accesses the Move-out dashboard.
+*	Security team navigates to the list view of approved Move-out 
+requests.
+*	Security team applies filters (property, status, dates, etc.) as 
+needed.
+*	Security team selects a Move-out request to view its details.
+*	Security team closes the request.
+*	A confirmation pop-up is displayed with Yes or No options.
+*	Upon confirmation, the request is closed, and post-conditions 
+are applied.
+o	De link the unit on the date of move out
+o	Cancel all existing amenities
+o	Unit status is changed to vacant 
+o	Any active access cards will be deactivated & card details 
+will not be visible in the UI
+o	Service requests where there is no action taken yet will 
+be cancelled
+Alternate Flow
+NA
+Priority
+High
+Special Requirements
+No
+System
+Back-office Portal
+
+14.1.1.	 Process Flow Diagram
+ 
+Figure 61: UC-146 Process flow – Close Move-Out Request
+14.1.2.	Screen Mock-ups
+NA
+14.1.3.	Field Level Specification
+Table 81: UC-146 Form Field Specification – Close Move-out request
+S. No.
+Field Label
+Item Type
+Data Type
+M/
+O/D
+Editable
+Value Set
+Default 
+Value
+1
+Comments/Re
+mark
+Textbox
+varchar (35)
+M
+Y
+
+-
+14.1.4.	Validation
+*	Mandatory field validation for Mandatory fields
+*	All transactions should be captured in the history panel
+14.1.5.	Business rule
+*	Security team should have permission to close the request. 
+14.1.6.	Processing
+*	Site security team will receive the approved move-out permit details
+*	Site security team will close the request
+o	De link the unit on the date of move out
+o	Cancel all existing amenities
+o	Unit status is changed to vacant 
+o	Any active access cards will be deactivated & card details will not be visible in the UI
+o	Service requests where there is no action taken yet will be cancelled
+*	All validations & business rules should be successfully met before closure Move-out Request.
+*	In case any of the validation conditions are not met, admin should display an appropriate error 
+message.
+14.1.7.	Notification Template
+NA
+14.1.8.	Integration Requirements
+NA
+14.1.9.	Acceptance Criteria
+Table 82: UC-146 Acceptance Criteria
+S. No.
+Criteria
+1
+Site security should be able to mark the status of the request as closed
+
+15.	General Requirement 
+15.1.	Reporting Specification
+*	All the requests created by Customer with respect for the unit should be visible in the centralized 
+dashboard in the mobile app UI under respective module.
+*	The following details with respect to the request created should be visible in the app.
+o	Created date.
+o	Request ID
+15.2.	Risks / Assumptions / Dependencies / Constraints     
+*	Terms and conditions to be provided by business.
+15.3.	System Configuration
+NA
+15.4.	 Other System Requirements/ Non-Functional Requirements
+NA.
+Appendix: Index of Table
+Table 1: List of use Case	1
+Table 2: List of Acronyms and Abbreviations	2
+Table 3: List of Reference Documents	2
+Table 4: UC-125 Master data set up for Community specific recipients	3
+Table 5: UC-125 Form Field Specification	4
+Table 6: UC-125 Acceptance Criteria	5
+Table 7: UC-126 Back-office Portal - Move-in Dashboard	6
+Table 8: UC-126 Acceptance Criteria	15
+Table 9: UC-127 Back-office Portal Account Renewal Dashboard	15
+Table 10: UC-127 Acceptance Criteria	22
+Table 11: UC-128 Back-office Portal Move-out Dashboard	23
+Table 12: UC-128 Acceptance Criteria	29
+Table 13: UC-129 Move-In on behalf of Owner	30
+Table 14: UC-129 Form Field Specification - Move-in Owner	35
+Table 15 UC-129 Notification Templates Move-in Owner	38
+Table 16: UC-129 Acceptance Criteria	38
+Table 17: UC-130 Move-In on behalf of Tenant	38
+Table 18: UC-130 Form Field Specification - Move-in Tenant	44
+Table 19: UC-130 Notification Templates Move-in Tenant	47
+Table 20: UC-130 Acceptance Criteria	47
+Table 21: UC-131 Move-In on behalf of HHO Unit	48
+Table 22: UC-131 Form Field Specification - Move-in HHO-Unit	52
+Table 23: UC-131 Notification Templates Move-in HHO-Unit	54
+Table 24: UC-131 Acceptance Criteria	55
+Table 25: UC-132 Move-In on behalf of HHO Company	55
+Table 26: UC-132 Form Field Specification – Move-in HHO-Company	61
+Table 27: UC-132 Notification Templates Move-in HHO-Company	64
+Table 28: UC-132 Acceptance Criteria	64
+Table 29: UC-133 RFI for Move-in request raised by Owner/Tenant/HHO	65
+Table 30: UC-133 Form Field Specification – RFI of the move-in request	67
+Table 31: UC-133 RFI of the move-in request Notification Templates	68
+Table 32: UC-133 Acceptance Criteria	68
+Table 33: UC-134 Approve move-in request raised by Owner/Tenant/HHO	69
+Table 34: UC-134  Form Field Specification – RFI of the move-in request	71
+Table 35: UC-134 Approve move-in request Notification Templates	72
+Table 36: UC-134 Acceptance Criteria	72
+Table 37: UC-135 Cancel move-in request raised by Owner/Tenant/HHO	73
+Table 38: UC-135 Form Field Specification – Cancel move-in request	74
+Table 39: UC-135 Cancel move-in request Notification Templates	75
+Table 40: UC-135 Acceptance Criteria	75
+Table 41: UC-136 Closure of Approved move in request by the security	76
+Table 42: UC-136  Form Field Specification – Cancel move-in request	77
+Table 43: UC-136 Acceptance Criteria	79
+Table 44: UC-137 Account Renewal on behalf of Tenant	80
+Table 45: UC-137 Form Field Specification - Move-in Tenant	85
+Table 46: UC-137 Tenant Move-in Notification Templates	88
+Table 47: UC-137 Acceptance Criteria	88
+Table 48: UC-138 Account Renewal on behalf of HHO Unit	88
+Table 49: UC-138 Form Field Specification - Move-in HHO-Unit	93
+Table 50: UC-138 HHO-Unit Account Renewal Notification Templates	95
+Table 51: UC-138 Acceptance Criteria	95
+Table 52: UC-139 Account Renewal on behalf of HHO Company	95
+Table 53: UC-139 Form Field Specification – Move-in HHO-Company	101
+Table 54: UC-139 HHO-Unit Account Renewal Notification Templates	104
+Table 55: UC-139 Acceptance Criteria	104
+Table 56: UC-140 RFI for Account Renewal request raised by Tenant/HHO	105
+Table 57: UC-140 Form Field Specification – RFI of the Account Renewal request	106
+Table 58: UC-140 RFI of the Account Renewal request Notification Templates	107
+Table 59: UC-140 Acceptance Criteria	107
+Table 60: UC-141 Approve Account Renewal request raised by Tenant/HHO	108
+Table 61: UC-141 Form Field Specification – RFI of the Account Renewal  request	109
+Table 62: UC-141 Approve Account Renewal Request Notification Templates	110
+Table 63: UC-141 Acceptance Criteria	110
+Table 64: UC-142 Account Renewal Request cancelled from the back-office portal	111
+Table 65: UC-142 Form Field Specification – Cancel Account Renewal request	112
+Table 66: UC-142 Cancel move-in request Notification Templates	113
+Table 67: UC-142 Acceptance Criteria	113
+Table 68: UC-143 Move-Out Requested on behalf of User	114
+Table 69: UC-143 Form Field Specification – Move Out	117
+Table 70: UC-143 Move-Out Notification Templates	119
+Table 71: UC-143 Acceptance Criteria	119
+Table 72: UC-144 Approve Move-out request raised by Owner/Tenant/HHO	120
+Table 73: UC-144 Form Field Specification – Approve Move-out Request	121
+Table 74: UC-144 Move-Out Notification Templates	122
+Table 75: UC-144 Acceptance Criteria	123
+Table 76: UC-145 Cancel the Move-out request from the back office	124
+Table 77: UC-145 Form Field Specification – Cancel move-out request	125
+Table 78: UC-145 Cancel Move-out Notification Templates	126
+Table 79: UC-145 Acceptance Criteria	126
+Table 80: UC-146 Closure of approved move out request by the security	127
+Table 81: UC-146 Form Field Specification – Close Move-out request	129
+Table 82: UC-146 Acceptance Criteria	129
+
+Appendix: Index of Figures
+Figure 1: UC-126 Back-office Dashboard	8
+Figure 2: UC-126 Move-In Request list	9
+Figure 3: UC-126 Move-in Details (Owner)	10
+Figure 4: UC-126 Move-in Details (Tenant)	11
+Figure 5: UC-126 Move-in Details (HHO-unit)	12
+Figure 6: UC-126 Move-in Details (HHO-Company)	13
+Figure 7: UC-126 Move-in History	14
+Figure 8: UC-127 Back-office Dashboard	17
+Figure 9: UC-127 Account Renewal Request list	18
+Figure 10: UC-127 Account Renewal Details (Tenant)	19
+Figure 11: UC-127 Account Renewal Details (HHO-unit)	20
+Figure 12: UC-127 Account Renewal Details (HHO-Company)	21
+Figure 13: UC-127 Account Renewal History	22
+Figure 14: UC-128 Back-office Dashboard	25
+Figure 15: UC-128 Move-Out Request list	26
+Figure 16: UC-128 Move-out Details	27
+Figure 17: UC-128 Move-out History	28
+Figure 18: UC-129 Process flow - Move-In as an Owner	33
+Figure 19: UC-129 Move-In Request list	33
+Figure 20: UC-129 Move-In as an Owner	34
+Figure 21: UC-129 Move-In Request form - Owner	35
+Figure 22: UC-130 Process flow - Move-In as a Tenant	40
+Figure 23: UC-130 Move-In Request list	41
+Figure 24: UC-130 Move-In as a Tenant	42
+Figure 25: UC-130 Move-In Request form - Tenant	43
+Figure 26: UC-130 Tenant Move-in - Document Upload	44
+Figure 27: UC-131 Process flow - Move-In as an HHO-Unit	50
+Figure 28: UC-131 Move-In Request list	50
+Figure 29: UC-131 Move-In as HHO-Unit	51
+Figure 30: UC-131 Move-In Request form – HHO Unit	52
+Figure 31: UC-132 Process flow - Move-In as an HHO-Company	58
+Figure 32: UC-132 Move-In Request list	58
+Figure 33: UC-132 Move-In as an HHO-Company	59
+Figure 34: UC-132 Move-In Request form - HHO-Company	60
+Figure 35: UC-132 HHO-Company Move-in - Document Upload	61
+Figure 36: UC-133 Process flow - RFI of the move-in request	67
+Figure 37: UC 134 Process flow – Approve move-in request	71
+Figure 38: UC 135 Process flow – Cancel move-in request	74
+Figure 39: UC-136 Process flow – Close move-in request	77
+Figure 40: UC-137 Process flow – Account Renewal as a Tenant	82
+Figure 41: UC-137 Account Renewal Request list	83
+Figure 42: UC-137 Account Renewal as a Tenant	84
+Figure 43: UC-137 Account Renewal Request form - Tenant	85
+Figure 44: UC-138 Process flow – Account Renewal as an HHO-Unit	90
+Figure 45: UC-138 Account Renewal Request list	91
+Figure 46: UC-138 Account Renewal as an HHO-Unit	92
+Figure 47: UC-138 Move-In Request form - HHO-Unit	93
+Figure 48: UC-139 Process flow – Account Renewal as an HHO-Company	97
+Figure 49: UC-139 Account Renewal Request list	98
+Figure 50: UC-139 Account Renewal as an HHO-Unit	99
+Figure 51: UC-139 Account Renewal Request form - HHO-Company	100
+Figure 52: UC-139 HHO-Company Move-in - Document Upload	101
+Figure 53: UC-140 Process flow - RFI of the Account Renewal Request	106
+Figure 54: UC-141 Process flow – Approve Account Renewal request	109
+Figure 55: UC-142 Process flow – Cancel Account Renewal request	112
+Figure 56 UC-143 Process flow - Move-Out by Community Admin	116
+Figure 57: UC-143 Move-Out Request list	117
+Figure 58: UC-143 Move-Out Request form	117
+Figure 59: UC-144 Process flow – Approve Move-Out Request	121
+Figure 60: UC-145 Process flow – Cancel Move-Out Request	125
+Figure 61: UC-146 Process flow – Close Move-Out Request	128
+
+Approvals
+This document has been approved as the official Business Requirements Document for Amenity request 
+module. Following approval of this document, changes will be governed by the project’s change 
+management process, including impact analysis, appropriate reviews, and approvals.
+Name
+Designation
+Date
+Signature
+Mijo James
+Head – Community 
+Management
+
+
+Guruswamy Periyasamy 
+CIO
+
+
+Akash Lall
+GM-IT
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+Classification: Internal		 
+Confidential: For internal use only
+Confidentiality Clause
+This document is the property of techcarrot. All ideas and information contained within the document is the intellectual 
+property of techcarrot. These documents are not for general distribution and are meant for use solely by the person/persons 
+to whom it is specifically issued to. Copying or unauthorized distribution of these documents, in any form or means including 
+electronic, mechanical, photocopying or otherwise is illegal.
+
+
+
+ 
+
+
+
+
+
+
+
+Classification: Internal										       	| Page 1
+Confidential: For internal use only
+
+
+Confidentiality Clause
+This document is the property of DHRE. All ideas and information contained within the document is the intellectual 
+property of DHRE. These documents are not for general distribution and are meant for use solely by the 
+person/persons to whom it is specifically issued to. Copying or unauthorized distribution of these documents, in 
+any form or means including electronic, mechanical, photocopying or otherwise is illegal.
+
