@@ -1,5 +1,4 @@
 name: Build on Pull Request
-
 on:
   pull_request:
     branches:
@@ -12,16 +11,74 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout code with submodules
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SOBHA_PAT_ACTION_TOKEN }} # Use PAT token for authentication
+          submodules: recursive # Let GitHub Actions handle submodules with authentication
+          fetch-depth: 0
+
+      - name: Switch submodules to matching branch
+        run: |
+          BRANCH_NAME="${{ github.base_ref }}"
+          echo "Switching submodules to branch: $BRANCH_NAME"
+
+          # Configure git with the PAT token for submodule operations
+          git config --global url."https://x-access-token:${{ secrets.SOBHA_PAT_ACTION_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
+          for d in $(git config --file .gitmodules --get-regexp path | awk '{ print $2 }'); do
+            echo "Processing submodule: $d"
+            if [ -d "$d" ]; then
+              cd "$d"
+              git fetch origin
+              if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+                echo "Switching $d to branch $BRANCH_NAME"
+                git checkout "$BRANCH_NAME" || git checkout -b "$BRANCH_NAME" "origin/$BRANCH_NAME"
+                git pull origin "$BRANCH_NAME" || echo "Could not pull $BRANCH_NAME for $d"
+              else
+                echo "Branch $BRANCH_NAME not found in submodule $d. Failing build."
+                exit 1
+              fi
+              cd - > /dev/null
+            else
+              echo "Submodule directory $d not found. Failing build."
+              exit 1
+            fi
+          done
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
+
+      - name: Generate lock file if missing
+        run: |
+          if [ ! -f package-lock.json ]; then
+            npm install --package-lock-only --legacy-peer-deps
+          fi
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --legacy-peer-deps
+          else
+            npm install --legacy-peer-deps
+          fi
 
       - name: Build project
         run: npm run build
+
+      - name: Display submodule status (for debugging)
+        run: |
+          echo "=== Submodule Status ==="
+          git submodule status
+          echo "=== Submodule Branch Info ==="
+          for d in $(git config --file .gitmodules --get-regexp path | awk '{ print $2 }'); do
+            if [ -d "$d" ]; then
+              echo "Submodule $d:"
+              cd "$d"
+              git branch -v
+              cd - > /dev/null
+            fi
+          done
+
