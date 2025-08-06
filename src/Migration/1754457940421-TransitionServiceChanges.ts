@@ -17,6 +17,6 @@ export class TransitionServiceChanges1754457940421 implements MigrationInterface
         await queryRunner.query(`ALTER TABLE \`sr_sub_category\` DROP COLUMN \`name\``);
         await queryRunner.query(`ALTER TABLE \`sr_sub_category\` ADD \`name\` varchar(55) NOT NULL`);
         await queryRunner.query(`CREATE UNIQUE INDEX \`IDX_5a48f26118d3dfcc6cc3fe3e2c\` ON \`sr_sub_category\` (\`name\`)`);
-        }
+    }
 
 }
