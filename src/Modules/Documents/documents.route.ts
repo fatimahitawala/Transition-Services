@@ -17,13 +17,12 @@ const storage = multer.memoryStorage();
 const upload = multer({ 
     storage: storage,
     fileFilter: (req, file, cb) => {
-        // Allow PDF, DOC, DOCX files for welcome packs
+        // Allow PDF and HTML files for welcome packs
         if (file.mimetype.includes("application/pdf") || 
-            file.mimetype.includes("application/msword") || 
-            file.mimetype.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
+            file.mimetype.includes("text/html")) {
             cb(null, true);
         } else {
-            cb(new Error("Please upload only PDF, DOC, or DOCX files!"));
+            cb(new Error("Please upload only PDF or HTML files!"));
         }
     }
 });
@@ -62,7 +61,42 @@ router.get('/health', (req, res) => documentsController.health(req, res));
 router.get('/welcome-pack', authMiddleware.auth(), validate(documentsValidation.getWelcomePackList), catchAsync(documentsController.getWelcomePackList));
 router.post('/welcome-pack', authMiddleware.auth(), upload.single('welcomePackFile'), validate(documentsValidation.createWelcomePack), catchAsync(documentsController.createWelcomePack));
 router.get('/welcome-pack/:id', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.getWelcomePackById));
+router.get('/welcome-pack/:id/download', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.downloadWelcomePackFile));
 router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePackFile'), validate(documentsValidation.updateWelcomePack), catchAsync(documentsController.updateWelcomePack));
+
+/**
+ * @swagger
+ * /documents/welcome-pack/{id}/download:
+ *   get:
+ *     summary: Download welcome pack file
+ *     tags: [Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Welcome pack ID
+ *     responses:
+ *       200:
+ *         description: File content
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *           text/html:
+ *             schema:
+ *               type: string
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Welcome pack or file not found
+ *       500:
+ *         description: Internal server error
+ */
 
 export default router;
 
@@ -106,7 +140,7 @@ export default router;
  *         name: isActive
  *         schema:
  *           type: boolean
- *         description: Filter by active status (true/false)
+ *         description: Filter by active status (true/false). If not specified, shows all records (both active and inactive)
  *       - in: query
  *         name: startDate
  *         schema:
@@ -146,6 +180,12 @@ export default router;
  *           maximum: 100
  *           default: 20
  *         description: Items per page
+ *       - in: query
+ *         name: includeFile
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: Include file content in response (true/false)
  *     responses:
  *       200:
  *         description: List of welcome packs with pagination
@@ -175,6 +215,10 @@ export default router;
  *                       type: integer
  *                     total_pages:
  *                       type: integer
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
  */
 
 /**
@@ -194,6 +238,7 @@ export default router;
  *             required:
  *               - masterCommunityId
  *               - communityId
+ *               - welcomePackFile
  *             properties:
  *               masterCommunityId:
  *                 type: integer
@@ -207,20 +252,39 @@ export default router;
  *               welcomePackFile:
  *                 type: string
  *                 format: binary
- *                 description: Welcome pack file (PDF, DOC, DOCX)
+ *                 description: Welcome pack file (PDF or HTML only)
  *               isActive:
  *                 type: boolean
  *                 default: true
  *     responses:
  *       201:
  *         description: Welcome pack created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 code:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   $ref: '#/components/schemas/WelcomePack'
+ *       400:
+ *         description: Bad request - Invalid file type or missing required fields
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
  */
 
 /**
  * @swagger
  * /documents/welcome-pack/{id}:
  *   get:
- *     summary: Get welcome pack by ID
+ *     summary: Get welcome pack by ID with file content
  *     tags: [Documents]
  *     security:
  *       - bearerAuth: []
@@ -231,9 +295,34 @@ export default router;
  *         schema:
  *           type: integer
  *         description: Welcome pack ID
+ *       - in: query
+ *         name: includeFile
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: Include file content in response (true/false)
  *     responses:
  *       200:
- *         description: Welcome pack details
+ *         description: Welcome pack details with optional file content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 code:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   $ref: '#/components/schemas/WelcomePack'
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Welcome pack not found
+ *       500:
+ *         description: Internal server error
  */
 
 /**
@@ -264,10 +353,31 @@ export default router;
  *               welcomePackFile:
  *                 type: string
  *                 format: binary
- *                 description: Welcome pack file to replace (PDF, DOC, DOCX)
+ *                 description: Welcome pack file to replace (PDF or HTML only)
  *     responses:
  *       200:
  *         description: Welcome pack updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 code:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   $ref: '#/components/schemas/WelcomePack'
+ *       400:
+ *         description: Bad request - Invalid file type
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Welcome pack not found
+ *       500:
+ *         description: Internal server error
  */
 
 /**
@@ -279,29 +389,16 @@ export default router;
  *       properties:
  *         id:
  *           type: integer
- *         masterCommunity:
- *           type: object
- *           properties:
- *             id:
- *               type: integer
- *             name:
- *               type: string
- *         community:
- *           type: object
- *           properties:
- *             id:
- *               type: integer
- *             name:
- *               type: string
- *         tower:
- *           type: object
- *           properties:
- *             id:
- *               type: integer
- *             name:
- *               type: string
+ *         masterCommunityId:
+ *           type: integer
+ *         communityId:
+ *           type: integer
+ *         towerId:
+ *           type: integer
+ *           nullable: true
  *         templateString:
  *           type: string
+ *           description: Base64 encoded file content (only included when includeFile=true)
  *         isActive:
  *           type: boolean
  *         createdAt:
@@ -310,4 +407,8 @@ export default router;
  *         updatedAt:
  *           type: string
  *           format: date-time
+ *         createdBy:
+ *           type: integer
+ *         updatedBy:
+ *           type: integer
  */

@@ -26,8 +26,9 @@ export class DocumentsController {
     }
 
     async getWelcomePackById(req: Request, res: Response) {
-        const { params: { id } }: Record<string, any> = req;
-        const result = await documentsService.getWelcomePackById(parseInt(id));
+        const { params: { id }, query: { includeFile } }: Record<string, any> = req;
+        const includeFileFlag = includeFile === 'true' || includeFile === true;
+        const result = await documentsService.getWelcomePackById(parseInt(id), includeFileFlag);
         if (!result) {
             return notFoundResponse(res, APICodes.NOT_FOUND);
         }
@@ -52,4 +53,6 @@ export class DocumentsController {
         const result = await documentsService.updateWelcomePack(parseInt(id), body, req.file, userId);
         return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
     }
+
+
 }

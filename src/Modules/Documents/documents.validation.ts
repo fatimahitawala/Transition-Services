@@ -13,7 +13,8 @@ export class DocumentsValidation {
         sortBy: Joi.string().valid('id', 'masterCommunityId', 'communityId', 'towerId', 'isActive', 'createdAt', 'updatedAt').optional().description('Sort field'),
         sortOrder: Joi.string().valid('ASC', 'DESC').optional().description('Sort order (ASC/DESC)'),
         page: Joi.number().min(1).optional().description('Page number (default: 1)'),
-        per_page: Joi.number().min(1).max(100).optional().description('Items per page (default: 20, max: 100)')
+        per_page: Joi.number().min(1).max(100).optional().description('Items per page (default: 20, max: 100)'),
+        includeFile: Joi.boolean().optional().default(false).description('Include file content in response')
     });
 
     createWelcomePack = Joi.object({
@@ -34,7 +35,8 @@ export class DocumentsValidation {
         id: Joi.number().required().messages({
             'any.required': 'Welcome Pack ID is required',
             'number.base': 'Welcome Pack ID must be a number'
-        })
+        }),
+        includeFile: Joi.boolean().optional().default(false).description('Include file content in response')
     });
 
     updateWelcomePack = Joi.object({
