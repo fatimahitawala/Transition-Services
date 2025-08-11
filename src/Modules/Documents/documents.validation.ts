@@ -45,4 +45,40 @@ export class DocumentsValidation {
             'boolean.base': 'Status must be true or false'
         })
     });
+
+
+
+    // Consolidated template validation methods
+    getTemplateList = Joi.object({
+        templateType: Joi.string().valid('MIP', 'MOP').optional(),
+        page: Joi.number().integer().min(1).default(1),
+        per_page: Joi.number().integer().min(1).max(100).default(20),
+        masterCommunityIds: Joi.string().optional(),
+        communityIds: Joi.string().optional(),
+        towerIds: Joi.string().optional(),
+        search: Joi.string().optional(),
+        isActive: Joi.boolean().optional(),
+        startDate: Joi.date().iso().optional(),
+        endDate: Joi.date().iso().optional(),
+        sortBy: Joi.string().valid('id', 'createdAt', 'updatedAt', 'templateType').default('createdAt'),
+        sortOrder: Joi.string().valid('ASC', 'DESC').default('DESC'),
+        includeFile: Joi.boolean().default(false)
+    });
+
+    createTemplate = Joi.object({
+        masterCommunityId: Joi.number().integer().required(),
+        communityId: Joi.number().integer().required(),
+        towerId: Joi.number().integer().optional().allow(null),
+        templateType: Joi.string().valid('MIP', 'MOP').required(),
+        isActive: Joi.boolean().default(true)
+    });
+
+    getTemplateById = Joi.object({
+        id: Joi.number().integer().required(),
+        includeFile: Joi.boolean().default(false)
+    });
+
+    updateTemplate = Joi.object({
+        isActive: Joi.boolean().optional()
+    });
 }

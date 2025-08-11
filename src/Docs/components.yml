@@ -99,6 +99,166 @@ components:
             message: Success Message
             code: SC001
 
+    Template:
+      type: object
+      properties:
+        id:
+          type: integer
+        masterCommunity:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        community:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        tower:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        templateType:
+          type: string
+          enum: [move-in, move-out, welcome-pack]
+        templateString:
+          type: string
+          description: Base64 encoded file content (only included when includeFile=true)
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+        updatedBy:
+          type: integer
+    
+    MipTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+        masterCommunity:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        community:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        tower:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        templateType:
+          type: string
+          enum: [move-in]
+        templateString:
+          type: string
+          description: Base64 encoded file content (only included when includeFile=true)
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+        updatedBy:
+          type: integer
+    
+    MopTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+        masterCommunity:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        community:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        tower:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        templateType:
+          type: string
+          enum: [move-out]
+        templateString:
+          type: string
+          description: Base64 encoded file content (only included when includeFile=true)
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+        updatedBy:
+          type: integer
+    
+    TemplateHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+        template:
+          type: object
+          $ref: "#/components/schemas/Template"
+        action:
+          type: string
+          enum: [create, update, delete]
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+            username:
+              type: string
+        createdAt:
+          type: string
+          format: date-time
+
   securitySchemes:
     bearerAuth:
       type: http

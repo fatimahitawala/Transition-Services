@@ -64,6 +64,383 @@ router.get('/welcome-pack/:id', authMiddleware.auth(), validate(documentsValidat
 router.get('/welcome-pack/:id/download', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.downloadWelcomePackFile));
 router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePackFile'), validate(documentsValidation.updateWelcomePack), catchAsync(documentsController.updateWelcomePack));
 
+       // MIP (Move In Permit) and MOP (Move Out Permit) Templates Routes (Admin routes) - All routes require authentication
+
+       /**
+        * @swagger
+        * /documents/templates:
+        *   get:
+        *     summary: Get list of templates (MIP and MOP only)
+        *     tags: [Documents - Templates]
+        *     security:
+        *       - bearerAuth: []
+        *     parameters:
+        *       - in: query
+        *         name: templateType
+        *         schema:
+        *           type: string
+        *           enum: [MIP, MOP]
+        *         description: Type of template to filter by (MIP = Move In Permit, MOP = Move Out Permit)
+        *       - in: query
+        *         name: page
+        *         schema:
+        *           type: integer
+        *           default: 1
+        *         description: Page number for pagination
+        *       - in: query
+        *         name: per_page
+        *         schema:
+        *           type: integer
+        *           default: 20
+        *         description: Number of items per page
+        *       - in: query
+        *         name: masterCommunityIds
+        *         schema:
+        *           type: string
+        *         description: Comma-separated master community IDs for filtering
+        *       - in: query
+        *         name: communityIds
+        *         schema:
+        *           type: string
+        *         description: Comma-separated community IDs for filtering
+        *       - in: query
+        *         name: towerIds
+        *         schema:
+        *           type: string
+        *         description: Comma-separated tower IDs for filtering
+        *       - in: query
+        *         name: search
+        *         schema:
+        *           type: string
+        *         description: Search term for filtering by name
+        *       - in: query
+        *         name: isActive
+        *         schema:
+        *           type: boolean
+        *         description: Filter by active status
+        *       - in: query
+        *         name: startDate
+        *         schema:
+        *           type: string
+        *           format: date
+        *         description: Start date for filtering
+        *       - in: query
+        *         name: endDate
+        *         schema:
+        *           type: string
+        *           format: date
+        *         description: End date for filtering
+        *       - in: query
+        *         name: sortBy
+        *         schema:
+        *           type: string
+        *           default: createdAt
+        *         description: Field to sort by
+        *       - in: query
+        *         name: sortOrder
+        *         schema:
+        *           type: string
+        *           enum: [ASC, DESC]
+        *           default: DESC
+        *         description: Sort order
+        *       - in: query
+        *         name: includeFile
+        *         schema:
+        *           type: boolean
+        *           default: false
+        *         description: Whether to include template file content
+        *     responses:
+        *       200:
+        *         description: List of templates retrieved successfully
+        *         content:
+        *           application/json:
+        *             schema:
+        *               type: object
+        *               properties:
+        *                 success:
+        *                   type: boolean
+        *                 message:
+        *                   type: string
+        *                 data:
+        *                   type: array
+        *                   items:
+        *                     $ref: '#/components/schemas/Template'
+        *                 pagination:
+        *                   type: object
+        *                   properties:
+        *                     currentPage:
+        *                       type: integer
+        *                     totalPages:
+        *                       type: integer
+        *                     totalItems:
+        *                       type: integer
+        *                     itemsPerPage:
+        *                       type: integer
+        *       401:
+        *         description: Unauthorized
+        *       500:
+        *         description: Internal server error
+        */
+       router.get('/templates', authMiddleware.auth(), validate(documentsValidation.getTemplateList), catchAsync(documentsController.getTemplateList));
+
+       /**
+        * @swagger
+        * /documents/templates:
+        *   post:
+        *     summary: Create a new template (MIP or MOP only)
+        *     tags: [Documents - Templates]
+        *     security:
+        *       - bearerAuth: []
+        *     requestBody:
+        *       required: true
+        *       content:
+        *         multipart/form-data:
+        *           schema:
+        *             type: object
+        *             required:
+        *               - masterCommunityId
+        *               - communityId
+        *               - templateType
+        *               - templateFile
+        *             properties:
+        *               masterCommunityId:
+        *                 type: integer
+        *                 description: Master Community ID
+        *               communityId:
+        *                 type: integer
+        *                 description: Community ID
+        *               towerId:
+        *                 type: integer
+        *                 description: Tower ID (optional)
+        *               templateType:
+        *                 type: string
+        *                 enum: [MIP, MOP]
+        *                 description: Type of template (MIP = Move In Permit, MOP = Move Out Permit)
+        *               isActive:
+        *                 type: boolean
+        *                 description: Whether the template is active
+        *               templateFile:
+        *                 type: string
+        *                 format: binary
+        *                 description: Template file (PDF or HTML, max 10MB)
+        *     responses:
+        *       201:
+        *         description: Template created successfully
+        *         content:
+        *           application/json:
+        *             schema:
+        *               type: object
+        *               properties:
+        *                 success:
+        *                   type: boolean
+        *                 message:
+        *                   type: string
+        *                 data:
+        *                   $ref: '#/components/schemas/Template'
+        *       400:
+        *         description: Bad request - validation error or file type/size issue
+        *       401:
+        *         description: Unauthorized
+        *       500:
+        *         description: Internal server error
+        */
+       router.post('/templates', authMiddleware.auth(), upload.single('templateFile'), validate(documentsValidation.createTemplate), catchAsync(documentsController.createTemplate));
+
+       /**
+        * @swagger
+        * /documents/templates/{id}:
+        *   get:
+        *     summary: Get template by ID
+        *     tags: [Documents - Templates]
+        *     security:
+        *       - bearerAuth: []
+        *     parameters:
+        *       - in: path
+        *         name: id
+        *         required: true
+        *         schema:
+        *           type: integer
+        *         description: Template ID
+        *       - in: query
+        *         name: includeFile
+        *         schema:
+        *           type: boolean
+        *           default: false
+        *         description: Whether to include template file content
+        *     responses:
+        *       200:
+        *         description: Template retrieved successfully
+        *         content:
+        *           application/json:
+        *             schema:
+        *               type: object
+        *               properties:
+        *                 success:
+        *                   type: boolean
+        *                 message:
+        *                   type: string
+        *                 data:
+        *                   $ref: '#/components/schemas/Template'
+        *       401:
+        *         description: Unauthorized
+        *       404:
+        *         description: Template not found
+        *       500:
+        *         description: Internal server error
+        */
+       router.get('/templates/:id', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateById));
+
+       /**
+        * @swagger
+        * /documents/templates/{id}/download:
+        *   get:
+        *     summary: Download template file
+        *     tags: [Documents - Templates]
+        *     security:
+        *       - bearerAuth: []
+        *     parameters:
+        *       - in: path
+        *         name: id
+        *         required: true
+        *         schema:
+        *           type: integer
+        *         description: Template ID
+        *     responses:
+        *       200:
+        *         description: File content
+        *         content:
+        *           application/pdf:
+        *             schema:
+        *               type: string
+        *               format: binary
+        *           text/html:
+        *             schema:
+        *               type: string
+        *       401:
+        *         description: Unauthorized
+        *       404:
+        *         description: Template or file not found
+        *       500:
+        *         description: Internal server error
+        */
+       router.get('/templates/:id/download', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.downloadTemplateFile));
+
+       /**
+        * @swagger
+        * /documents/templates/{id}:
+        *   put:
+        *     summary: Update template
+        *     tags: [Documents - Templates]
+        *     security:
+        *       - bearerAuth: []
+        *     parameters:
+        *       - in: path
+        *         name: id
+        *         required: true
+        *         schema:
+        *           type: integer
+        *         description: Template ID
+        *     requestBody:
+        *       required: true
+        *       content:
+        *         multipart/form-data:
+        *           schema:
+        *             type: object
+        *             properties:
+        *               isActive:
+        *                 type: boolean
+        *                 description: Whether the template is active
+        *               templateFile:
+        *                 type: string
+        *                 format: binary
+        *                 description: New template file (PDF or HTML, max 10MB)
+        *     responses:
+        *       200:
+        *         description: Template updated successfully
+        *         content:
+        *           application/json:
+        *             schema:
+        *               type: object
+        *               properties:
+        *                 success:
+        *                   type: boolean
+        *                 message:
+        *                   type: string
+        *                 data:
+        *                   $ref: '#/components/schemas/Template'
+        *       400:
+        *         description: Bad request - validation error or file type/size issue
+        *       401:
+        *         description: Unauthorized
+        *       404:
+        *         description: Template not found
+        *       500:
+        *         description: Internal server error
+        */
+       router.put('/templates/:id', authMiddleware.auth(), upload.single('templateFile'), validate(documentsValidation.updateTemplate), catchAsync(documentsController.updateTemplate));
+
+       /**
+        * @swagger
+        * /documents/templates/{id}/history:
+        *   get:
+        *     summary: Get template history
+        *     tags: [Documents - Templates]
+        *     security:
+        *       - bearerAuth: []
+        *     parameters:
+        *       - in: path
+        *         name: id
+        *         required: true
+        *         schema:
+        *           type: integer
+        *         description: Template ID
+        *     responses:
+        *       200:
+        *         description: Template history retrieved successfully
+        *         content:
+        *           application/json:
+        *             schema:
+        *               type: object
+        *               properties:
+        *                 success:
+        *                   type: boolean
+        *                 message:
+        *                   type: string
+        *                 data:
+        *                   type: array
+        *                   items:
+        *                     $ref: '#/components/schemas/TemplateHistory'
+        *       401:
+        *         description: Unauthorized
+        *       404:
+        *         description: Template not found
+        *       500:
+        *         description: Internal server error
+        */
+       router.get('/templates/:id/history', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateHistory));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /**
  * @swagger
  * /documents/welcome-pack/{id}/download:
@@ -105,6 +482,8 @@ export default router;
  * tags:
  *   name: Documents
  *   description: Welcome Pack Management
+ *   name: Documents - Templates
+ *   description: Consolidated Templates Management (MIP and MOP)
  */
 
 /**
@@ -380,35 +759,98 @@ export default router;
  *         description: Internal server error
  */
 
-/**
- * @swagger
- * components:
- *   schemas:
- *     WelcomePack:
- *       type: object
- *       properties:
- *         id:
- *           type: integer
- *         masterCommunityId:
- *           type: integer
- *         communityId:
- *           type: integer
- *         towerId:
- *           type: integer
- *           nullable: true
- *         templateString:
- *           type: string
- *           description: Base64 encoded file content (only included when includeFile=true)
- *         isActive:
- *           type: boolean
- *         createdAt:
- *           type: string
- *           format: date-time
- *         updatedAt:
- *           type: string
- *           format: date-time
- *         createdBy:
- *           type: integer
- *         updatedBy:
- *           type: integer
- */
+       /**
+        * @swagger
+        * components:
+        *   schemas:
+        *     WelcomePack:
+        *       type: object
+        *       properties:
+        *         id:
+        *           type: integer
+        *         masterCommunityId:
+        *           type: integer
+        *         communityId:
+        *           type: integer
+        *         towerId:
+        *           type: integer
+        *           nullable: true
+        *         templateString:
+        *           type: string
+        *           description: Base64 encoded file content (only included when includeFile=true)
+        *         isActive:
+        *           type: boolean
+        *         createdAt:
+        *           type: string
+        *           format: date-time
+        *         updatedAt:
+        *           type: string
+        *           format: date-time
+        *         createdBy:
+        *           type: integer
+        *         updatedBy:
+        *           type: integer
+        *     
+        *     Template:
+        *       type: object
+        *       properties:
+        *         id:
+        *           type: integer
+        *         masterCommunity:
+        *           type: object
+        *           properties:
+        *             id:
+        *               type: integer
+        *             name:
+        *               type: string
+        *         community:
+        *           type: object
+        *           properties:
+        *             id:
+        *               type: integer
+        *             name:
+        *               type: string
+        *         tower:
+        *           type: object
+        *           nullable: true
+        *           properties:
+        *             id:
+        *               type: integer
+        *             name:
+        *               type: string
+        *         templateType:
+        *           type: string
+        *           enum: [MIP, MOP]
+        *         templateString:
+        *           type: string
+        *           description: Base64 encoded file content (only included when includeFile=true)
+        *         isActive:
+        *           type: boolean
+        *         createdAt:
+        *           type: string
+        *           format: date-time
+        *         updatedAt:
+        *           type: string
+        *           format: date-time
+        *         createdBy:
+        *           type: integer
+        *         updatedBy:
+        *           type: integer
+        *     
+        *     TemplateHistory:
+        *       type: object
+        *       properties:
+        *         id:
+        *           type: integer
+        *         templateType:
+        *           type: string
+        *           enum: [MIP, MOP]
+        *         isActive:
+        *           type: boolean
+        *         createdAt:
+        *           type: string
+        *           format: date-time
+        *         updatedAt:
+        *           type: string
+        *           format: date-time
+        */

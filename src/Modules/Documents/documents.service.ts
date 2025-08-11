@@ -1,26 +1,15 @@
-import { OccupancyRequestWelcomePack } from '../../Entities/OccupancyRequestWelcomePack.entity';
 import { AppDataSource } from '../../Common/data-source';
-import httpStatus from 'http-status';
+import { OccupancyRequestWelcomePack } from '../../Entities/OccupancyRequestWelcomePack.entity';
+import { OccupancyRequestTemplates } from '../../Entities/OccupancyRequestTemplates.entity';
+import { OccupancyRequestTemplateHistory } from '../../Entities/OccupancyRequestTemplateHistory.entity';
 import ApiError from '../../Common/Utils/ApiError';
 import { APICodes } from '../../Common/Constants/apiCodes.en';
-import { getPaginationInfo } from '../../Common/Utils/paginationUtils';
-import { logger } from '../../Common/Utils/logger';
 
-/**
- * DocumentsService - Manages welcome pack documents
- * 
- * Business Rules:
- * 1. Only one active welcome pack can exist per combination of masterCommunityId, communityId, and towerId
- * 2. When creating a new welcome pack with existing combination: all existing records become inactive, new one becomes active
- * 3. When editing a welcome pack status from inactive to active: all other records with same combination become inactive
- * 4. Supported file types: PDF and HTML only
- * 5. File size limit: 10MB
- */
 export class DocumentsService {
 
     health() {
-        return { 
-            success: true,
+        return {
+            status: 'OK',
             message: 'Documents service is running',
             timestamp: new Date().toISOString()
         };
@@ -43,7 +32,10 @@ export class DocumentsService {
 
             const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
             
-            let getWelcomePackList = welcomePackRepository.createQueryBuilder('welcomePack');
+            let getWelcomePackList = welcomePackRepository.createQueryBuilder('welcomePack')
+                .leftJoinAndSelect('welcomePack.masterCommunity', 'masterCommunity')
+                .leftJoinAndSelect('welcomePack.community', 'community')
+                .leftJoinAndSelect('welcomePack.tower', 'tower');
             
             // Add templateString field if includeFile is true
             if (includeFile === 'true' || includeFile === true) {
@@ -55,31 +47,31 @@ export class DocumentsService {
             let whereParams: any = {};
             
             if (isActive !== undefined && isActive !== '') {
-                whereClause = "welcomePack.isActive = :isActive";
+                whereClause += " AND welcomePack.isActive = :isActive";
                 whereParams.isActive = isActive === 'true' || isActive === true;
             }
 
             // Add filtering by master community
             if (masterCommunityIds && masterCommunityIds.length) {
-                whereClause += " AND welcomePack.masterCommunityId IN (:...masterCommunityIds)";
+                whereClause += " AND welcomePack.masterCommunity.id IN (:...masterCommunityIds)";
                 whereParams.masterCommunityIds = masterCommunityIds;
             }
 
             // Add filtering by community
             if (communityIds && communityIds.length) {
-                whereClause += " AND welcomePack.communityId IN (:...communityIds)";
+                whereClause += " AND welcomePack.community.id IN (:...communityIds)";
                 whereParams.communityIds = communityIds;
             }
 
             // Add filtering by tower
             if (towerIds && towerIds.length) {
-                whereClause += " AND welcomePack.towerId IN (:...towerIds)";
+                whereClause += " AND welcomePack.tower.id IN (:...towerIds)";
                 whereParams.towerIds = towerIds;
             }
 
             // Add search functionality
             if (search) {
-                whereClause += " AND (welcomePack.masterCommunityId LIKE :search OR welcomePack.communityId LIKE :search OR welcomePack.towerId LIKE :search)";
+                whereClause += " AND (masterCommunity.name LIKE :search OR community.name LIKE :search OR tower.name LIKE :search)";
                 whereParams.search = `%${search}%`;
             }
 
@@ -98,41 +90,51 @@ export class DocumentsService {
 
             // Add sorting
             getWelcomePackList.orderBy(`welcomePack.${sortBy}`, sortOrder);
-            
-            // Log the generated SQL query for debugging
-            logger.info(`Generated SQL query: ${getWelcomePackList.getSql()}`);
-            logger.info(`Query parameters: ${JSON.stringify(whereParams)}`);
 
             // Get total count for pagination
-            const count = await getWelcomePackList.getCount();
+            const totalCount = await getWelcomePackList.getCount();
 
             // Add pagination
-            getWelcomePackList.offset((page - 1) * per_page).limit(per_page);
+            const offset = (page - 1) * per_page;
+            getWelcomePackList.skip(offset).take(per_page);
 
-            const welcomePacks = await getWelcomePackList.getMany();
-            
-            // Log the results for debugging
-            logger.info(`Found ${welcomePacks.length} welcome packs`);
-            logger.info(`Sample welcome pack: ${JSON.stringify(welcomePacks[0] || {})}`);
-            
-            let processedWelcomePacks;
-            if (includeFile === 'true' || includeFile === true) {
-                // Return with file content
-                processedWelcomePacks = welcomePacks;
-            } else {
-                // Remove templateString from response to avoid sending large base64 data
-                processedWelcomePacks = welcomePacks.map(pack => {
-                    const { templateString, ...packWithoutFile } = pack;
-                    return packWithoutFile;
-                });
-            }
-            
-            const pagination = getPaginationInfo(page, per_page, count);
-            return { data: processedWelcomePacks, pagination };
-        } catch (error: any) {
-            logger.error(`Error in getWelcomePackList: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+            // Execute query
+            const data = await getWelcomePackList.getMany();
+
+            // Format response data
+            const formattedData = data.map((item: any) => ({
+                id: item.id,
+                masterCommunity: {
+                    id: item.masterCommunity?.id,
+                    name: item.masterCommunity?.name
+                },
+                community: {
+                    id: item.community?.id,
+                    name: item.community?.name
+                },
+                tower: item.tower ? {
+                    id: item.tower.id,
+                    name: item.tower.name
+                } : null,
+                templateString: item.templateString,
+                isActive: item.isActive,
+                createdAt: item.createdAt,
+                updatedAt: item.updatedAt,
+                createdBy: item.createdBy,
+                updatedBy: item.updatedBy
+            }));
+
+            return {
+                data: formattedData,
+                pagination: {
+                    currentPage: page,
+                    totalPages: Math.ceil(totalCount / per_page),
+                    totalItems: totalCount,
+                    itemsPerPage: per_page
+                }
+            };
+        } catch (error) {
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to get welcome pack list');
         }
     }
 
@@ -142,100 +144,66 @@ export class DocumentsService {
             if (!AppDataSource.isInitialized) {
                 await AppDataSource.initialize();
             }
-            
-            const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
-            
-            // Handle file upload
-            let templateString = data.templateString || '';
-            let fileName = '';
-            let fileType = '';
-            
-            if (file) {
-                // Validate file type
-                const allowedMimeTypes = [
-                    'application/pdf',
-                    'text/html'
-                ];
-                
-                if (!allowedMimeTypes.includes(file.mimetype)) {
-                    throw new ApiError(httpStatus.BAD_REQUEST, 'Only PDF and HTML files are allowed', 'EC400');
-                }
-                
-                // Validate file size (max 10MB)
-                const maxSize = 10 * 1024 * 1024; // 10MB
-                if (file.size > maxSize) {
-                    throw new ApiError(httpStatus.BAD_REQUEST, 'File size must be less than 10MB', 'EC400');
-                }
-                
-                // Convert file to base64
-                templateString = file.buffer.toString('base64');
-                fileName = file.originalname;
-                fileType = file.mimetype;
+
+            const { masterCommunityId, communityId, towerId, isActive = true } = data;
+
+            // Validate file
+            if (!file) {
+                throw new ApiError(APICodes.BAD_REQUEST, 'File is required');
             }
 
-            // Validate required fields
-            if (!data.masterCommunityId || !data.communityId) {
-                throw new ApiError(httpStatus.BAD_REQUEST, 'Master Community ID and Community ID are required', 'EC400');
+            if (file.size > 10 * 1024 * 1024) { // 10MB
+                throw new ApiError(APICodes.BAD_REQUEST, 'File size must be less than 10MB');
             }
 
-            // Check for existing welcome pack with same combination
-            const whereCondition: any = {
-                masterCommunityId: parseInt(data.masterCommunityId),
-                communityId: parseInt(data.communityId)
+            const allowedTypes = ['application/pdf', 'text/html'];
+            if (!allowedTypes.includes(file.mimetype)) {
+                throw new ApiError(APICodes.BAD_REQUEST, 'Only PDF and HTML files are allowed');
+            }
+
+            // Deactivate existing active welcome packs for the same combination
+            const existingWelcomePack = await AppDataSource.getRepository(OccupancyRequestWelcomePack)
+                .createQueryBuilder('welcomePack')
+                .where('welcomePack.masterCommunity.id = :masterCommunityId', { masterCommunityId })
+                .andWhere('welcomePack.community.id = :communityId', { communityId })
+                .andWhere('welcomePack.isActive = :isActive', { isActive: true });
+
+            if (towerId) {
+                existingWelcomePack.andWhere('welcomePack.tower.id = :towerId', { towerId });
+            } else {
+                existingWelcomePack.andWhere('welcomePack.tower IS NULL');
+            }
+
+            const existingPack = await existingWelcomePack.getOne();
+
+            if (existingPack) {
+                existingPack.isActive = false;
+                existingPack.updatedBy = userId;
+                await AppDataSource.getRepository(OccupancyRequestWelcomePack).save(existingPack);
+            }
+
+            // Create new welcome pack
+            const welcomePackData: any = {
+                masterCommunity: { id: masterCommunityId },
+                community: { id: communityId },
+                templateString: file.buffer,
+                isActive,
+                createdBy: userId
             };
-            
-            if (data.towerId) {
-                whereCondition.towerId = parseInt(data.towerId);
-            } else {
-                whereCondition.towerId = null;
+
+            if (towerId) {
+                welcomePackData.tower = { id: towerId };
             }
 
-            const existingWelcomePacks = await welcomePackRepository.find({
-                where: whereCondition
-            });
+            const welcomePack = AppDataSource.getRepository(OccupancyRequestWelcomePack).create(welcomePackData);
+            const savedWelcomePack = await AppDataSource.getRepository(OccupancyRequestWelcomePack).save(welcomePack);
 
-            let savedWelcomePack;
-
-            if (existingWelcomePacks && existingWelcomePacks.length > 0) {
-                // If records exist with same combination, make all existing records inactive
-                const updateResult = await welcomePackRepository.update(
-                    whereCondition,
-                    { isActive: false, updatedBy: userId || 0 }
-                );
-                
-                logger.info(`Made ${updateResult.affected} existing welcome pack records inactive for combination: masterCommunityId=${data.masterCommunityId}, communityId=${data.communityId}, towerId=${data.towerId || 'null'}`);
-
-                // Create new welcome pack as active
-                const welcomePack = new OccupancyRequestWelcomePack();
-                welcomePack.masterCommunityId = parseInt(data.masterCommunityId);
-                welcomePack.communityId = parseInt(data.communityId);
-                welcomePack.towerId = data.towerId ? parseInt(data.towerId) : null;
-                welcomePack.templateString = templateString;
-                welcomePack.isActive = true; // Always active for new creation
-                welcomePack.createdBy = userId || 0;
-                welcomePack.updatedBy = userId || 0;
-
-                savedWelcomePack = await welcomePackRepository.save(welcomePack);
-            } else {
-                // Create new welcome pack (no existing records with same combination)
-                const welcomePack = new OccupancyRequestWelcomePack();
-                welcomePack.masterCommunityId = parseInt(data.masterCommunityId);
-                welcomePack.communityId = parseInt(data.communityId);
-                welcomePack.towerId = data.towerId ? parseInt(data.towerId) : null;
-                welcomePack.templateString = templateString;
-                welcomePack.isActive = true; // Always active for new creation
-                welcomePack.createdBy = userId || 0;
-                welcomePack.updatedBy = userId || 0;
-
-                savedWelcomePack = await welcomePackRepository.save(welcomePack);
-            }
-            
-            // Return the saved welcome pack with all metadata
             return savedWelcomePack;
-        } catch (error: any) {
-            logger.error(`Error in createWelcomePack: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to create welcome pack');
         }
     }
 
@@ -245,29 +213,31 @@ export class DocumentsService {
             if (!AppDataSource.isInitialized) {
                 await AppDataSource.initialize();
             }
-            
+
             const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
             
-            const welcomePack = await welcomePackRepository.findOne({
-                where: { id }
-            });
-
-            if (!welcomePack) {
-                throw new ApiError(httpStatus.NOT_FOUND, 'Welcome pack not found', 'EC404');
-            }
+            let queryBuilder = welcomePackRepository.createQueryBuilder('welcomePack')
+                .leftJoinAndSelect('welcomePack.masterCommunity', 'masterCommunity')
+                .leftJoinAndSelect('welcomePack.community', 'community')
+                .leftJoinAndSelect('welcomePack.tower', 'tower')
+                .where('welcomePack.id = :id', { id });
 
             if (includeFile) {
-                // Return with file content
-                return welcomePack;
-            } else {
-                // Remove templateString from response to avoid sending large base64 data
-                const { templateString, ...welcomePackWithoutFile } = welcomePack;
-                return welcomePackWithoutFile;
+                queryBuilder.addSelect('welcomePack.templateString');
             }
-        } catch (error: any) {
-            logger.error(`Error in getWelcomePackById: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+
+            const welcomePack = await queryBuilder.getOne();
+
+            if (!welcomePack) {
+                throw new ApiError(APICodes.NOT_FOUND, 'Welcome pack not found');
+            }
+
+            return welcomePack;
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to get welcome pack');
         }
     }
 
@@ -277,44 +247,42 @@ export class DocumentsService {
             if (!AppDataSource.isInitialized) {
                 await AppDataSource.initialize();
             }
-            
-            const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
-            
-            const welcomePack = await welcomePackRepository.findOne({
-                where: { id }
-            });
 
-            if (!welcomePack) {
-                throw new ApiError(httpStatus.NOT_FOUND, 'Welcome pack not found', 'EC404');
-            }
+            const welcomePack = await this.getWelcomePackById(id, true);
 
             if (!welcomePack.templateString) {
-                throw new ApiError(httpStatus.NOT_FOUND, 'No file content found', 'EC404');
+                throw new ApiError(APICodes.NOT_FOUND, 'Welcome pack file not found');
             }
 
-            // Convert base64 back to buffer
-            const fileBuffer = Buffer.from(welcomePack.templateString, 'base64');
-            
-            // Since we don't store MIME type in the database, we'll infer it from the file content
-            // Check if the content starts with HTML tags or PDF magic numbers
-            const contentStart = fileBuffer.toString('utf8', 0, 100).toLowerCase();
-            let fileExtension = 'pdf';
-            let contentType = 'application/pdf';
-            
-            if (contentStart.includes('<!doctype html') || contentStart.includes('<html') || contentStart.includes('<head')) {
-                fileExtension = 'html';
-                contentType = 'text/html';
+            let contentType = 'application/octet-stream';
+            let fileName = `welcome-pack-${id}`;
+
+            // Try to determine if it's PDF or HTML based on content
+            if (Buffer.isBuffer(welcomePack.templateString)) {
+                // Check if it's a PDF by looking at the first few bytes
+                if (welcomePack.templateString.length >= 4 && 
+                    welcomePack.templateString[0] === 0x25 && 
+                    welcomePack.templateString[1] === 0x50 && 
+                    welcomePack.templateString[2] === 0x44 && 
+                    welcomePack.templateString[3] === 0x46) {
+                    contentType = 'application/pdf';
+                    fileName += '.pdf';
+                } else {
+                    contentType = 'text/html';
+                    fileName += '.html';
+                }
             }
-            
+
             return {
-                buffer: fileBuffer,
-                fileName: `welcome-pack-${id}.${fileExtension}`,
-                contentType: contentType
+                buffer: welcomePack.templateString,
+                contentType,
+                fileName
             };
-        } catch (error: any) {
-            logger.error(`Error in downloadWelcomePackFile: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to download welcome pack file');
         }
     }
 
@@ -324,194 +292,503 @@ export class DocumentsService {
             if (!AppDataSource.isInitialized) {
                 await AppDataSource.initialize();
             }
-            
-            const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
-            
-            const welcomePack = await welcomePackRepository.findOne({ where: { id } });
-            if (!welcomePack) {
-                throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
-            }
 
-            // Handle file upload if provided
-            if (file) {
-                // Validate file type
-                const allowedMimeTypes = [
-                    'application/pdf',
-                    'text/html'
-                ];
-                
-                if (!allowedMimeTypes.includes(file.mimetype)) {
-                    throw new ApiError(httpStatus.BAD_REQUEST, 'Only PDF and HTML files are allowed', 'EC400');
-                }
-                
-                // Validate file size (max 10MB)
-                const maxSize = 10 * 1024 * 1024; // 10MB
-                if (file.size > maxSize) {
-                    throw new ApiError(httpStatus.BAD_REQUEST, 'File size must be less than 10MB', 'EC400');
-                }
-                
-                // Convert file to base64 and update
-                welcomePack.templateString = file.buffer.toString('base64');
-            }
+            const welcomePack = await this.getWelcomePackById(id);
 
-            // Check if status is being changed from inactive to active
-            if (data.isActive !== undefined) {
-                const newStatus = data.isActive === 'true' || data.isActive === true;
-                const currentStatus = welcomePack.isActive;
-                
-                // If changing from inactive to active, make all other records with same combination inactive
-                if (!currentStatus && newStatus) {
-                    const whereCondition: any = {
-                        masterCommunityId: welcomePack.masterCommunityId,
-                        communityId: welcomePack.communityId
-                    };
-                    
-                    if (welcomePack.towerId) {
-                        whereCondition.towerId = welcomePack.towerId;
-                    } else {
-                        whereCondition.towerId = null;
+            // If updating to active, deactivate other active welcome packs for the same combination
+            if (data.isActive === true) {
+                const queryBuilder = AppDataSource.getRepository(OccupancyRequestWelcomePack)
+                    .createQueryBuilder('welcomePack')
+                    .where('welcomePack.id != :id', { id })
+                    .andWhere('welcomePack.masterCommunityId = :masterCommunityId', { masterCommunityId: welcomePack.masterCommunityId })
+                    .andWhere('welcomePack.communityId = :communityId', { communityId: welcomePack.communityId })
+                    .andWhere('welcomePack.isActive = :isActive', { isActive: true });
+
+                if (welcomePack.towerId) {
+                    queryBuilder.andWhere('welcomePack.towerId = :towerId', { towerId: welcomePack.towerId });
+                } else {
+                    queryBuilder.andWhere('welcomePack.towerId IS NULL');
+                }
+
+                const activeWelcomePacks = await queryBuilder.getMany();
+
+                if (activeWelcomePacks.length > 0) {
+                    // Deactivate existing welcome packs
+                    for (const activeWelcomePack of activeWelcomePacks) {
+                        activeWelcomePack.isActive = false;
+                        activeWelcomePack.updatedBy = userId;
+                        await AppDataSource.getRepository(OccupancyRequestWelcomePack).save(activeWelcomePack);
                     }
-                    
-                    // Make all other records with same combination inactive
-                    const updateResult = await welcomePackRepository.update(
-                        whereCondition,
-                        { isActive: false, updatedBy: userId || 0 }
-                    );
-                    
-                    logger.info(`Made ${updateResult.affected} other welcome pack records inactive for combination: masterCommunityId=${welcomePack.masterCommunityId}, communityId=${welcomePack.communityId}, towerId=${welcomePack.towerId}`);
                 }
-                
-                welcomePack.isActive = newStatus;
-                logger.info(`Updated welcome pack ${id} status from ${currentStatus} to ${newStatus}`);
             }
-            
-            welcomePack.updatedBy = userId || 0;
 
-            const updatedWelcomePack = await welcomePackRepository.save(welcomePack);
-            
-            // Remove templateString from response to avoid sending large base64 data
-            const { templateString, ...welcomePackWithoutFile } = updatedWelcomePack;
-            return welcomePackWithoutFile;
-        } catch (error: any) {
-            logger.error(`Error in updateWelcomePack: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+            // Update welcome pack data
+            if (file) {
+                // Validate file type and size
+                if (file.size > 10 * 1024 * 1024) { // 10MB
+                    throw new ApiError(APICodes.BAD_REQUEST, 'File size must be less than 10MB');
+                }
+
+                const allowedTypes = ['application/pdf', 'text/html'];
+                if (!allowedTypes.includes(file.mimetype)) {
+                    throw new ApiError(APICodes.BAD_REQUEST, 'Only PDF and HTML files are allowed');
+                }
+
+                data.templateString = file.buffer;
+            }
+
+            data.updatedBy = userId;
+
+            // Update the welcome pack
+            Object.assign(welcomePack, data);
+            const updatedWelcomePack = await AppDataSource.getRepository(OccupancyRequestWelcomePack).save(welcomePack);
+
+            if (!updatedWelcomePack) {
+                throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to update welcome pack');
+            }
+
+            return updatedWelcomePack;
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to update welcome pack');
         }
     }
 
-    // Get active welcome pack for a specific combination
     async getActiveWelcomePack(masterCommunityId: number, communityId: number, towerId?: number) {
         try {
             // Ensure database connection is initialized
             if (!AppDataSource.isInitialized) {
                 await AppDataSource.initialize();
             }
-            
-            const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
-            
-            const whereCondition: any = {
-                masterCommunityId,
-                communityId,
-                isActive: true
-            };
-            
+
+            const queryBuilder = AppDataSource.getRepository(OccupancyRequestWelcomePack)
+                .createQueryBuilder('welcomePack')
+                .leftJoinAndSelect('welcomePack.masterCommunity', 'masterCommunity')
+                .leftJoinAndSelect('welcomePack.community', 'community')
+                .leftJoinAndSelect('welcomePack.tower', 'tower')
+                .where('welcomePack.masterCommunity.id = :masterCommunityId', { masterCommunityId })
+                .andWhere('welcomePack.community.id = :communityId', { communityId })
+                .andWhere('welcomePack.isActive = :isActive', { isActive: true });
+
             if (towerId) {
-                whereCondition.towerId = towerId;
+                queryBuilder.andWhere('welcomePack.tower.id = :towerId', { towerId });
             } else {
-                whereCondition.towerId = null;
+                queryBuilder.andWhere('welcomePack.tower IS NULL');
             }
 
-            const activeWelcomePack = await welcomePackRepository.findOne({
-                where: whereCondition
-            });
+            const welcomePack = await queryBuilder.getOne();
 
-            return activeWelcomePack;
-        } catch (error: any) {
-            logger.error(`Error in getActiveWelcomePack: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+            if (!welcomePack) {
+                throw new ApiError(APICodes.NOT_FOUND, 'No active welcome pack found for the specified combination');
+            }
+
+            return welcomePack;
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to get active welcome pack');
         }
     }
 
-    // Helper method to ensure data consistency - only one active record per combination
     async ensureDataConsistency() {
         try {
             // Ensure database connection is initialized
             if (!AppDataSource.isInitialized) {
                 await AppDataSource.initialize();
             }
-            
-            const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
-            
-            // Find all combinations that have multiple active records
-            const duplicateActiveRecords = await welcomePackRepository
+
+            // Find all active welcome packs
+            const activeWelcomePacks = await AppDataSource.getRepository(OccupancyRequestWelcomePack)
                 .createQueryBuilder('welcomePack')
-                .select([
-                    'welcomePack.masterCommunityId',
-                    'welcomePack.communityId',
-                    'welcomePack.towerId',
-                    'COUNT(welcomePack.id) as count'
-                ])
                 .where('welcomePack.isActive = :isActive', { isActive: true })
-                .groupBy('welcomePack.masterCommunityId, welcomePack.communityId, welcomePack.towerId')
-                .having('COUNT(welcomePack.id) > 1')
-                .getRawMany();
+                .getMany();
 
-            let fixedCount = 0;
-            
-            for (const record of duplicateActiveRecords) {
-                const whereCondition: any = {
-                    masterCommunityId: record.masterCommunityId,
-                    communityId: record.communityId
-                };
+            // Group by master community, community, and tower combination
+            const groupedWelcomePacks = new Map();
+
+            for (const welcomePack of activeWelcomePacks) {
+                const key = `${welcomePack.masterCommunityId}-${welcomePack.communityId}-${welcomePack.towerId || 'null'}`;
                 
-                if (record.towerId) {
-                    whereCondition.towerId = record.towerId;
-                } else {
-                    whereCondition.towerId = null;
+                if (!groupedWelcomePacks.has(key)) {
+                    groupedWelcomePacks.set(key, []);
                 }
+                groupedWelcomePacks.get(key).push(welcomePack);
+            }
 
-                // Get all active records for this combination
-                const activeRecords = await welcomePackRepository.find({
-                    where: whereCondition,
-                    order: { createdAt: 'DESC' }
-                });
-
-                // Keep only the most recent one active, make others inactive
-                if (activeRecords.length > 1) {
-                    const recordsToDeactivate = activeRecords.slice(1); // All except the first (most recent)
-                    const recordIds = recordsToDeactivate.map(r => r.id);
+            // Deactivate all but the most recent welcome pack in each group
+            for (const [key, welcomePacks] of groupedWelcomePacks) {
+                if (welcomePacks.length > 1) {
+                    // Sort by creation date (newest first)
+                    welcomePacks.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
                     
-                    await welcomePackRepository.update(
-                        { id: recordIds[0] },
-                        { isActive: false, updatedBy: 0 }
-                    );
-                    
-                    // Update remaining records one by one if there are more
-                    for (let i = 1; i < recordIds.length; i++) {
-                        await welcomePackRepository.update(
-                            { id: recordIds[i] },
-                            { isActive: false, updatedBy: 0 }
-                        );
+                    // Keep the first one (newest) active, deactivate the rest
+                    for (let i = 1; i < welcomePacks.length; i++) {
+                        welcomePacks[i].isActive = false;
+                        await AppDataSource.getRepository(OccupancyRequestWelcomePack).save(welcomePacks[i]);
                     }
-                    
-                    fixedCount += recordsToDeactivate.length;
-                    logger.info(`Fixed data consistency: Made ${recordsToDeactivate.length} duplicate active records inactive for combination: masterCommunityId=${record.masterCommunityId}, communityId=${record.communityId}, towerId=${record.towerId}`);
                 }
             }
 
-            if (fixedCount > 0) {
-                logger.info(`Data consistency check completed. Fixed ${fixedCount} duplicate active records.`);
-            } else {
-                logger.info('Data consistency check completed. No duplicate active records found.');
-            }
-
-            return { fixedCount, duplicateActiveRecords: duplicateActiveRecords.length };
-        } catch (error: any) {
-            logger.error(`Error in ensureDataConsistency: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+            return {
+                message: 'Data consistency check completed',
+                deactivatedCount: activeWelcomePacks.length - groupedWelcomePacks.size
+            };
+        } catch (error) {
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to ensure data consistency');
         }
     }
 
- }
+    // Consolidated template service methods
+    async getTemplateList(query: any, userId: string) {
+        try {
+            const { page = 1, limit = 10, search, masterCommunityId, communityId, towerId, templateType, includeFile = false } = query;
+            const offset = (page - 1) * limit;
+
+            const queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplates)
+                .createQueryBuilder('template')
+                .leftJoinAndSelect('template.masterCommunity', 'masterCommunity')
+                .leftJoinAndSelect('template.community', 'community')
+                .leftJoinAndSelect('template.tower', 'tower')
+                .where('template.templateType IN (:...templateTypes)', { templateTypes: ['MIP', 'MOP'] })
+                .orderBy('template.createdAt', 'DESC');
+
+            if (search) {
+                queryBuilder.andWhere(
+                    '(masterCommunity.name LIKE :search OR community.name LIKE :search OR tower.name LIKE :search)',
+                    { search: `%${search}%` }
+                );
+            }
+
+            if (masterCommunityId) {
+                queryBuilder.andWhere('masterCommunity.id = :masterCommunityId', { masterCommunityId });
+            }
+
+            if (communityId) {
+                queryBuilder.andWhere('community.id = :communityId', { communityId });
+            }
+
+            if (towerId) {
+                queryBuilder.andWhere('tower.id = :towerId', { towerId });
+            }
+
+            if (templateType) {
+                queryBuilder.andWhere('template.templateType = :templateType', { templateType });
+            }
+
+            const [templates, total] = await queryBuilder
+                .skip(offset)
+                .take(limit)
+                .getManyAndCount();
+
+            // Handle file content if requested
+            if (includeFile) {
+                templates.forEach((template: any) => {
+                    if (template.templateString) {
+                        template.templateString = template.templateString.toString('base64');
+                    }
+                });
+            }
+
+            return {
+                templates,
+                pagination: {
+                    currentPage: page,
+                    totalPages: Math.ceil(total / limit),
+                    totalItems: total,
+                    itemsPerPage: limit
+                }
+            };
+        } catch (error) {
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to get template list');
+        }
+    }
+
+    async createTemplate(data: any, templateFile: any, userId: string) {
+        try {
+            const { masterCommunityId, communityId, towerId, templateType, isActive = true } = data;
+
+            // Validate file type and size
+            if (!templateFile) {
+                throw new ApiError(APICodes.BAD_REQUEST, 'Template file is required');
+            }
+
+            if (templateFile.size > 10 * 1024 * 1024) { // 10MB
+                throw new ApiError(APICodes.BAD_REQUEST, 'File size must be less than 10MB');
+            }
+
+            const allowedTypes = ['application/pdf', 'text/html'];
+            if (!allowedTypes.includes(templateFile.mimetype)) {
+                throw new ApiError(APICodes.BAD_REQUEST, 'Only PDF and HTML files are allowed');
+            }
+
+            // Deactivate existing active templates for the same combination
+            const queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplates)
+                .createQueryBuilder('template')
+                .where('template.masterCommunity.id = :masterCommunityId', { masterCommunityId })
+                .andWhere('template.community.id = :communityId', { communityId })
+                .andWhere('template.templateType = :templateType', { templateType })
+                .andWhere('template.isActive = :isActive', { isActive: true });
+
+            if (towerId) {
+                queryBuilder.andWhere('template.tower.id = :towerId', { towerId });
+            } else {
+                queryBuilder.andWhere('template.tower IS NULL');
+            }
+
+            const existingTemplates = await queryBuilder.getMany();
+
+            if (existingTemplates.length > 0) {
+                // Create history records for existing templates
+                for (const template of existingTemplates) {
+                    const historyRecord = AppDataSource.getRepository(OccupancyRequestTemplateHistory).create({
+                        occupancyRequestTemplates: template,
+                        templateType: template.templateType,
+                        isActive: template.isActive,
+                        createdBy: parseInt(userId)
+                    });
+                    await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
+                }
+
+                // Deactivate existing templates
+                for (const template of existingTemplates) {
+                    template.isActive = false;
+                    template.updatedBy = parseInt(userId);
+                    await AppDataSource.getRepository(OccupancyRequestTemplates).save(template);
+                }
+            }
+
+            // Create new template
+            const templateData: any = {
+                masterCommunity: { id: masterCommunityId },
+                community: { id: communityId },
+                templateType,
+                templateString: templateFile.buffer,
+                isActive,
+                createdBy: parseInt(userId)
+            };
+
+            if (towerId) {
+                templateData.tower = { id: towerId };
+            }
+
+            const template = AppDataSource.getRepository(OccupancyRequestTemplates).create(templateData);
+            const savedTemplate = await AppDataSource.getRepository(OccupancyRequestTemplates).save(template);
+
+            // Create history record
+            const historyRecord = AppDataSource.getRepository(OccupancyRequestTemplateHistory).create({
+                occupancyRequestTemplates: savedTemplate as unknown as OccupancyRequestTemplates,
+                templateType: (savedTemplate as unknown as OccupancyRequestTemplates).templateType,
+                isActive: (savedTemplate as unknown as OccupancyRequestTemplates).isActive,
+                createdBy: parseInt(userId)
+            });
+
+            await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
+
+            return savedTemplate;
+        } catch (error) {
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to create template');
+        }
+    }
+
+    async getTemplateById(id: number, includeFile: boolean = false) {
+        try {
+            const templateRepository = AppDataSource.getRepository(OccupancyRequestTemplates);
+            
+            let queryBuilder = templateRepository.createQueryBuilder('template')
+                .leftJoinAndSelect('template.masterCommunity', 'masterCommunity')
+                .leftJoinAndSelect('template.community', 'community')
+                .leftJoinAndSelect('template.tower', 'tower')
+                .where('template.id = :id', { id });
+
+            if (includeFile) {
+                queryBuilder.addSelect('template.templateString');
+            }
+
+            const template = await queryBuilder.getOne();
+
+            if (!template) {
+                throw new ApiError(APICodes.NOT_FOUND, 'Template not found');
+            }
+
+            return template;
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to get template');
+        }
+    }
+
+    async downloadTemplateFile(id: number) {
+        try {
+            const template = await AppDataSource.getRepository(OccupancyRequestTemplates)
+                .createQueryBuilder('template')
+                .where('template.id = :id', { id })
+                .getOne();
+
+            if (!template) {
+                throw new ApiError(APICodes.NOT_FOUND, 'Template not found');
+            }
+
+            if (!template.templateString) {
+                throw new ApiError(APICodes.BAD_REQUEST, 'Template file not found');
+            }
+
+            // Determine content type and file name
+            let contentType = 'application/octet-stream';
+            let fileName = `template_${id}`;
+
+            // Check if it's a PDF (PDF magic numbers: %PDF)
+            if (template.templateString.toString().startsWith('%PDF')) {
+                contentType = 'application/pdf';
+                fileName += '.pdf';
+            } else if (template.templateString.toString().includes('<html') || template.templateString.toString().includes('<!DOCTYPE')) {
+                contentType = 'text/html';
+                fileName += '.html';
+            }
+
+            return {
+                buffer: template.templateString,
+                contentType,
+                fileName
+            };
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to download template file');
+        }
+    }
+
+    async updateTemplate(id: number, data: any, templateFile: any, userId: string) {
+        try {
+            const template = await AppDataSource.getRepository(OccupancyRequestTemplates)
+                .createQueryBuilder('template')
+                .where('template.id = :id', { id })
+                .getOne();
+
+            if (!template) {
+                throw new ApiError(APICodes.NOT_FOUND, 'Template not found');
+            }
+
+            // Validate file if provided
+            if (templateFile) {
+                if (templateFile.size > 10 * 1024 * 1024) { // 10MB
+                    throw new ApiError(APICodes.BAD_REQUEST, 'File size must be less than 10MB');
+                }
+
+                const allowedTypes = ['application/pdf', 'text/html'];
+                if (!allowedTypes.includes(templateFile.mimetype)) {
+                    throw new ApiError(APICodes.BAD_REQUEST, 'Only PDF and HTML files are allowed');
+                }
+
+                template.templateString = templateFile.buffer;
+            }
+
+            // Update other fields
+            if (data.masterCommunityId) {
+                template.masterCommunity = { id: data.masterCommunityId } as any;
+            }
+            if (data.communityId) {
+                template.community = { id: data.communityId } as any;
+            }
+            if (data.towerId !== undefined) {
+                template.tower = data.towerId ? { id: data.towerId } as any : null;
+            }
+            if (data.templateType) {
+                template.templateType = data.templateType;
+            }
+            if (data.isActive !== undefined) {
+                template.isActive = data.isActive;
+            }
+
+            template.updatedBy = parseInt(userId);
+
+            // If setting to active, deactivate other templates for the same combination
+            if (data.isActive === true) {
+                const queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplates)
+                    .createQueryBuilder('template')
+                    .where('template.id != :id', { id })
+                    .andWhere('template.masterCommunity.id = :masterCommunityId', { masterCommunityId: template.masterCommunity.id })
+                    .andWhere('template.community.id = :communityId', { communityId: template.community.id })
+                    .andWhere('template.templateType = :templateType', { templateType: template.templateType })
+                    .andWhere('template.isActive = :isActive', { isActive: true });
+
+                if (template.tower) {
+                    queryBuilder.andWhere('template.tower.id = :towerId', { towerId: template.tower.id });
+                } else {
+                    queryBuilder.andWhere('template.tower IS NULL');
+                }
+
+                const existingTemplates = await queryBuilder.getMany();
+
+                if (existingTemplates.length > 0) {
+                    // Create history records for existing templates
+                    for (const existingTemplate of existingTemplates) {
+                        const historyRecord = AppDataSource.getRepository(OccupancyRequestTemplateHistory).create({
+                            occupancyRequestTemplates: existingTemplate,
+                            templateType: existingTemplate.templateType,
+                            isActive: existingTemplate.isActive,
+                            createdBy: parseInt(userId)
+                        });
+                        await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
+                    }
+
+                    // Deactivate existing templates
+                    for (const existingTemplate of existingTemplates) {
+                        existingTemplate.isActive = false;
+                        existingTemplate.updatedBy = parseInt(userId);
+                        await AppDataSource.getRepository(OccupancyRequestTemplates).save(existingTemplate);
+                    }
+                }
+            }
+
+            // Save updated template
+            const updatedTemplate = await AppDataSource.getRepository(OccupancyRequestTemplates).save(template);
+
+            if (!updatedTemplate) {
+                throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to update template');
+            }
+
+            // Create history record
+            const historyRecord = AppDataSource.getRepository(OccupancyRequestTemplateHistory).create({
+                occupancyRequestTemplates: updatedTemplate,
+                templateType: updatedTemplate.templateType,
+                isActive: updatedTemplate.isActive,
+                createdBy: parseInt(userId)
+            });
+
+            await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
+
+            return updatedTemplate;
+        } catch (error) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to update template');
+        }
+    }
+
+    async getTemplateHistory(id: number) {
+        try {
+            // Ensure database connection is initialized
+            if (!AppDataSource.isInitialized) {
+                await AppDataSource.initialize();
+            }
+
+            const history = await AppDataSource.getRepository(OccupancyRequestTemplateHistory)
+                .createQueryBuilder('history')
+                .leftJoinAndSelect('history.occupancyRequestTemplates', 'template')
+                .where('template.id = :id', { id })
+                .orderBy('history.createdAt', 'DESC')
+                .getMany();
+
+            return history;
+        } catch (error) {
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to get template history');
+        }
+    }
+}
