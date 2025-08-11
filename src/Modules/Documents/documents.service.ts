@@ -5,6 +5,7 @@ import { OccupancyRequestTemplateHistory } from '../../Entities/OccupancyRequest
 import ApiError from '../../Common/Utils/ApiError';
 import { APICodes } from '../../Common/Constants/apiCodes.en';
 import { logger } from '../../Common/Utils/logger';
+import httpStatus from 'http-status';
 
 export class DocumentsService {
 
@@ -19,24 +20,44 @@ export class DocumentsService {
     // Welcome Pack Methods
     async getWelcomePackList(query: any) {
         try {
+            logger.info(`Starting getWelcomePackList with query: ${JSON.stringify(query)}`);
+            
             // Ensure database connection is initialized
             if (!AppDataSource.isInitialized) {
+                logger.info('Database not initialized, attempting to initialize...');
                 await AppDataSource.initialize();
+                logger.info('Database initialized successfully');
             }
             
             let { page = 1, per_page = 20, masterCommunityIds = '', communityIds = '', towerIds = '', search = '', isActive, startDate, endDate, sortBy = 'createdAt', sortOrder = 'DESC', includeFile = false } = query;
 
-            // Parse comma-separated IDs
-            masterCommunityIds = masterCommunityIds.split(',').filter((e: any) => e);
-            communityIds = communityIds.split(',').filter((e: any) => e);
-            towerIds = towerIds.split(',').filter((e: any) => e);
+            // Validate that masterCommunityIds is provided
+            if (!masterCommunityIds || masterCommunityIds.trim() === '') {
+                throw new ApiError(httpStatus.BAD_REQUEST, 'masterCommunityIds is required', 'EC400');
+            }
+
+            // Parse comma-separated IDs and filter out empty values
+            const parseIds = (ids: string) => {
+                if (!ids || ids.trim() === '') return [];
+                return ids.split(',').filter((e: any) => e && e.trim() !== '');
+            };
+
+            masterCommunityIds = parseIds(masterCommunityIds);
+            communityIds = parseIds(communityIds);
+            towerIds = parseIds(towerIds);
+
+            // Ensure masterCommunityIds has at least one valid ID
+            if (masterCommunityIds.length === 0) {
+                throw new ApiError(httpStatus.BAD_REQUEST, 'At least one valid masterCommunityId is required', 'EC400');
+            }
+
+            logger.info(`Parsed IDs - masterCommunityIds: ${JSON.stringify(masterCommunityIds)}, communityIds: ${JSON.stringify(communityIds)}, towerIds: ${JSON.stringify(towerIds)}`);
 
             const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
+            logger.info('Repository obtained successfully');
             
-            let getWelcomePackList = welcomePackRepository.createQueryBuilder('welcomePack')
-                .leftJoinAndSelect('welcomePack.masterCommunity', 'masterCommunity')
-                .leftJoinAndSelect('welcomePack.community', 'community')
-                .leftJoinAndSelect('welcomePack.tower', 'tower');
+            // Start with a simple query to test basic functionality
+            let getWelcomePackList = welcomePackRepository.createQueryBuilder('welcomePack');
             
             // Add templateString field if includeFile is true
             if (includeFile === 'true' || includeFile === true) {
@@ -52,40 +73,41 @@ export class DocumentsService {
                 whereParams.isActive = isActive === 'true' || isActive === true;
             }
 
-            // Add filtering by master community
-            if (masterCommunityIds && masterCommunityIds.length) {
-                whereClause += " AND welcomePack.masterCommunity.id IN (:...masterCommunityIds)";
-                whereParams.masterCommunityIds = masterCommunityIds;
-            }
+            // Add filtering by master community - required
+            whereClause += " AND welcomePack.masterCommunityId IN (:...masterCommunityIds)";
+            whereParams.masterCommunityIds = masterCommunityIds;
 
-            // Add filtering by community
-            if (communityIds && communityIds.length) {
-                whereClause += " AND welcomePack.community.id IN (:...communityIds)";
+            // Add filtering by community - only if IDs are provided
+            if (communityIds && communityIds.length > 0) {
+                whereClause += " AND welcomePack.communityId IN (:...communityIds)";
                 whereParams.communityIds = communityIds;
             }
 
-            // Add filtering by tower
-            if (towerIds && towerIds.length) {
-                whereClause += " AND welcomePack.tower.id IN (:...towerIds)";
+            // Add filtering by tower - only if IDs are provided
+            if (towerIds && towerIds.length > 0) {
+                whereClause += " AND welcomePack.towerId IN (:...towerIds)";
                 whereParams.towerIds = towerIds;
             }
 
             // Add search functionality
-            if (search) {
-                whereClause += " AND (masterCommunity.name LIKE :search OR community.name LIKE :search OR tower.name LIKE :search)";
-                whereParams.search = `%${search}%`;
+            if (search && search.trim() !== '') {
+                whereClause += " AND (welcomePack.masterCommunityId IN (SELECT id FROM master_communities WHERE name LIKE :search) OR welcomePack.communityId IN (SELECT id FROM communities WHERE name LIKE :search) OR welcomePack.towerId IN (SELECT id FROM towers WHERE name LIKE :search))";
+                whereParams.search = `%${search.trim()}%`;
             }
 
             // Add date range filtering
-            if (startDate) {
+            if (startDate && startDate.trim() !== '') {
                 whereClause += " AND DATE(welcomePack.createdAt) >= DATE(:startDate)";
                 whereParams.startDate = startDate;
             }
 
-            if (endDate) {
+            if (endDate && endDate.trim() !== '') {
                 whereClause += " AND DATE(welcomePack.createdAt) <= DATE(:endDate)";
                 whereParams.endDate = endDate;
             }
+
+            logger.info(`Where clause: ${whereClause}`);
+            logger.info(`Where params: ${JSON.stringify(whereParams)}`);
 
             getWelcomePackList.where(whereClause, whereParams);
 
@@ -93,30 +115,25 @@ export class DocumentsService {
             getWelcomePackList.orderBy(`welcomePack.${sortBy}`, sortOrder);
 
             // Get total count for pagination
+            logger.info('Getting total count...');
             const totalCount = await getWelcomePackList.getCount();
+            logger.info(`Total count: ${totalCount}`);
 
             // Add pagination
             const offset = (page - 1) * per_page;
             getWelcomePackList.skip(offset).take(per_page);
 
             // Execute query
+            logger.info('Executing query...');
             const data = await getWelcomePackList.getMany();
+            logger.info(`Query executed successfully, got ${data.length} records`);
 
-            // Format response data
+            // Format response data - simplified without joins for now
             const formattedData = data.map((item: any) => ({
                 id: item.id,
-                masterCommunity: {
-                    id: item.masterCommunity?.id,
-                    name: item.masterCommunity?.name
-                },
-                community: {
-                    id: item.community?.id,
-                    name: item.community?.name
-                },
-                tower: item.tower ? {
-                    id: item.tower.id,
-                    name: item.tower.name
-                } : null,
+                masterCommunityId: item.masterCommunityId,
+                communityId: item.communityId,
+                towerId: item.towerId,
                 templateString: item.templateString,
                 isActive: item.isActive,
                 createdAt: item.createdAt,
@@ -124,6 +141,8 @@ export class DocumentsService {
                 createdBy: item.createdBy,
                 updatedBy: item.updatedBy
             }));
+
+            logger.info('Data formatted successfully');
 
             return {
                 data: formattedData,
@@ -136,8 +155,9 @@ export class DocumentsService {
             };
         } catch (error: any) {
             logger.error(`Error in getWelcomePackList: ${JSON.stringify(error)}`);
+            logger.error(`Error stack: ${error.stack}`);
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -167,14 +187,14 @@ export class DocumentsService {
             // Deactivate existing active welcome packs for the same combination
             const existingWelcomePack = await AppDataSource.getRepository(OccupancyRequestWelcomePack)
                 .createQueryBuilder('welcomePack')
-                .where('welcomePack.masterCommunity.id = :masterCommunityId', { masterCommunityId })
-                .andWhere('welcomePack.community.id = :communityId', { communityId })
+                .where('welcomePack.masterCommunityId = :masterCommunityId', { masterCommunityId })
+                .andWhere('welcomePack.communityId = :communityId', { communityId })
                 .andWhere('welcomePack.isActive = :isActive', { isActive: true });
 
             if (towerId) {
-                existingWelcomePack.andWhere('welcomePack.tower.id = :towerId', { towerId });
+                existingWelcomePack.andWhere('welcomePack.towerId = :towerId', { towerId });
             } else {
-                existingWelcomePack.andWhere('welcomePack.tower IS NULL');
+                existingWelcomePack.andWhere('welcomePack.towerId IS NULL');
             }
 
             const existingPack = await existingWelcomePack.getOne();
@@ -187,15 +207,15 @@ export class DocumentsService {
 
             // Create new welcome pack
             const welcomePackData: any = {
-                masterCommunity: { id: masterCommunityId },
-                community: { id: communityId },
+                masterCommunityId,
+                communityId,
                 templateString: file.buffer,
                 isActive,
                 createdBy: userId
             };
 
             if (towerId) {
-                welcomePackData.tower = { id: towerId };
+                welcomePackData.towerId = towerId;
             }
 
             const welcomePack = AppDataSource.getRepository(OccupancyRequestWelcomePack).create(welcomePackData);
@@ -222,9 +242,6 @@ export class DocumentsService {
             const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
             
             let queryBuilder = welcomePackRepository.createQueryBuilder('welcomePack')
-                .leftJoinAndSelect('welcomePack.masterCommunity', 'masterCommunity')
-                .leftJoinAndSelect('welcomePack.community', 'community')
-                .leftJoinAndSelect('welcomePack.tower', 'tower')
                 .where('welcomePack.id = :id', { id });
 
             if (includeFile) {
@@ -459,47 +476,84 @@ export class DocumentsService {
     // Consolidated template service methods
     async getTemplateList(query: any, userId: string) {
         try {
-            const { page = 1, limit = 10, search, masterCommunityId, communityId, towerId, templateType, includeFile = false } = query;
-            const offset = (page - 1) * limit;
+            logger.info(`Starting getTemplateList with query: ${JSON.stringify(query)}`);
+            
+            // Ensure database connection is initialized
+            if (!AppDataSource.isInitialized) {
+                await AppDataSource.initialize();
+            }
 
+            const { page = 1, per_page = 20, search, masterCommunityIds = '', communityIds = '', towerIds = '', templateType, includeFile = false, sortBy = 'createdAt', sortOrder = 'DESC', isActive } = query;
+
+            // Parse comma-separated IDs and filter out empty values
+            const parseIds = (ids: string) => {
+                if (!ids || ids.trim() === '') return [];
+                return ids.split(',').filter((e: any) => e && e.trim() !== '');
+            };
+
+            const parsedMasterCommunityIds = parseIds(masterCommunityIds);
+            const parsedCommunityIds = parseIds(communityIds);
+            const parsedTowerIds = parseIds(towerIds);
+
+            logger.info(`Parsed IDs - masterCommunityIds: ${JSON.stringify(parsedMasterCommunityIds)}, communityIds: ${JSON.stringify(parsedCommunityIds)}, towerIds: ${JSON.stringify(parsedTowerIds)}`);
+
+            // Start with a simple query to test basic functionality
             const queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplates)
                 .createQueryBuilder('template')
-                .leftJoinAndSelect('template.masterCommunity', 'masterCommunity')
-                .leftJoinAndSelect('template.community', 'community')
-                .leftJoinAndSelect('template.tower', 'tower')
-                .where('template.templateType IN (:...templateTypes)', { templateTypes: ['MIP', 'MOP'] })
-                .orderBy('template.createdAt', 'DESC');
+                .where('template.templateType IN (:...templateTypes)', { templateTypes: ['MIP', 'MOP'] });
 
-            if (search) {
+            // Add filtering by master community - only if IDs are provided
+            if (parsedMasterCommunityIds && parsedMasterCommunityIds.length > 0) {
+                queryBuilder.andWhere('template.masterCommunityId IN (:...masterCommunityIds)', { masterCommunityIds: parsedMasterCommunityIds });
+            }
+
+            // Add filtering by community - only if IDs are provided
+            if (parsedCommunityIds && parsedCommunityIds.length > 0) {
+                queryBuilder.andWhere('template.communityId IN (:...communityIds)', { communityIds: parsedCommunityIds });
+            }
+
+            // Add filtering by tower - only if IDs are provided
+            if (parsedTowerIds && parsedTowerIds.length > 0) {
+                queryBuilder.andWhere('template.towerId IN (:...towerIds)', { towerIds: parsedTowerIds });
+            }
+
+            // Add search functionality
+            if (search && search.trim() !== '') {
                 queryBuilder.andWhere(
-                    '(masterCommunity.name LIKE :search OR community.name LIKE :search OR tower.name LIKE :search)',
-                    { search: `%${search}%` }
+                    '(template.masterCommunityId IN (SELECT id FROM master_communities WHERE name LIKE :search) OR template.communityId IN (SELECT id FROM communities WHERE name LIKE :search) OR template.towerId IN (SELECT id FROM towers WHERE name LIKE :search))',
+                    { search: `%${search.trim()}%` }
                 );
             }
 
-            if (masterCommunityId) {
-                queryBuilder.andWhere('masterCommunity.id = :masterCommunityId', { masterCommunityId });
-            }
-
-            if (communityId) {
-                queryBuilder.andWhere('community.id = :communityId', { communityId });
-            }
-
-            if (towerId) {
-                queryBuilder.andWhere('tower.id = :towerId', { towerId });
-            }
-
+            // Add template type filtering
             if (templateType) {
                 queryBuilder.andWhere('template.templateType = :templateType', { templateType });
             }
 
-            const [templates, total] = await queryBuilder
+            // Add active status filtering
+            if (isActive !== undefined && isActive !== '') {
+                queryBuilder.andWhere('template.isActive = :isActive', { isActive: isActive === 'true' || isActive === true });
+            }
+
+            // Add sorting
+            queryBuilder.orderBy(`template.${sortBy}`, sortOrder);
+
+            // Get total count for pagination
+            logger.info('Getting total count...');
+            const total = await queryBuilder.getCount();
+            logger.info(`Total count: ${total}`);
+
+            // Add pagination
+            const offset = (page - 1) * per_page;
+            const templates = await queryBuilder
                 .skip(offset)
-                .take(limit)
-                .getManyAndCount();
+                .take(per_page)
+                .getMany();
+
+            logger.info(`Query executed successfully, got ${templates.length} templates out of ${total} total`);
 
             // Handle file content if requested
-            if (includeFile) {
+            if (includeFile === 'true' || includeFile === true) {
                 templates.forEach((template: any) => {
                     if (template.templateString) {
                         template.templateString = template.templateString.toString('base64');
@@ -511,15 +565,16 @@ export class DocumentsService {
                 templates,
                 pagination: {
                     currentPage: page,
-                    totalPages: Math.ceil(total / limit),
+                    totalPages: Math.ceil(total / per_page),
                     totalItems: total,
-                    itemsPerPage: limit
+                    itemsPerPage: per_page
                 }
             };
         } catch (error: any) {
             logger.error(`Error in getTemplateList: ${JSON.stringify(error)}`);
+            logger.error(`Error stack: ${error.stack}`);
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -544,15 +599,15 @@ export class DocumentsService {
             // Deactivate existing active templates for the same combination
             const queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplates)
                 .createQueryBuilder('template')
-                .where('template.masterCommunity.id = :masterCommunityId', { masterCommunityId })
-                .andWhere('template.community.id = :communityId', { communityId })
+                .where('template.masterCommunityId = :masterCommunityId', { masterCommunityId })
+                .andWhere('template.communityId = :communityId', { communityId })
                 .andWhere('template.templateType = :templateType', { templateType })
                 .andWhere('template.isActive = :isActive', { isActive: true });
 
             if (towerId) {
-                queryBuilder.andWhere('template.tower.id = :towerId', { towerId });
+                queryBuilder.andWhere('template.towerId = :towerId', { towerId });
             } else {
-                queryBuilder.andWhere('template.tower IS NULL');
+                queryBuilder.andWhere('template.towerId IS NULL');
             }
 
             const existingTemplates = await queryBuilder.getMany();
@@ -579,8 +634,8 @@ export class DocumentsService {
 
             // Create new template
             const templateData: any = {
-                masterCommunity: { id: masterCommunityId },
-                community: { id: communityId },
+                masterCommunityId,
+                communityId,
                 templateType,
                 templateString: templateFile.buffer,
                 isActive,
@@ -588,7 +643,7 @@ export class DocumentsService {
             };
 
             if (towerId) {
-                templateData.tower = { id: towerId };
+                templateData.towerId = towerId;
             }
 
             const template = AppDataSource.getRepository(OccupancyRequestTemplates).create(templateData);

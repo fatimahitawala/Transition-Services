@@ -4,7 +4,7 @@ export class DocumentsValidation {
     
     getWelcomePackList = Joi.object({
         search: Joi.string().optional().description('Search term for master community, community, or tower ID'),
-        masterCommunityIds: Joi.string().optional().description('Filter by master community IDs (comma-separated)'),
+        masterCommunityIds: Joi.string().required().description('Filter by master community IDs (comma-separated) - Required'),
         communityIds: Joi.string().optional().description('Filter by community IDs (comma-separated)'),
         towerIds: Joi.string().optional().description('Filter by tower IDs (comma-separated)'),
         isActive: Joi.boolean().optional().description('Filter by active status (true/false)'),
