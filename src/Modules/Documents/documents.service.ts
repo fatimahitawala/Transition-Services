@@ -4,6 +4,7 @@ import { OccupancyRequestTemplates } from '../../Entities/OccupancyRequestTempla
 import { OccupancyRequestTemplateHistory } from '../../Entities/OccupancyRequestTemplateHistory.entity';
 import ApiError from '../../Common/Utils/ApiError';
 import { APICodes } from '../../Common/Constants/apiCodes.en';
+import { logger } from '../../Common/Utils/logger';
 
 export class DocumentsService {
 
@@ -133,8 +134,10 @@ export class DocumentsService {
                     itemsPerPage: per_page
                 }
             };
-        } catch (error) {
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to get welcome pack list');
+        } catch (error: any) {
+            logger.error(`Error in getWelcomePackList: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -199,11 +202,13 @@ export class DocumentsService {
             const savedWelcomePack = await AppDataSource.getRepository(OccupancyRequestWelcomePack).save(welcomePack);
 
             return savedWelcomePack;
-        } catch (error) {
+        } catch (error: any) {
             if (error instanceof ApiError) {
                 throw error;
             }
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to create welcome pack');
+            logger.error(`Error in createWelcomePack: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -233,11 +238,13 @@ export class DocumentsService {
             }
 
             return welcomePack;
-        } catch (error) {
+        } catch (error: any) {
             if (error instanceof ApiError) {
                 throw error;
             }
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to get welcome pack');
+            logger.error(`Error in getWelcomePackById: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -278,11 +285,13 @@ export class DocumentsService {
                 contentType,
                 fileName
             };
-        } catch (error) {
+        } catch (error: any) {
             if (error instanceof ApiError) {
                 throw error;
             }
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to download welcome pack file');
+            logger.error(`Error in downloadWelcomePackFile: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -348,11 +357,13 @@ export class DocumentsService {
             }
 
             return updatedWelcomePack;
-        } catch (error) {
+        } catch (error: any) {
             if (error instanceof ApiError) {
                 throw error;
             }
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to update welcome pack');
+            logger.error(`Error in updateWelcomePack: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -385,11 +396,13 @@ export class DocumentsService {
             }
 
             return welcomePack;
-        } catch (error) {
+        } catch (error: any) {
             if (error instanceof ApiError) {
                 throw error;
             }
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to get active welcome pack');
+            logger.error(`Error in getActiveWelcomePack: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -436,8 +449,10 @@ export class DocumentsService {
                 message: 'Data consistency check completed',
                 deactivatedCount: activeWelcomePacks.length - groupedWelcomePacks.size
             };
-        } catch (error) {
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to ensure data consistency');
+        } catch (error: any) {
+            logger.error(`Error in ensureDataConsistency: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -501,8 +516,10 @@ export class DocumentsService {
                     itemsPerPage: limit
                 }
             };
-        } catch (error) {
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to get template list');
+        } catch (error: any) {
+            logger.error(`Error in getTemplateList: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -588,8 +605,10 @@ export class DocumentsService {
             await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
 
             return savedTemplate;
-        } catch (error) {
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to create template');
+        } catch (error: any) {
+            logger.error(`Error in createTemplate: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -614,11 +633,13 @@ export class DocumentsService {
             }
 
             return template;
-        } catch (error) {
+        } catch (error: any) {
             if (error instanceof ApiError) {
                 throw error;
             }
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to get template');
+            logger.error(`Error in getTemplateById: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -655,11 +676,13 @@ export class DocumentsService {
                 contentType,
                 fileName
             };
-        } catch (error) {
+        } catch (error: any) {
             if (error instanceof ApiError) {
                 throw error;
             }
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to download template file');
+            logger.error(`Error in downloadTemplateFile: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -764,11 +787,13 @@ export class DocumentsService {
             await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
 
             return updatedTemplate;
-        } catch (error) {
+        } catch (error: any) {
             if (error instanceof ApiError) {
                 throw error;
             }
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to update template');
+            logger.error(`Error in updateTemplate: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -787,8 +812,10 @@ export class DocumentsService {
                 .getMany();
 
             return history;
-        } catch (error) {
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, 'Failed to get template history');
+        } catch (error: any) {
+            logger.error(`Error in getTemplateHistory: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 }
