@@ -59,9 +59,23 @@ export class DocumentsService {
             // Start with a simple query to test basic functionality
             let getWelcomePackList = welcomePackRepository.createQueryBuilder('welcomePack');
             
-            // Add templateString field if includeFile is true
+            // Handle field selection based on includeFile parameter
             if (includeFile === 'true' || includeFile === true) {
+                // When includeFile is true, select all fields including templateString
                 getWelcomePackList.addSelect('welcomePack.templateString');
+            } else {
+                // When includeFile is false, explicitly select only the fields we want (excluding templateString)
+                getWelcomePackList.select([
+                    'welcomePack.id',
+                    'welcomePack.masterCommunityId',
+                    'welcomePack.communityId',
+                    'welcomePack.towerId',
+                    'welcomePack.isActive',
+                    'welcomePack.createdAt',
+                    'welcomePack.updatedAt',
+                    'welcomePack.createdBy',
+                    'welcomePack.updatedBy'
+                ]);
             }
 
             // Base condition - show all records by default, filter by isActive only when specified
@@ -172,16 +186,16 @@ export class DocumentsService {
 
             // Validate file
             if (!file) {
-                throw new ApiError(APICodes.BAD_REQUEST, 'File is required');
+                throw new ApiError(APICodes.UNKNOWN_ERROR, 'File is required');
             }
 
             if (file.size > 10 * 1024 * 1024) { // 10MB
-                throw new ApiError(APICodes.BAD_REQUEST, 'File size must be less than 10MB');
+                throw new ApiError(APICodes.UNKNOWN_ERROR, 'File size must be less than 10MB');
             }
 
             const allowedTypes = ['application/pdf', 'text/html'];
             if (!allowedTypes.includes(file.mimetype)) {
-                throw new ApiError(APICodes.BAD_REQUEST, 'Only PDF and HTML files are allowed');
+                throw new ApiError(APICodes.UNKNOWN_ERROR, 'Only PDF and HTML files are allowed');
             }
 
             // Deactivate existing active welcome packs for the same combination
@@ -245,7 +259,21 @@ export class DocumentsService {
                 .where('welcomePack.id = :id', { id });
 
             if (includeFile) {
+                // When includeFile is true, select all fields including templateString
                 queryBuilder.addSelect('welcomePack.templateString');
+            } else {
+                // When includeFile is false, explicitly select only the fields we want (excluding templateString)
+                queryBuilder.select([
+                    'welcomePack.id',
+                    'welcomePack.masterCommunityId',
+                    'welcomePack.communityId',
+                    'welcomePack.towerId',
+                    'welcomePack.isActive',
+                    'welcomePack.createdAt',
+                    'welcomePack.updatedAt',
+                    'welcomePack.createdBy',
+                    'welcomePack.updatedBy'
+                ]);
             }
 
             const welcomePack = await queryBuilder.getOne();
@@ -352,12 +380,12 @@ export class DocumentsService {
             if (file) {
                 // Validate file type and size
                 if (file.size > 10 * 1024 * 1024) { // 10MB
-                    throw new ApiError(APICodes.BAD_REQUEST, 'File size must be less than 10MB');
+                    throw new ApiError(APICodes.UNKNOWN_ERROR, 'File size must be less than 10MB');
                 }
 
                 const allowedTypes = ['application/pdf', 'text/html'];
                 if (!allowedTypes.includes(file.mimetype)) {
-                    throw new ApiError(APICodes.BAD_REQUEST, 'Only PDF and HTML files are allowed');
+                    throw new ApiError(APICodes.UNKNOWN_ERROR, 'Only PDF and HTML files are allowed');
                 }
 
                 data.templateString = file.buffer;
@@ -500,7 +528,27 @@ export class DocumentsService {
             // Start with a simple query to test basic functionality
             const queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplates)
                 .createQueryBuilder('template')
-                .where('template.templateType IN (:...templateTypes)', { templateTypes: ['MIP', 'MOP'] });
+                .where('template.templateType IN (:...templateTypes)', { templateTypes: ['move-in', 'move-out'] });
+
+            // Handle field selection based on includeFile parameter
+            if (includeFile === 'true' || includeFile === true) {
+                // When includeFile is true, select all fields including templateString
+                queryBuilder.addSelect('template.templateString');
+            } else {
+                // When includeFile is false, explicitly select only the fields we want (excluding templateString)
+                queryBuilder.select([
+                    'template.id',
+                    'template.templateType',
+                    'template.isActive',
+                    'template.createdAt',
+                    'template.updatedAt',
+                    'template.createdBy',
+                    'template.updatedBy',
+                    'template.masterCommunityId',
+                    'template.communityId',
+                    'template.towerId'
+                ]);
+            }
 
             // Add filtering by master community - only if IDs are provided
             if (parsedMasterCommunityIds && parsedMasterCommunityIds.length > 0) {
@@ -552,14 +600,9 @@ export class DocumentsService {
 
             logger.info(`Query executed successfully, got ${templates.length} templates out of ${total} total`);
 
-            // Handle file content if requested
-            if (includeFile === 'true' || includeFile === true) {
-                templates.forEach((template: any) => {
-                    if (template.templateString) {
-                        template.templateString = template.templateString.toString('base64');
-                    }
-                });
-            }
+            // Note: File content handling is now done at the query level
+            // When includeFile is false, templateString is not selected
+            // When includeFile is true, templateString is selected and returned as-is
 
             return {
                 templates,
@@ -580,21 +623,56 @@ export class DocumentsService {
 
     async createTemplate(data: any, templateFile: any, userId: string) {
         try {
-            const { masterCommunityId, communityId, towerId, templateType, isActive = true } = data;
+            logger.info(`Starting createTemplate with data: ${JSON.stringify(data)}`);
+            logger.info(`Template file info: ${JSON.stringify({
+                originalname: templateFile?.originalname,
+                mimetype: templateFile?.mimetype,
+                size: templateFile?.size,
+                bufferLength: templateFile?.buffer?.length
+            })}`);
+            logger.info(`User ID: ${userId}`);
+
+            // Convert form data to proper types
+            const masterCommunityId = parseInt(data.masterCommunityId);
+            const communityId = parseInt(data.communityId);
+            const towerId = data.towerId ? parseInt(data.towerId) : null;
+            const templateType = data.templateType;
+            const isActive = data.isActive === 'true' || data.isActive === true;
+
+            // Validate converted data
+            if (isNaN(masterCommunityId)) {
+                throw new ApiError(APICodes.UNKNOWN_ERROR, 'Invalid masterCommunityId: must be a number');
+            }
+            if (isNaN(communityId)) {
+                throw new ApiError(APICodes.UNKNOWN_ERROR, 'Invalid communityId: must be a number');
+            }
+            if (data.towerId && towerId !== null && isNaN(towerId)) {
+                throw new ApiError(APICodes.UNKNOWN_ERROR, 'Invalid towerId: must be a number');
+            }
+
+            logger.info(`Converted data - masterCommunityId: ${masterCommunityId} (${typeof masterCommunityId}), communityId: ${communityId} (${typeof communityId}), towerId: ${towerId} (${typeof towerId}), templateType: ${templateType}, isActive: ${isActive} (${typeof isActive})`);
+
+            // Check database connection
+            if (!AppDataSource.isInitialized) {
+                logger.error('Database not initialized');
+                throw new ApiError(APICodes.UNKNOWN_ERROR, 'Database connection not available');
+            }
 
             // Validate file type and size
             if (!templateFile) {
-                throw new ApiError(APICodes.BAD_REQUEST, 'Template file is required');
+                throw new ApiError(APICodes.UNKNOWN_ERROR, 'Template file is required');
             }
 
             if (templateFile.size > 10 * 1024 * 1024) { // 10MB
-                throw new ApiError(APICodes.BAD_REQUEST, 'File size must be less than 10MB');
+                throw new ApiError(APICodes.UNKNOWN_ERROR, 'File size must be less than 10MB');
             }
 
             const allowedTypes = ['application/pdf', 'text/html'];
             if (!allowedTypes.includes(templateFile.mimetype)) {
-                throw new ApiError(APICodes.BAD_REQUEST, 'Only PDF and HTML files are allowed');
+                throw new ApiError(APICodes.UNKNOWN_ERROR, 'Only PDF and HTML files are allowed');
             }
+
+            logger.info(`File validation passed. Checking for existing templates...`);
 
             // Deactivate existing active templates for the same combination
             const queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplates)
@@ -604,64 +682,113 @@ export class DocumentsService {
                 .andWhere('template.templateType = :templateType', { templateType })
                 .andWhere('template.isActive = :isActive', { isActive: true });
 
-            if (towerId) {
-                queryBuilder.andWhere('template.towerId = :towerId', { towerId });
+            if (towerId !== null && towerId !== undefined) {
+                queryBuilder.andWhere('template.towerId = :towerId', { towerId: towerId as number });
             } else {
                 queryBuilder.andWhere('template.towerId IS NULL');
             }
 
+            logger.info(`Query built: ${queryBuilder.getQuery()}`);
             const existingTemplates = await queryBuilder.getMany();
+            logger.info(`Found ${existingTemplates.length} existing templates`);
 
             if (existingTemplates.length > 0) {
+                logger.info('Creating history records for existing templates...');
                 // Create history records for existing templates
                 for (const template of existingTemplates) {
-                    const historyRecord = AppDataSource.getRepository(OccupancyRequestTemplateHistory).create({
-                        occupancyRequestTemplates: template,
-                        templateType: template.templateType,
-                        isActive: template.isActive,
-                        createdBy: parseInt(userId)
-                    });
-                    await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
+                    try {
+                        const historyRecord = AppDataSource.getRepository(OccupancyRequestTemplateHistory).create({
+                            occupancyRequestTemplates: template,
+                            templateType: template.templateType,
+                            isActive: template.isActive,
+                            createdBy: parseInt(userId),
+                            updatedBy: parseInt(userId) // Add this line to fix the history table error
+                        });
+                        await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
+                        logger.info(`History record created for template ${template.id}`);
+                    } catch (historyError) {
+                        logger.error(`Error creating history record: ${JSON.stringify(historyError)}`);
+                        throw historyError;
+                    }
                 }
 
+                logger.info('Deactivating existing templates...');
                 // Deactivate existing templates
                 for (const template of existingTemplates) {
-                    template.isActive = false;
-                    template.updatedBy = parseInt(userId);
-                    await AppDataSource.getRepository(OccupancyRequestTemplates).save(template);
+                    try {
+                        template.isActive = false;
+                        template.updatedBy = parseInt(userId);
+                        await AppDataSource.getRepository(OccupancyRequestTemplates).save(template);
+                        logger.info(`Template ${(template as any).id} deactivated`);
+                    } catch (deactivateError) {
+                        logger.error(`Error deactivating template: ${JSON.stringify(deactivateError)}`);
+                        throw deactivateError;
+                    }
                 }
             }
 
+            logger.info('Creating new template...');
             // Create new template
             const templateData: any = {
                 masterCommunityId,
                 communityId,
                 templateType,
-                templateString: templateFile.buffer,
+                templateString: templateFile.buffer.toString('base64'), // Convert buffer to base64 string
                 isActive,
-                createdBy: parseInt(userId)
+                createdBy: parseInt(userId),
+                updatedBy: parseInt(userId) // Add this line to fix the database error
             };
 
             if (towerId) {
                 templateData.towerId = towerId;
             }
 
-            const template = AppDataSource.getRepository(OccupancyRequestTemplates).create(templateData);
-            const savedTemplate = await AppDataSource.getRepository(OccupancyRequestTemplates).save(template);
+            logger.info(`Template data prepared: ${JSON.stringify({
+                ...templateData,
+                templateString: `Buffer of length ${templateData.templateString?.length}`
+            })}`);
 
+            let savedTemplate: any;
+            try {
+                const template = AppDataSource.getRepository(OccupancyRequestTemplates).create(templateData);
+                logger.info('Template entity created, attempting to save...');
+                savedTemplate = await AppDataSource.getRepository(OccupancyRequestTemplates).save(template);
+                logger.info(`Template saved successfully with ID: ${savedTemplate.id}`);
+            } catch (saveError) {
+                logger.error(`Error saving template: ${JSON.stringify(saveError)}`);
+                throw saveError;
+            }
+
+            logger.info('Creating history record for new template...');
             // Create history record
-            const historyRecord = AppDataSource.getRepository(OccupancyRequestTemplateHistory).create({
-                occupancyRequestTemplates: savedTemplate as unknown as OccupancyRequestTemplates,
-                templateType: (savedTemplate as unknown as OccupancyRequestTemplates).templateType,
-                isActive: (savedTemplate as unknown as OccupancyRequestTemplates).isActive,
-                createdBy: parseInt(userId)
-            });
+            try {
+                const historyRecord = AppDataSource.getRepository(OccupancyRequestTemplateHistory).create({
+                    occupancyRequestTemplates: savedTemplate as unknown as OccupancyRequestTemplates,
+                    templateType: (savedTemplate as unknown as OccupancyRequestTemplates).templateType,
+                    isActive: (savedTemplate as unknown as OccupancyRequestTemplates).isActive,
+                    createdBy: parseInt(userId),
+                    updatedBy: parseInt(userId) // Add this line to fix the history table error
+                });
 
-            await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
+                await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
+                logger.info('History record created successfully');
+            } catch (historyError) {
+                logger.error(`Error creating history record for new template: ${JSON.stringify(historyError)}`);
+                throw historyError;
+            }
 
+            logger.info('Template creation completed successfully');
             return savedTemplate;
         } catch (error: any) {
             logger.error(`Error in createTemplate: ${JSON.stringify(error)}`);
+            logger.error(`Error stack: ${error.stack}`);
+            logger.error(`Error name: ${error.name}`);
+            logger.error(`Error message: ${error.message}`);
+            
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
             throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
@@ -678,7 +805,28 @@ export class DocumentsService {
                 .where('template.id = :id', { id });
 
             if (includeFile) {
+                // When includeFile is true, select all fields including templateString
                 queryBuilder.addSelect('template.templateString');
+            } else {
+                // When includeFile is false, explicitly select only the fields we want (excluding templateString)
+                queryBuilder.select([
+                    'template.id',
+                    'template.templateType',
+                    'template.isActive',
+                    'template.createdAt',
+                    'template.updatedAt',
+                    'template.createdBy',
+                    'template.updatedBy',
+                    'template.masterCommunityId',
+                    'template.communityId',
+                    'template.towerId',
+                    'masterCommunity.id',
+                    'masterCommunity.name',
+                    'community.id',
+                    'community.name',
+                    'tower.id',
+                    'tower.name'
+                ]);
             }
 
             const template = await queryBuilder.getOne();
@@ -710,24 +858,27 @@ export class DocumentsService {
             }
 
             if (!template.templateString) {
-                throw new ApiError(APICodes.BAD_REQUEST, 'Template file not found');
+                throw new ApiError(APICodes.UNKNOWN_ERROR, 'Template file not found');
             }
+
+            // Convert base64 string back to buffer
+            const buffer = Buffer.from(template.templateString, 'base64');
 
             // Determine content type and file name
             let contentType = 'application/octet-stream';
             let fileName = `template_${id}`;
 
             // Check if it's a PDF (PDF magic numbers: %PDF)
-            if (template.templateString.toString().startsWith('%PDF')) {
+            if (buffer.toString('utf8', 0, 4).startsWith('%PDF')) {
                 contentType = 'application/pdf';
                 fileName += '.pdf';
-            } else if (template.templateString.toString().includes('<html') || template.templateString.toString().includes('<!DOCTYPE')) {
+            } else if (buffer.toString('utf8').includes('<html') || buffer.toString('utf8').includes('<!DOCTYPE')) {
                 contentType = 'text/html';
                 fileName += '.html';
             }
 
             return {
-                buffer: template.templateString,
+                buffer: buffer,
                 contentType,
                 fileName
             };
@@ -755,12 +906,12 @@ export class DocumentsService {
             // Validate file if provided
             if (templateFile) {
                 if (templateFile.size > 10 * 1024 * 1024) { // 10MB
-                    throw new ApiError(APICodes.BAD_REQUEST, 'File size must be less than 10MB');
+                    throw new ApiError(APICodes.UNKNOWN_ERROR, 'File size must be less than 10MB');
                 }
 
                 const allowedTypes = ['application/pdf', 'text/html'];
                 if (!allowedTypes.includes(templateFile.mimetype)) {
-                    throw new ApiError(APICodes.BAD_REQUEST, 'Only PDF and HTML files are allowed');
+                    throw new ApiError(APICodes.UNKNOWN_ERROR, 'Only PDF and HTML files are allowed');
                 }
 
                 template.templateString = templateFile.buffer;
@@ -810,7 +961,8 @@ export class DocumentsService {
                             occupancyRequestTemplates: existingTemplate,
                             templateType: existingTemplate.templateType,
                             isActive: existingTemplate.isActive,
-                            createdBy: parseInt(userId)
+                            createdBy: parseInt(userId),
+                            updatedBy: parseInt(userId) // Add this line to fix the history table error
                         });
                         await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
                     }
@@ -836,7 +988,8 @@ export class DocumentsService {
                 occupancyRequestTemplates: updatedTemplate,
                 templateType: updatedTemplate.templateType,
                 isActive: updatedTemplate.isActive,
-                createdBy: parseInt(userId)
+                createdBy: parseInt(userId),
+                updatedBy: parseInt(userId) // Add this line to fix the history table error
             });
 
             await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);

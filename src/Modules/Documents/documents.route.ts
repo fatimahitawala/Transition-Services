@@ -64,13 +64,13 @@ router.get('/welcome-pack/:id', authMiddleware.auth(), validate(documentsValidat
 router.get('/welcome-pack/:id/download', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.downloadWelcomePackFile));
 router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePackFile'), validate(documentsValidation.updateWelcomePack), catchAsync(documentsController.updateWelcomePack));
 
-       // MIP (Move In Permit) and MOP (Move Out Permit) Templates Routes (Admin routes) - All routes require authentication
+       // Move-in and Move-out Templates Routes (Admin routes) - All routes require authentication
 
        /**
         * @swagger
         * /documents/templates:
         *   get:
-        *     summary: Get list of templates (MIP and MOP only)
+        *     summary: Get list of templates (move-in and move-out only)
         *     tags: [Documents - Templates]
         *     security:
         *       - bearerAuth: []
@@ -79,8 +79,8 @@ router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePac
         *         name: templateType
         *         schema:
         *           type: string
-        *           enum: [MIP, MOP]
-        *         description: Type of template to filter by (MIP = Move In Permit, MOP = Move Out Permit)
+        *           enum: [move-in, move-out]
+        *         description: Type of template to filter by (move-in = Move In Permit, move-out = Move Out Permit)
         *       - in: query
         *         name: page
         *         schema:
@@ -187,7 +187,7 @@ router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePac
         * @swagger
         * /documents/templates:
         *   post:
-        *     summary: Create a new template (MIP or MOP only)
+        *     summary: Create a new template (move-in or move-out only)
         *     tags: [Documents - Templates]
         *     security:
         *       - bearerAuth: []
@@ -214,8 +214,8 @@ router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePac
         *                 description: Tower ID (optional)
         *               templateType:
         *                 type: string
-        *                 enum: [MIP, MOP]
-        *                 description: Type of template (MIP = Move In Permit, MOP = Move Out Permit)
+        *                 enum: [move-in, move-out]
+        *                 description: Type of template (move-in = Move In Permit, move-out = Move Out Permit)
         *               isActive:
         *                 type: boolean
         *                 description: Whether the template is active
@@ -483,7 +483,7 @@ export default router;
  *   name: Documents
  *   description: Welcome Pack Management
  *   name: Documents - Templates
- *   description: Consolidated Templates Management (MIP and MOP)
+ *   description: Consolidated Templates Management (move-in and move-out)
  */
 
 /**
@@ -820,7 +820,7 @@ export default router;
         *               type: string
         *         templateType:
         *           type: string
-        *           enum: [MIP, MOP]
+        *           enum: [move-in, move-out]
         *         templateString:
         *           type: string
         *           description: Base64 encoded file content (only included when includeFile=true)
@@ -844,7 +844,7 @@ export default router;
         *           type: integer
         *         templateType:
         *           type: string
-        *           enum: [MIP, MOP]
+        *           enum: [move-in, move-out]
         *         isActive:
         *           type: boolean
         *         createdAt:

@@ -50,7 +50,7 @@ export class DocumentsValidation {
 
     // Consolidated template validation methods
     getTemplateList = Joi.object({
-        templateType: Joi.string().valid('MIP', 'MOP').optional(),
+        templateType: Joi.string().valid('move-in', 'move-out').optional(),
         page: Joi.number().integer().min(1).default(1),
         per_page: Joi.number().integer().min(1).max(100).default(20),
         masterCommunityIds: Joi.string().optional(),
@@ -69,7 +69,7 @@ export class DocumentsValidation {
         masterCommunityId: Joi.number().integer().required(),
         communityId: Joi.number().integer().required(),
         towerId: Joi.number().integer().optional().allow(null),
-        templateType: Joi.string().valid('MIP', 'MOP').required(),
+        templateType: Joi.string().valid('move-in', 'move-out').required(),
         isActive: Joi.boolean().default(true)
     });
 
