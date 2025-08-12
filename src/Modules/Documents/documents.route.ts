@@ -419,26 +419,367 @@ router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePac
         */
        router.get('/templates/:id/history', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateHistory));
 
+       // Email Recipients Routes
+       /**
+        * @swagger
+        * /documents/email-recipients:
+        *   get:
+        *     summary: Get list of email recipients with advanced filtering, search, and pagination. Supports filtering by master community, community, tower, active status, and date ranges.
+        *     tags: [Documents - Email Recipients]
+        *     security:
+        *       - bearerAuth: []
+        *     parameters:
+        *       - in: query
+        *         name: search
+        *         schema:
+        *           type: string
+        *         description: Search term for master community, community, tower, or email addresses
+        *       - in: query
+        *         name: masterCommunityIds
+        *         schema:
+        *           type: string
+        *         description: Filter by master community IDs (comma-separated)
+        *       - in: query
+        *         name: communityIds
+        *         schema:
+        *           type: string
+        *         description: Filter by community IDs (comma-separated)
+        *       - in: query
+        *         name: towerIds
+        *         schema:
+        *           type: string
+        *         description: Filter by tower IDs (comma-separated)
+        *       - in: query
+        *         name: isActive
+        *         schema:
+        *           type: boolean
+        *         description: Filter by active status (true/false)
+        *       - in: query
+        *         name: startDate
+        *         schema:
+        *           type: string
+        *           format: date
+        *         description: Filter by start date (ISO format)
+        *       - in: query
+        *         name: endDate
+        *         schema:
+        *           type: string
+        *           format: date
+        *         description: Filter by end date (ISO format)
+        *       - in: query
+        *         name: sortBy
+        *         schema:
+        *           type: string
+        *           enum: [id, masterCommunityId, communityId, towerId, isActive, createdAt, updatedAt]
+        *         description: Sort field
+        *       - in: query
+        *         name: sortOrder
+        *         schema:
+        *           type: string
+        *           enum: [ASC, DESC]
+        *         description: Sort order (ASC/DESC)
+        *       - in: query
+        *         name: page
+        *         schema:
+        *           type: integer
+        *           minimum: 1
+        *           default: 1
+        *         description: Page number
+        *       - in: query
+        *         name: per_page
+        *         schema:
+        *           type: integer
+        *           minimum: 1
+        *           maximum: 100
+        *           default: 20
+        *         description: Items per page
+        *     responses:
+        *       200:
+        *         description: List of email recipients with pagination
+        *         content:
+        *           application/json:
+        *             schema:
+        *               type: object
+        *               properties:
+        *                 status:
+        *                   type: boolean
+        *                 code:
+        *                   type: string
+        *                 message:
+        *                   type: string
+        *                 data:
+        *                   type: array
+        *                   items:
+        *                     $ref: '#/components/schemas/EmailRecipients'
+        *                 meta:
+        *                   type: object
+        *                   properties:
+        *                     page:
+        *                       type: integer
+        *                     per_page:
+        *                       type: integer
+        *                     total_records:
+        *                       type: integer
+        *                     total_pages:
+        *                       type: integer
+        *       401:
+        *         description: Unauthorized
+        *       500:
+        *         description: Internal server error
+        */
+       router.get('/email-recipients', authMiddleware.auth(), validate(documentsValidation.getEmailRecipientsList), catchAsync(documentsController.getEmailRecipientsList));
 
+       /**
+        * @swagger
+        * /documents/email-recipients:
+        *   post:
+        *     summary: Create a new email recipients configuration (only one active configuration allowed per unique combination of master community/community/tower)
+        *     tags: [Documents - Email Recipients]
+        *     security:
+        *       - bearerAuth: []
+         *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - masterCommunityId
+ *               - communityId
+ *               - mipRecipients
+ *               - mopRecipients
+ *             properties:
+ *               masterCommunityId:
+ *                 type: integer
+ *                 description: Master Community ID
+ *                 example: 1
+         *               communityId:
+        *                 type: integer
+        *                 description: Community ID
+        *                 example: 5
+        *               towerId:
+        *                 type: integer
+        *                 description: Tower ID (optional)
+        *                 example: 10
+        *               mipRecipients:
+        *                 type: string
+        *                 description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+        *                 example: "admin@community.com, manager@community.com, supervisor@community.com"
+        *               mopRecipients:
+        *                 type: string
+        *                 description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+        *                 example: "admin@community.com, manager@community.com, supervisor@community.com"
+        *               isActive:
+ *                 type: boolean
+ *                 default: true
+ *                 description: Whether the configuration is active
+ *           example:
+ *             masterCommunityId: 1
+ *             communityId: 5
+ *             towerId: 10
+ *             mipRecipients: "admin@community.com, manager@community.com, supervisor@community.com"
+ *             mopRecipients: "admin@community.com, manager@community.com, supervisor@community.com"
+ *             isActive: true
+        *     responses:
+        *       201:
+        *         description: Email recipients configuration created successfully
+        *         content:
+        *           application/json:
+        *             schema:
+        *               type: object
+        *               properties:
+        *                 status:
+        *                   type: boolean
+        *                 code:
+        *                   type: string
+        *                 message:
+        *                   type: string
+        *                 data:
+        *                   $ref: '#/components/schemas/EmailRecipients'
+        *       400:
+        *         description: Bad request - validation error, email format error, or conflict with existing active configuration for the same master community/community/tower combination
+        *       401:
+        *         description: Unauthorized
+        *       500:
+        *         description: Internal server error
+        */
+       router.post('/email-recipients', authMiddleware.auth(), validate(documentsValidation.createEmailRecipients), catchAsync(documentsController.createEmailRecipients));
 
+       /**
+        * @swagger
+        * /documents/email-recipients/{id}:
+        *   put:
+        *     summary: Update email recipients configuration (setting to active will deactivate other configurations for the same combination)
+        *     tags: [Documents - Email Recipients]
+        *     security:
+        *       - bearerAuth: []
+        *     parameters:
+        *       - in: path
+        *         name: id
+        *         required: true
+        *         schema:
+        *           type: integer
+        *         description: Email Recipients ID
+         *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+         *               mipRecipients:
+        *                 type: string
+        *                 description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+        *                 example: "admin@community.com, manager@community.com, supervisor@community.com"
+        *               mopRecipients:
+        *                 type: string
+        *                 description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+        *                 example: "admin@community.com, manager@community.com, supervisor@community.com"
+ *               isActive:
+ *                 type: boolean
+ *                 description: Whether the configuration is active
+ *           example:
+ *             mipRecipients: "admin@community.com, manager@community.com, supervisor@community.com"
+ *             mopRecipients: "admin@community.com, manager@community.com, supervisor@community.com"
+ *             isActive: true
+        *     responses:
+        *       200:
+        *         description: Email recipients configuration updated successfully
+        *         content:
+        *           application/json:
+        *             schema:
+        *               type: object
+        *               properties:
+        *                 status:
+        *                   type: boolean
+        *                 code:
+        *                   type: string
+        *                 message:
+        *                   type: string
+        *                 data:
+        *                   $ref: '#/components/schemas/EmailRecipients'
+        *       400:
+        *         description: Bad request - validation error, email format error, or conflict with existing active configuration for the same master community/community/tower combination
+        *       401:
+        *         description: Unauthorized
+        *       404:
+        *         description: Email recipients configuration not found
+        *       500:
+        *         description: Internal server error
+        */
+       router.put('/email-recipients/:id', authMiddleware.auth(), validate(documentsValidation.updateEmailRecipients), catchAsync(documentsController.updateEmailRecipients));
 
+       /**
+        * @swagger
+        * /documents/email-recipients/{id}/history:
+        *   get:
+        *     summary: Get email recipients configuration history - tracks all changes including who added/edited the configuration
+        *     tags: [Documents - Email Recipients]
+        *     security:
+        *       - bearerAuth: []
+        *     parameters:
+        *       - in: path
+        *         name: id
+        *         required: true
+        *         schema:
+        *           type: integer
+        *         description: Email Recipients ID
+        *     responses:
+        *       200:
+        *         description: Email recipients history retrieved successfully
+        *         content:
+        *           application/json:
+        *             schema:
+        *               type: object
+        *               properties:
+        *                 success:
+        *                   type: boolean
+        *                 message:
+        *                   type: string
+        *                 data:
+        *                   type: array
+        *                   items:
+        *                     $ref: '#/components/schemas/EmailRecipientsHistory'
+        *       401:
+        *         description: Unauthorized
+        *       404:
+        *         description: Email recipients configuration not found
+        *       500:
+        *         description: Internal server error
+        */
+       router.get('/email-recipients/:id/history', authMiddleware.auth(), validate(documentsValidation.getEmailRecipientsById), catchAsync(documentsController.getEmailRecipientsHistory));
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+       /**
+        * @swagger
+        * /documents/email-recipients/export:
+        *   get:
+        *     summary: Export email recipients to CSV or Excel format with applied filters and search criteria
+        *     tags: [Documents - Email Recipients]
+        *     security:
+        *       - bearerAuth: []
+        *     parameters:
+        *       - in: query
+        *         name: search
+        *         schema:
+        *           type: string
+        *         description: Search term for master community, community, tower, or email addresses
+        *       - in: query
+        *         name: masterCommunityIds
+        *         schema:
+        *           type: string
+        *         description: Filter by master community IDs (comma-separated)
+        *       - in: query
+        *         name: communityIds
+        *         schema:
+        *           type: string
+        *         description: Filter by community IDs (comma-separated)
+        *       - in: query
+        *         name: towerIds
+        *         schema:
+        *           type: string
+        *         description: Filter by tower IDs (comma-separated)
+        *       - in: query
+        *         name: isActive
+        *         schema:
+        *           type: boolean
+        *         description: Filter by active status (true/false)
+        *       - in: query
+        *         name: startDate
+        *         schema:
+        *           type: string
+        *           format: date
+        *         description: Filter by start date (ISO format)
+        *       - in: query
+        *         name: endDate
+        *         schema:
+        *           type: string
+        *           format: date
+        *         description: Filter by end date (ISO format)
+        *       - in: query
+        *         name: format
+        *         schema:
+        *           type: string
+        *           enum: [csv, excel]
+        *           default: csv
+        *         description: Export format (csv or excel)
+        *     responses:
+        *       200:
+        *         description: File content
+        *         content:
+        *           text/csv:
+        *             schema:
+        *               type: string
+        *               format: binary
+        *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+        *             schema:
+        *               type: string
+        *               format: binary
+        *       401:
+        *         description: Unauthorized
+        *       500:
+        *         description: Internal server error
+        */
+       router.get('/email-recipients/export', authMiddleware.auth(), validate(documentsValidation.exportEmailRecipients), catchAsync(documentsController.exportEmailRecipients));
 
 
 /**
@@ -480,10 +821,12 @@ export default router;
 /**
  * @swagger
  * tags:
- *   name: Documents
- *   description: Welcome Pack Management
- *   name: Documents - Templates
- *   description: Consolidated Templates Management (move-in and move-out)
+ *   - name: Documents
+ *     description: Welcome Pack Management
+ *   - name: Documents - Templates
+ *     description: Consolidated Templates Management (move-in and move-out)
+ *   - name: Documents - Email Recipients
+ *     description: Email Recipients Management for Move-in and Move-out notifications. Supports multiple comma-separated email addresses per community. Only one active configuration allowed per unique combination of master community/community/tower.
  */
 
 /**
@@ -845,6 +1188,76 @@ export default router;
         *         templateType:
         *           type: string
         *           enum: [move-in, move-out]
+        *         isActive:
+        *           type: boolean
+        *         createdAt:
+        *           type: string
+        *           format: date-time
+        *         updatedAt:
+        *           type: string
+        *           format: date-time
+        *     
+        *     EmailRecipients:
+        *       type: object
+        *       properties:
+        *         id:
+        *           type: integer
+        *         masterCommunity:
+        *           type: object
+        *           properties:
+        *             id:
+        *               type: integer
+        *             name:
+        *               type: string
+        *         community:
+        *           type: object
+        *           properties:
+        *             id:
+        *               type: integer
+        *             name:
+        *               type: string
+        *         tower:
+        *           type: object
+        *           nullable: true
+        *           properties:
+        *             id:
+        *               type: integer
+        *             name:
+        *               type: string
+        *         mipRecipients:
+        *           type: string
+        *           description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+        *           example: "admin@community.com, manager@community.com, supervisor@community.com"
+        *         mopRecipients:
+        *           type: string
+        *           description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+        *           example: "admin@community.com, manager@community.com, supervisor@community.com"
+        *         isActive:
+        *           type: boolean
+        *         createdAt:
+        *           type: string
+        *           format: date-time
+        *         updatedAt:
+        *           type: string
+        *           format: date-time
+        *         createdBy:
+        *           type: integer
+        *         updatedBy:
+        *           type: integer
+        *     
+        *     EmailRecipientsHistory:
+        *       type: object
+        *       properties:
+        *         id:
+        *           type: integer
+        *         mipRecipients:
+        *           type: string
+        *           description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+        *           example: "admin@community.com, manager@community.com, supervisor@community.com"
+        *         mopRecipients:
+        *           type: string
+        *           description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+        *           example: "admin@community.com, manager@community.com, supervisor@community.com"
         *         isActive:
         *           type: boolean
         *         createdAt:

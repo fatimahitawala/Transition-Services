@@ -2,6 +2,8 @@ import { AppDataSource } from '../../Common/data-source';
 import { OccupancyRequestWelcomePack } from '../../Entities/OccupancyRequestWelcomePack.entity';
 import { OccupancyRequestTemplates } from '../../Entities/OccupancyRequestTemplates.entity';
 import { OccupancyRequestTemplateHistory } from '../../Entities/OccupancyRequestTemplateHistory.entity';
+import { OccupancyRequestEmailRecipients } from '../../Entities/OccupancyRequestEmailRecipients.entity';
+import { OccupancyRequestEmailRecipientsHistory } from '../../Entities/OccupancyRequestEmailRecipientsHistory.entity';
 import ApiError from '../../Common/Utils/ApiError';
 import { APICodes } from '../../Common/Constants/apiCodes.en';
 import { logger } from '../../Common/Utils/logger';
@@ -1025,5 +1027,491 @@ export class DocumentsService {
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
             throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
+    }
+
+    // Email Recipients Methods
+    async getEmailRecipientsList(query: any) {
+        try {
+            logger.info(`Starting getEmailRecipientsList with query: ${JSON.stringify(query)}`);
+            
+            // Ensure database connection is initialized
+            if (!AppDataSource.isInitialized) {
+                await AppDataSource.initialize();
+            }
+
+            const { page = 1, per_page = 20, search = '', masterCommunityIds = '', communityIds = '', towerIds = '', isActive, startDate, endDate, sortBy = 'createdAt', sortOrder = 'DESC' } = query;
+
+            // Parse comma-separated IDs and filter out empty values
+            const parseIds = (ids: string) => {
+                if (!ids || ids.trim() === '') return [];
+                return ids.split(',').filter((e: any) => e && e.trim() !== '');
+            };
+
+            const parsedMasterCommunityIds = parseIds(masterCommunityIds);
+            const parsedCommunityIds = parseIds(communityIds);
+            const parsedTowerIds = parseIds(towerIds);
+
+            logger.info(`Parsed IDs - masterCommunityIds: ${JSON.stringify(parsedMasterCommunityIds)}, communityIds: ${JSON.stringify(parsedCommunityIds)}, towerIds: ${JSON.stringify(parsedTowerIds)}`);
+
+            const queryBuilder = AppDataSource.getRepository(OccupancyRequestEmailRecipients)
+                .createQueryBuilder('recipients')
+                .leftJoinAndSelect('recipients.masterCommunity', 'masterCommunity')
+                .leftJoinAndSelect('recipients.community', 'community')
+                .leftJoinAndSelect('recipients.tower', 'tower')
+                .select([
+                    'recipients.id',
+                    'recipients.mipRecipients',
+                    'recipients.mopRecipients',
+                    'recipients.isActive',
+                    'recipients.createdAt',
+                    'recipients.updatedAt',
+                    'recipients.createdBy',
+                    'recipients.updatedBy',
+                    'masterCommunity.id',
+                    'masterCommunity.name',
+                    'community.id',
+                    'community.name',
+                    'tower.id',
+                    'tower.name'
+                ]);
+
+            // Add filtering by master community - only if IDs are provided
+            if (parsedMasterCommunityIds && parsedMasterCommunityIds.length > 0) {
+                queryBuilder.andWhere('recipients.masterCommunity.id IN (:...masterCommunityIds)', { masterCommunityIds: parsedMasterCommunityIds });
+            }
+
+            // Add filtering by community - only if IDs are provided
+            if (parsedCommunityIds && parsedCommunityIds.length > 0) {
+                queryBuilder.andWhere('recipients.community.id IN (:...communityIds)', { communityIds: parsedCommunityIds });
+            }
+
+            // Add filtering by tower - only if IDs are provided
+            if (parsedTowerIds && parsedTowerIds.length > 0) {
+                queryBuilder.andWhere('recipients.tower.id IN (:...towerIds)', { towerIds: parsedTowerIds });
+            }
+
+            // Add search functionality
+            if (search && search.trim() !== '') {
+                queryBuilder.andWhere(
+                    '(masterCommunity.name LIKE :search OR community.name LIKE :search OR tower.name LIKE :search OR recipients.mipRecipients LIKE :search OR recipients.mopRecipients LIKE :search)',
+                    { search: `%${search.trim()}%` }
+                );
+            }
+
+            // Add active status filtering
+            if (isActive !== undefined && isActive !== '') {
+                queryBuilder.andWhere('recipients.isActive = :isActive', { isActive: isActive === 'true' || isActive === true });
+            }
+
+            // Add date range filtering
+            if (startDate && startDate.trim() !== '') {
+                queryBuilder.andWhere('DATE(recipients.createdAt) >= DATE(:startDate)', { startDate });
+            }
+
+            if (endDate && endDate.trim() !== '') {
+                queryBuilder.andWhere('DATE(recipients.createdAt) <= DATE(:endDate)', { endDate });
+            }
+
+            // Add sorting
+            queryBuilder.orderBy(`recipients.${sortBy}`, sortOrder);
+
+            // Get total count for pagination
+            logger.info('Getting total count...');
+            const total = await queryBuilder.getCount();
+            logger.info(`Total count: ${total}`);
+
+            // Add pagination
+            const offset = (page - 1) * per_page;
+            const recipients = await queryBuilder
+                .skip(offset)
+                .take(per_page)
+                .getMany();
+
+            logger.info(`Query executed successfully, got ${recipients.length} recipients out of ${total} total`);
+
+            return {
+                officialRecipients: recipients,
+                pagination: {
+                    currentPage: page,
+                    totalPages: Math.ceil(total / per_page),
+                    totalItems: total,
+                    itemsPerPage: per_page
+                }
+            };
+        } catch (error: any) {
+            logger.error(`Error in getEmailRecipientsList: ${JSON.stringify(error)}`);
+            logger.error(`Error stack: ${error.stack}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        }
+    }
+
+    async createEmailRecipients(data: any, userId: number) {
+        try {
+            logger.info(`Starting createEmailRecipients with data: ${JSON.stringify(data)}`);
+            
+            // Ensure database connection is initialized
+            if (!AppDataSource.isInitialized) {
+                await AppDataSource.initialize();
+            }
+
+            const { masterCommunityId, communityId, towerId, mipRecipients, mopRecipients, isActive = true } = data;
+
+            // Validate email format for MIP recipients
+            if (mipRecipients && mipRecipients.trim() !== '') {
+                const mipEmails = mipRecipients.split(',').map((email: string) => email.trim());
+                for (const email of mipEmails) {
+                    if (!this.isValidEmail(email)) {
+                        throw new ApiError(APICodes.UNKNOWN_ERROR, `Invalid email format for MIP recipient: ${email}`);
+                    }
+                }
+            }
+
+            // Validate email format for MOP recipients
+            if (mopRecipients && mopRecipients.trim() !== '') {
+                const mopEmails = mopRecipients.split(',').map((email: string) => email.trim());
+                for (const email of mopEmails) {
+                    if (!this.isValidEmail(email)) {
+                        throw new ApiError(APICodes.UNKNOWN_ERROR, `Invalid email format for MOP recipient: ${email}`);
+                    }
+                }
+            }
+
+            // Check if there's already an active configuration for the same combination
+            const existingRecipients = await AppDataSource.getRepository(OccupancyRequestEmailRecipients)
+                .createQueryBuilder('recipients')
+                .where('recipients.masterCommunity.id = :masterCommunityId', { masterCommunityId })
+                .andWhere('recipients.community.id = :communityId', { communityId })
+                .andWhere('recipients.isActive = :isActive', { isActive: true });
+
+            if (towerId) {
+                existingRecipients.andWhere('recipients.tower.id = :towerId', { towerId });
+            } else {
+                existingRecipients.andWhere('recipients.tower IS NULL');
+            }
+
+            const existing = await existingRecipients.getOne();
+
+            if (existing) {
+                // Create error message
+                let errorMessage = 'An active email recipient configuration already exists for ';
+                if (towerId) {
+                    errorMessage += `Master Community ID ${masterCommunityId}, Community ID ${communityId}, and Tower ID ${towerId}`;
+                } else {
+                    errorMessage += `Master Community ID ${masterCommunityId} and Community ID ${communityId}`;
+                }
+                errorMessage += '. Only one active configuration is allowed per combination.';
+                
+                throw new ApiError(APICodes.UNKNOWN_ERROR, errorMessage);
+            }
+
+
+
+            const recipients = new OccupancyRequestEmailRecipients();
+            recipients.masterCommunity = { id: masterCommunityId } as any;
+            recipients.community = { id: communityId } as any;
+            recipients.mipRecipients = mipRecipients.trim();
+            recipients.mopRecipients = mopRecipients.trim();
+            recipients.isActive = isActive;
+            recipients.createdBy = userId;
+            
+            if (towerId) {
+                recipients.tower = { id: towerId } as any;
+            }
+            
+            const savedRecipients = await AppDataSource.getRepository(OccupancyRequestEmailRecipients).save(recipients);
+
+            // Create history record
+            const historyRecord = new OccupancyRequestEmailRecipientsHistory();
+            historyRecord.occupancyRequestEmailRecipients = savedRecipients;
+            historyRecord.mipRecipients = savedRecipients.mipRecipients;
+            historyRecord.mopRecipients = savedRecipients.mopRecipients;
+            historyRecord.isActive = savedRecipients.isActive;
+            historyRecord.createdBy = userId;
+            historyRecord.updatedBy = userId;
+
+            await AppDataSource.getRepository(OccupancyRequestEmailRecipientsHistory).save(historyRecord);
+
+            logger.info('Email recipients created successfully');
+            return savedRecipients;
+        } catch (error: any) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            logger.error(`Error in createEmailRecipients: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        }
+    }
+
+    async updateEmailRecipients(id: number, data: any, userId: number) {
+        try {
+            logger.info(`Starting updateEmailRecipients with id: ${id}, data: ${JSON.stringify(data)}`);
+            
+            // Ensure database connection is initialized
+            if (!AppDataSource.isInitialized) {
+                await AppDataSource.initialize();
+            }
+
+            const recipients = await AppDataSource.getRepository(OccupancyRequestEmailRecipients)
+                .createQueryBuilder('recipients')
+                .leftJoinAndSelect('recipients.masterCommunity', 'masterCommunity')
+                .leftJoinAndSelect('recipients.community', 'community')
+                .leftJoinAndSelect('recipients.tower', 'tower')
+                .where('recipients.id = :id', { id })
+                .getOne();
+
+            if (!recipients) {
+                throw new ApiError(APICodes.NOT_FOUND, 'Email recipients configuration not found');
+            }
+
+            // Validate email format for MIP recipients if provided
+            if (data.mipRecipients && data.mipRecipients.trim() !== '') {
+                const mipEmails = data.mipRecipients.split(',').map((email: string) => email.trim());
+                for (const email of mipEmails) {
+                    if (!this.isValidEmail(email)) {
+                        throw new ApiError(APICodes.UNKNOWN_ERROR, `Invalid email format for MIP recipient: ${email}`);
+                    }
+                }
+            }
+
+            // Validate email format for MOP recipients if provided
+            if (data.mopRecipients && data.mopRecipients.trim() !== '') {
+                const mopEmails = data.mopRecipients.split(',').map((email: string) => email.trim());
+                for (const email of mopEmails) {
+                    if (!this.isValidEmail(email)) {
+                        throw new ApiError(APICodes.UNKNOWN_ERROR, `Invalid email format for MOP recipient: ${email}`);
+                    }
+                }
+            }
+
+            // If setting to active, check for conflicts
+            if (data.isActive === true) {
+                const queryBuilder = AppDataSource.getRepository(OccupancyRequestEmailRecipients)
+                    .createQueryBuilder('recipients')
+                    .where('recipients.id != :id', { id })
+                    .andWhere('recipients.masterCommunity.id = :masterCommunityId', { masterCommunityId: recipients.masterCommunity.id })
+                    .andWhere('recipients.community.id = :communityId', { communityId: recipients.community.id })
+                    .andWhere('recipients.isActive = :isActive', { isActive: true });
+
+                if (recipients.tower) {
+                    queryBuilder.andWhere('recipients.tower.id = :towerId', { towerId: recipients.tower.id });
+                } else {
+                    queryBuilder.andWhere('recipients.tower IS NULL');
+                }
+
+                const existingRecipients = await queryBuilder.getMany();
+
+                if (existingRecipients.length > 0) {
+                    // Create history records for existing recipients
+                    for (const existing of existingRecipients) {
+                        const historyRecord = new OccupancyRequestEmailRecipientsHistory();
+                        historyRecord.occupancyRequestEmailRecipients = existing;
+                        historyRecord.mipRecipients = existing.mipRecipients;
+                        historyRecord.mopRecipients = existing.mopRecipients;
+                        historyRecord.isActive = existing.isActive;
+                        historyRecord.createdBy = userId;
+                        historyRecord.updatedBy = userId;
+                        await AppDataSource.getRepository(OccupancyRequestEmailRecipientsHistory).save(historyRecord);
+                    }
+
+                    // Deactivate existing recipients
+                    for (const existing of existingRecipients) {
+                        existing.isActive = false;
+                        existing.updatedBy = userId;
+                        await AppDataSource.getRepository(OccupancyRequestEmailRecipients).save(existing);
+                    }
+                }
+            }
+
+            // Update recipients data
+            if (data.mipRecipients !== undefined) {
+                recipients.mipRecipients = data.mipRecipients.trim();
+            }
+            if (data.mopRecipients !== undefined) {
+                recipients.mopRecipients = data.mopRecipients.trim();
+            }
+            if (data.isActive !== undefined) {
+                recipients.isActive = data.isActive;
+            }
+
+            recipients.updatedBy = userId;
+
+            // Save updated recipients
+            const updatedRecipients = await AppDataSource.getRepository(OccupancyRequestEmailRecipients).save(recipients);
+
+            // Create history record
+            const historyRecord = new OccupancyRequestEmailRecipientsHistory();
+            historyRecord.occupancyRequestEmailRecipients = updatedRecipients;
+            historyRecord.mipRecipients = updatedRecipients.mipRecipients;
+            historyRecord.mopRecipients = updatedRecipients.mopRecipients;
+            historyRecord.isActive = updatedRecipients.isActive;
+            historyRecord.createdBy = userId;
+            historyRecord.updatedBy = userId;
+
+            await AppDataSource.getRepository(OccupancyRequestEmailRecipientsHistory).save(historyRecord);
+
+            logger.info('Email recipients updated successfully');
+            return updatedRecipients;
+        } catch (error: any) {
+            if (error instanceof ApiError) {
+                throw error;
+            }
+            logger.error(`Error in updateEmailRecipients: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        }
+    }
+
+    async getEmailRecipientsHistory(id: number) {
+        try {
+            // Ensure database connection is initialized
+            if (!AppDataSource.isInitialized) {
+                await AppDataSource.initialize();
+            }
+
+            const history = await AppDataSource.getRepository(OccupancyRequestEmailRecipientsHistory)
+                .createQueryBuilder('history')
+                .leftJoinAndSelect('history.occupancyRequestEmailRecipients', 'recipients')
+                .where('recipients.id = :id', { id })
+                .orderBy('history.createdAt', 'DESC')
+                .getMany();
+
+            return history;
+        } catch (error: any) {
+            logger.error(`Error in getEmailRecipientsHistory: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        }
+    }
+
+    async exportEmailRecipients(query: any) {
+        try {
+            logger.info(`Starting exportEmailRecipients with query: ${JSON.stringify(query)}`);
+            
+            // Ensure database connection is initialized
+            if (!AppDataSource.isInitialized) {
+                await AppDataSource.initialize();
+            }
+
+            const { search = '', masterCommunityIds = '', communityIds = '', towerIds = '', isActive, startDate, endDate, format = 'csv' } = query;
+
+            // Parse comma-separated IDs and filter out empty values
+            const parseIds = (ids: string) => {
+                if (!ids || ids.trim() === '') return [];
+                return ids.split(',').filter((e: any) => e && e.trim() !== '');
+            };
+
+            const parsedMasterCommunityIds = parseIds(masterCommunityIds);
+            const parsedCommunityIds = parseIds(communityIds);
+            const parsedTowerIds = parseIds(towerIds);
+
+            const queryBuilder = AppDataSource.getRepository(OccupancyRequestEmailRecipients)
+                .createQueryBuilder('recipients')
+                .leftJoinAndSelect('recipients.masterCommunity', 'masterCommunity')
+                .leftJoinAndSelect('recipients.community', 'community')
+                .leftJoinAndSelect('recipients.tower', 'tower')
+                .select([
+                    'recipients.id',
+                    'recipients.mipRecipients',
+                    'recipients.mopRecipients',
+                    'recipients.isActive',
+                    'recipients.createdAt',
+                    'recipients.updatedAt',
+                    'masterCommunity.name',
+                    'community.name',
+                    'tower.name'
+                ]);
+
+            // Add filtering by master community - only if IDs are provided
+            if (parsedMasterCommunityIds && parsedMasterCommunityIds.length > 0) {
+                queryBuilder.andWhere('recipients.masterCommunity.id IN (:...masterCommunityIds)', { masterCommunityIds: parsedMasterCommunityIds });
+            }
+
+            // Add filtering by community - only if IDs are provided
+            if (parsedCommunityIds && parsedCommunityIds.length > 0) {
+                queryBuilder.andWhere('recipients.community.id IN (:...communityIds)', { communityIds: parsedCommunityIds });
+            }
+
+            // Add filtering by tower - only if IDs are provided
+            if (parsedTowerIds && parsedTowerIds.length > 0) {
+                queryBuilder.andWhere('recipients.tower.id IN (:...towerIds)', { towerIds: parsedTowerIds });
+            }
+
+            // Add search functionality
+            if (search && search.trim() !== '') {
+                queryBuilder.andWhere(
+                    '(masterCommunity.name LIKE :search OR community.name LIKE :search OR tower.name LIKE :search OR recipients.mipRecipients LIKE :search OR recipients.mopRecipients LIKE :search)',
+                    { search: `%${search.trim()}%` }
+                );
+            }
+
+            // Add active status filtering
+            if (isActive !== undefined && isActive !== '') {
+                queryBuilder.andWhere('recipients.isActive = :isActive', { isActive: isActive === 'true' || isActive === true });
+            }
+
+            // Add date range filtering
+            if (startDate && startDate.trim() !== '') {
+                queryBuilder.andWhere('DATE(recipients.createdAt) >= DATE(:startDate)', { startDate });
+            }
+
+            if (endDate && endDate.trim() !== '') {
+                queryBuilder.andWhere('DATE(recipients.createdAt) <= DATE(:endDate)', { endDate });
+            }
+
+            // Get all records for export
+            const recipients = await queryBuilder.getMany();
+
+            if (format === 'csv') {
+                return this.generateCSV(recipients);
+            } else if (format === 'excel') {
+                return this.generateExcel(recipients);
+            } else {
+                throw new ApiError(APICodes.UNKNOWN_ERROR, 'Unsupported export format. Use "csv" or "excel"');
+            }
+        } catch (error: any) {
+            logger.error(`Error in exportEmailRecipients: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        }
+    }
+
+    private isValidEmail(email: string): boolean {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    }
+
+    private generateCSV(recipients: any[]): { buffer: Buffer, contentType: string, fileName: string } {
+        const headers = ['Sl. No', 'Master Community', 'Community', 'Tower', 'MIP Email Recipients', 'MOP Email Recipients', 'Status', 'Created At', 'Updated At'];
+        
+        const csvData = recipients.map((recipient, index) => [
+            index + 1,
+            recipient.masterCommunity?.name || 'N/A',
+            recipient.community?.name || 'N/A',
+            recipient.tower?.name || 'N/A',
+            recipient.mipRecipients || 'N/A',
+            recipient.mopRecipients || 'N/A',
+            recipient.isActive ? 'Active' : 'Inactive',
+            recipient.createdAt ? new Date(recipient.createdAt).toISOString() : 'N/A',
+            recipient.updatedAt ? new Date(recipient.updatedAt).toISOString() : 'N/A'
+        ]);
+
+        const csvContent = [headers, ...csvData]
+            .map(row => row.map(cell => `"${cell}"`).join(','))
+            .join('\n');
+
+        const buffer = Buffer.from(csvContent, 'utf-8');
+        
+        return {
+            buffer,
+            contentType: 'text/csv',
+            fileName: `email_recipients_${new Date().toISOString().split('T')[0]}.csv`
+        };
+    }
+
+    private generateExcel(recipients: any[]): { buffer: Buffer, contentType: string, fileName: string } {
+        // For now, return CSV as Excel (you can implement proper Excel generation later)
+        return this.generateCSV(recipients);
     }
 }

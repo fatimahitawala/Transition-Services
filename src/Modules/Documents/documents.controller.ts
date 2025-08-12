@@ -128,6 +128,47 @@ export class DocumentsController {
         });
     }
 
+    // Email Recipients Methods
+    async getEmailRecipientsList(req: Request, res: Response) {
+        const { query }: Record<string, any> = req;
+        const { officialRecipients, pagination } = await documentsService.getEmailRecipientsList(query);
+        return successResponseWithPaginationData(res, APICodes.COMMON_SUCCESS, officialRecipients, pagination);
+    }
+
+    async createEmailRecipients(req: Request, res: Response) {
+        const { user: { id: userId = '' }, body }: Record<string, any> = req;
+        const result = await documentsService.createEmailRecipients(body, userId);
+        return successResponseWithData(res, APICodes.CREATE_SUCCESS, result);
+    }
+
+    async updateEmailRecipients(req: Request, res: Response) {
+        const { user: { id: userId = '' }, body, params: { id } }: Record<string, any> = req;
+        const result = await documentsService.updateEmailRecipients(parseInt(id), body, userId);
+        return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+    }
+
+    async getEmailRecipientsHistory(req: Request, res: Response) {
+        const { id } = req.params;
+        const result = await documentsService.getEmailRecipientsHistory(parseInt(id));
+        res.status(200).json({
+            success: true,
+            message: 'Email recipients history retrieved successfully',
+            data: result
+        });
+    }
+
+    async exportEmailRecipients(req: Request, res: Response) {
+        const { query }: Record<string, any> = req;
+        const result = await documentsService.exportEmailRecipients(query);
+        
+        // Set headers for file download
+        res.setHeader('Content-Type', result.contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
+        res.setHeader('Content-Length', result.buffer.length);
+        
+        // Send the file buffer
+        res.send(result.buffer);
+    }
 
 
 }
