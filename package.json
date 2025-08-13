@@ -68,6 +68,7 @@
       "passport": "0.6.0",
       "passport-jwt": "4.0.1",
       "pg": "8.4.0",
+      "puppeteer": "^24.16.1",
       "reflect-metadata": "0.1.13",
       "swagger-jsdoc": "6.2.8",
       "swagger-ui-express": "4.6.2",

@@ -4,7 +4,7 @@ import { DocumentsValidation } from './documents.validation';
 import { validate } from '../../Common/Middlewares/validate';
 import { catchAsync } from '../../Common/Middlewares/catchAsync';
 import { AuthMiddleware } from '../../Common/Middlewares/AuthMiddleware';
-import multer from 'multer';
+import { welcomePackSingleUpload, templateSingleUpload } from '../../Common/Utils/upload';
 
 const documentsController = new DocumentsController();
 const documentsValidation = new DocumentsValidation();
@@ -12,57 +12,230 @@ const authMiddleware = new AuthMiddleware();
 
 const router = express.Router();
 
-// File upload configuration for welcome pack documents
-const storage = multer.memoryStorage();
-const upload = multer({ 
-    storage: storage,
-    fileFilter: (req, file, cb) => {
-        // Allow PDF and HTML files for welcome packs
-        if (file.mimetype.includes("application/pdf") || 
-            file.mimetype.includes("text/html")) {
-            cb(null, true);
-        } else {
-            cb(new Error("Please upload only PDF or HTML files!"));
-        }
-    }
-});
 
-// Health check
-router.get('/health', (req, res) => documentsController.health(req, res));
+
+// Welcome Pack Routes (Admin routes) - All routes require authentication
+router.get('/welcome-pack', authMiddleware.auth(), validate(documentsValidation.getWelcomePackList), catchAsync(documentsController.getWelcomePackList));
+router.post('/welcome-pack', authMiddleware.auth(), welcomePackSingleUpload, validate(documentsValidation.createWelcomePack), catchAsync(documentsController.createWelcomePack));
+router.get('/welcome-pack/:id', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.getWelcomePackById));
+router.get('/welcome-pack/:id/download', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.downloadWelcomePackFile));
+router.put('/welcome-pack/:id', authMiddleware.auth(), welcomePackSingleUpload, validate(documentsValidation.updateWelcomePack), catchAsync(documentsController.updateWelcomePack));
+router.get('/welcome-pack/:id/history', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.getWelcomePackHistory));
+
+// Unified History Route - handles all template types (move-in, move-out, welcome-pack, recipient-mail)
+router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documentsValidation.getUnifiedHistory), catchAsync(documentsController.getUnifiedHistory));
 
 /**
  * @swagger
- * /documents/health:
- *   get:
- *     summary: Health check for documents service
- *     tags: [Documents]
+ * /documents/welcome-pack/{id}:
+ *   put:
+ *     summary: Update welcome pack
+ *     description: Update welcome pack status and optionally upload a new file. File upload is optional for updates.
+ *     tags: [Documents - Welcome Pack]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Welcome pack ID to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               isActive:
+ *                 type: string
+ *                 enum: ['true', 'false']
+ *                 description: Active status of the welcome pack (optional)
+ *               welcomePackFile:
+ *                 type: string
+ *                 format: binary
+ *                 description: Welcome pack file (PDF or HTML) - optional for updates
+ *             example:
+ *               isActive: "false"
+ *               welcomePackFile: "(optional file upload)"
  *     responses:
  *       200:
- *         description: Service is healthy
+ *         description: Welcome pack updated successfully
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success:
+ *                 status:
  *                   type: boolean
+ *                   example: true
  *                 message:
  *                   type: string
- *                 timestamp:
+ *                   example: "Welcome pack updated successfully"
+ *                 code:
  *                   type: string
- *                   format: date-time
- *             example:
- *               success: true
- *               message: "Documents service is running"
- *               timestamp: "2025-08-07T10:30:00.000Z"
+ *                   example: "SC004"
+ *                 data:
+ *                   $ref: '#/components/schemas/WelcomePack'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ErrorResponse'
  */
 
-// Welcome Pack Routes (Admin routes) - All routes require authentication
-router.get('/welcome-pack', authMiddleware.auth(), validate(documentsValidation.getWelcomePackList), catchAsync(documentsController.getWelcomePackList));
-router.post('/welcome-pack', authMiddleware.auth(), upload.single('welcomePackFile'), validate(documentsValidation.createWelcomePack), catchAsync(documentsController.createWelcomePack));
-router.get('/welcome-pack/:id', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.getWelcomePackById));
-router.get('/welcome-pack/:id/download', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.downloadWelcomePackFile));
-router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePackFile'), validate(documentsValidation.updateWelcomePack), catchAsync(documentsController.updateWelcomePack));
+// Welcome Kit PDF Generation Routes
+
+/**
+ * @swagger
+ * /documents/welcome-kit/generate:
+ *   post:
+ *     summary: Generate Welcome Kit PDF with dynamic data
+ *     description: Creates a professional Welcome Kit PDF document for new residents with customizable move-in timings and resident information
+ *     tags: [Documents - Welcome Kit]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/WelcomeKitData'
+ *           examples:
+ *             basic:
+ *               summary: Basic request with required fields only
+ *               value:
+ *                 residentName: "ADI NEGRU"
+ *                 unitNumber: "1003"
+ *                 buildingName: "Creek Vistas Grande"
+ *             complete:
+ *               summary: Complete request with all fields
+ *               value:
+ *                 residentName: "ADI NEGRU"
+ *                 unitNumber: "1003"
+ *                 buildingName: "Creek Vistas Grande"
+ *                 communityName: "Creek Vistas Grande"
+ *                 masterCommunityName: "Sobha Hartland"
+ *                 dateOfIssue: "29-06-2025"
+ *                 moveInDate: "05-07-2025"
+ *                 referenceNumber: "WK-6844"
+ *                 contactNumber: "800 SOBHA (76242)"
+ *                 moveInTimingsWeekdays: "9:00 AM - 6:00 PM"
+ *                 moveInTimingsSundays: "10:00 AM - 4:00 PM"
+ *             customTimings:
+ *               summary: Request with custom move-in timings
+ *               value:
+ *                 residentName: "JOHN DOE"
+ *                 unitNumber: "2001"
+ *                 buildingName: "Sunset Tower"
+ *                 communityName: "Sobha Hartland"
+ *                 moveInDate: "20-08-2025"
+ *                 referenceNumber: "WK-2025-001"
+ *                 moveInTimingsWeekdays: "8:00 AM - 7:00 PM"
+ *                 moveInTimingsSundays: "9:00 AM - 5:00 PM"
+ *     responses:
+ *       200:
+ *         description: Welcome Kit PDF generated successfully
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *             description: PDF file containing the Welcome Kit document
+ *         headers:
+ *           Content-Disposition:
+ *             description: Filename for download
+ *             schema:
+ *               type: string
+ *               example: "attachment; filename=welcome-kit-WK-6844.pdf"
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/ErrorResponse'
+ */
+router.post('/welcome-kit/generate', authMiddleware.auth(), validate(documentsValidation.generateWelcomeKit), catchAsync(documentsController.generateWelcomeKitPDF));
+
+/**
+ * @swagger
+ * /documents/welcome-kit/template/{id}/generate:
+ *   post:
+ *     summary: Generate Welcome Kit PDF from existing template with dynamic data
+ *     description: Creates a Welcome Kit PDF using an existing template and overrides with provided dynamic data. All fields are optional as they can be inherited from the template.
+ *     tags: [Documents - Welcome Kit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Template ID from the welcome-pack system
+ *         example: 1
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/WelcomeKitTemplateData'
+ *           examples:
+ *             minimal:
+ *               summary: Minimal request - use template defaults
+ *               value: {}
+ *             overrideData:
+ *               summary: Override specific template data
+ *               value:
+ *                 residentName: "JANE SMITH"
+ *                 unitNumber: "B205"
+ *                 moveInDate: "25-08-2025"
+ *                 referenceNumber: "WK-2025-002"
+ *             completeOverride:
+ *               summary: Complete override of template data
+ *               value:
+ *                 residentName: "JOHN DOE"
+ *                 unitNumber: "2001"
+ *                 buildingName: "Ocean View"
+ *                 communityName: "Sobha Hartland"
+ *                 masterCommunityName: "Sobha Hartland"
+ *                 dateOfIssue: "15-08-2025"
+ *                 moveInDate: "20-08-2025"
+ *                 referenceNumber: "WK-2025-003"
+ *                 contactNumber: "800 SOBHA (76242)"
+ *                 moveInTimingsWeekdays: "8:00 AM - 7:00 PM"
+ *                 moveInTimingsSundays: "9:00 AM - 5:00 PM"
+ *     responses:
+ *       200:
+ *         description: Welcome Kit PDF generated successfully from template
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *             description: PDF file containing the Welcome Kit document based on template and provided data
+ *         headers:
+ *           Content-Disposition:
+ *             description: Filename for download
+ *             schema:
+ *               type: string
+ *               example: "attachment; filename=welcome-kit-template-1.pdf"
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         $ref: '#/components/responses/NotFound'
+ *       500:
+ *         $ref: '#/components/responses/ErrorResponse'
+ */
+router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validate(documentsValidation.generateWelcomeKitFromTemplate), catchAsync(documentsController.generateWelcomeKitPDFFromTemplate));
 
        // Move-in and Move-out Templates Routes (Admin routes) - All routes require authentication
 
@@ -77,10 +250,11 @@ router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePac
         *     parameters:
         *       - in: query
         *         name: templateType
+        *         required: true
         *         schema:
         *           type: string
         *           enum: [move-in, move-out]
-        *         description: Type of template to filter by (move-in = Move In Permit, move-out = Move Out Permit)
+        *         description: Type of template to filter by (move-in = Move In Permit, move-out = Move Out Permit) - Required
         *       - in: query
         *         name: page
         *         schema:
@@ -176,6 +350,8 @@ router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePac
         *                       type: integer
         *                     itemsPerPage:
         *                       type: integer
+        *       400:
+        *         description: Bad request - Template type is required and must be either "move-in" or "move-out"
         *       401:
         *         description: Unauthorized
         *       500:
@@ -244,7 +420,7 @@ router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePac
         *       500:
         *         description: Internal server error
         */
-       router.post('/templates', authMiddleware.auth(), upload.single('templateFile'), validate(documentsValidation.createTemplate), catchAsync(documentsController.createTemplate));
+       router.post('/templates', authMiddleware.auth(), templateSingleUpload, validate(documentsValidation.createTemplate), catchAsync(documentsController.createTemplate));
 
        /**
         * @swagger
@@ -377,13 +553,13 @@ router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePac
         *       500:
         *         description: Internal server error
         */
-       router.put('/templates/:id', authMiddleware.auth(), upload.single('templateFile'), validate(documentsValidation.updateTemplate), catchAsync(documentsController.updateTemplate));
+       router.put('/templates/:id', authMiddleware.auth(), templateSingleUpload, validate(documentsValidation.updateTemplate), catchAsync(documentsController.updateTemplate));
 
        /**
         * @swagger
         * /documents/templates/{id}/history:
         *   get:
-        *     summary: Get template history
+        *     summary: Get template history - tracks all changes including who added/edited the template (move-in/move-out)
         *     tags: [Documents - Templates]
         *     security:
         *       - bearerAuth: []
@@ -565,11 +741,11 @@ router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePac
         *                 type: string
         *                 description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
         *                 example: "admin@community.com, manager@community.com, supervisor@community.com"
-        *               mopRecipients:
-        *                 type: string
-        *                 description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
-        *                 example: "admin@community.com, manager@community.com, supervisor@community.com"
-        *               isActive:
+ *               mopRecipients:
+ *                 type: string
+ *                 description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+ *                 example: "admin@community.com, manager@community.com, supervisor@community.com"
+ *               isActive:
  *                 type: boolean
  *                 default: true
  *                 description: Whether the configuration is active
@@ -699,7 +875,7 @@ router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePac
         *                 data:
         *                   type: array
         *                   items:
-        *                     $ref: '#/components/schemas/EmailRecipientsHistory'
+        *                     $ref: '#/components/schemas/EmailRecipientsTemplateHistory'
         *       401:
         *         description: Unauthorized
         *       404:
@@ -709,77 +885,9 @@ router.put('/welcome-pack/:id', authMiddleware.auth(), upload.single('welcomePac
         */
        router.get('/email-recipients/:id/history', authMiddleware.auth(), validate(documentsValidation.getEmailRecipientsById), catchAsync(documentsController.getEmailRecipientsHistory));
 
-       /**
-        * @swagger
-        * /documents/email-recipients/export:
-        *   get:
-        *     summary: Export email recipients to CSV or Excel format with applied filters and search criteria
-        *     tags: [Documents - Email Recipients]
-        *     security:
-        *       - bearerAuth: []
-        *     parameters:
-        *       - in: query
-        *         name: search
-        *         schema:
-        *           type: string
-        *         description: Search term for master community, community, tower, or email addresses
-        *       - in: query
-        *         name: masterCommunityIds
-        *         schema:
-        *           type: string
-        *         description: Filter by master community IDs (comma-separated)
-        *       - in: query
-        *         name: communityIds
-        *         schema:
-        *           type: string
-        *         description: Filter by community IDs (comma-separated)
-        *       - in: query
-        *         name: towerIds
-        *         schema:
-        *           type: string
-        *         description: Filter by tower IDs (comma-separated)
-        *       - in: query
-        *         name: isActive
-        *         schema:
-        *           type: boolean
-        *         description: Filter by active status (true/false)
-        *       - in: query
-        *         name: startDate
-        *         schema:
-        *           type: string
-        *           format: date
-        *         description: Filter by start date (ISO format)
-        *       - in: query
-        *         name: endDate
-        *         schema:
-        *           type: string
-        *           format: date
-        *         description: Filter by end date (ISO format)
-        *       - in: query
-        *         name: format
-        *         schema:
-        *           type: string
-        *           enum: [csv, excel]
-        *           default: csv
-        *         description: Export format (csv or excel)
-        *     responses:
-        *       200:
-        *         description: File content
-        *         content:
-        *           text/csv:
-        *             schema:
-        *               type: string
-        *               format: binary
-        *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
-        *             schema:
-        *               type: string
-        *               format: binary
-        *       401:
-        *         description: Unauthorized
-        *       500:
-        *         description: Internal server error
-        */
-       router.get('/email-recipients/export', authMiddleware.auth(), validate(documentsValidation.exportEmailRecipients), catchAsync(documentsController.exportEmailRecipients));
+
+        
+
 
 
 /**
@@ -822,11 +930,33 @@ export default router;
  * @swagger
  * tags:
  *   - name: Documents
- *     description: Welcome Pack Management
+ *     description: Welcome Pack Management with complete history tracking
  *   - name: Documents - Templates
- *     description: Consolidated Templates Management (move-in and move-out)
+ *     description: Consolidated Templates Management (move-in and move-out) with complete history tracking
  *   - name: Documents - Email Recipients
- *     description: Email Recipients Management for Move-in and Move-out notifications. Supports multiple comma-separated email addresses per community. Only one active configuration allowed per unique combination of master community/community/tower.
+ *     description: Email Recipients Management for Move-in and Move-out notifications with complete history tracking. Supports multiple comma-separated email addresses per community. Only one active configuration allowed per unique combination of master community/community/tower.
+ *   - name: Documents - Unified History
+ *     description: Unified history tracking for all document types (move-in, move-out, welcome-pack, recipient-mail)
+ * 
+ * @swagger
+ * components:
+ *   x-history-routes:
+ *     description: |
+ *       Complete History Tracking Available for All Document Types:
+ *       
+ *       **Welcome Pack History:**
+ *       - GET /documents/welcome-pack/{id}/history - Track all welcome pack changes
+ *       
+ *       **Template History (Move-in/Move-out):**
+ *       - GET /documents/templates/{id}/history - Track all template changes
+ *       
+ *       **Email Recipients History:**
+ *       - GET /documents/email-recipients/{id}/history - Track all email recipient changes
+ *       
+ *       **Unified History:**
+ *       - GET /documents/history/{templateType}/{id} - Track history for any template type (move-in, move-out, welcome-pack, recipient-mail)
+ *       
+ *       All history endpoints return comprehensive audit trails including who made changes, when, and what was changed.
  */
 
 /**
@@ -1102,6 +1232,94 @@ export default router;
  *         description: Internal server error
  */
 
+/**
+ * @swagger
+ * /documents/welcome-pack/{id}/history:
+ *   get:
+ *     summary: Get welcome pack history by ID - tracks all changes including who added/edited the welcome pack
+ *     tags: [Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Welcome pack ID
+ *     responses:
+ *       200:
+ *         description: Welcome pack history retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/WelcomePackHistory'
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Welcome pack not found
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /documents/history/{templateType}/{id}:
+ *   get:
+ *     summary: Get unified history for any template type
+ *     description: Get history records for move-in, move-out, welcome-pack, or recipient-mail templates based on templateType parameter
+ *     tags: [Documents - Unified History]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: templateType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [move-in, move-out, welcome-pack, recipient-mail]
+ *         description: Type of template to get history for
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Template ID
+ *     responses:
+ *       200:
+ *         description: History retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/TemplateHistory'
+ *       400:
+ *         description: Bad request - Invalid template type
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Template not found
+ *       500:
+ *         description: Internal server error
+ */
+
        /**
         * @swagger
         * components:
@@ -1180,22 +1398,38 @@ export default router;
         *         updatedBy:
         *           type: integer
         *     
-        *     TemplateHistory:
-        *       type: object
-        *       properties:
-        *         id:
-        *           type: integer
-        *         templateType:
-        *           type: string
-        *           enum: [move-in, move-out]
-        *         isActive:
-        *           type: boolean
-        *         createdAt:
-        *           type: string
-        *           format: date-time
-        *         updatedAt:
-        *           type: string
-        *           format: date-time
+             *     TemplateHistory:
+     *       type: object
+     *       properties:
+     *         id:
+     *           type: integer
+     *         templateType:
+     *           type: string
+     *           enum: [move-in, move-out, recipient-mail, welcome-pack]
+     *           description: Type of template history entry
+     *         occupancyRequestTemplates:
+     *           type: object
+     *           nullable: true
+     *           properties:
+     *             id:
+     *               type: integer
+     *             templateType:
+     *               type: string
+     *               enum: [move-in, move-out]
+     *             isActive:
+     *               type: boolean
+     *         isActive:
+     *           type: boolean
+     *         createdAt:
+     *           type: string
+     *           format: date-time
+     *         updatedAt:
+     *           type: string
+     *           format: date-time
+     *         createdBy:
+     *           type: integer
+     *         updatedBy:
+     *           type: integer
         *     
         *     EmailRecipients:
         *       type: object
@@ -1245,19 +1479,101 @@ export default router;
         *         updatedBy:
         *           type: integer
         *     
-        *     EmailRecipientsHistory:
+             *     EmailRecipientsTemplateHistory:
+     *       type: object
+     *       properties:
+     *         id:
+     *           type: integer
+     *         templateType:
+     *           type: string
+     *           enum: [recipient-mail]
+     *           description: Type of template history entry
+     *         occupancyRequestEmailRecipients:
+     *           type: object
+     *           nullable: true
+     *           properties:
+     *             id:
+     *               type: integer
+     *             masterCommunity:
+     *               type: object
+     *               properties:
+     *                 id:
+     *                   type: integer
+     *                 name:
+     *                   type: string
+     *             community:
+     *               type: object
+     *               properties:
+     *                 id:
+     *                   type: integer
+     *                 name:
+     *                   type: string
+     *             tower:
+     *               type: object
+     *               nullable: true
+     *               properties:
+     *                 id:
+     *                   type: integer
+     *                 name:
+     *                   type: string
+     *         mipRecipients:
+     *           type: string
+     *           description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+     *           example: "admin@community.com, manager@community.com, supervisor@community.com"
+     *         mopRecipients:
+     *           type: string
+     *           description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+     *           example: "admin@community.com, manager@community.com, supervisor@community.com"
+     *         isActive:
+     *           type: boolean
+     *         createdAt:
+     *           type: string
+     *           format: date-time
+     *         updatedAt:
+     *           type: string
+     *           format: date-time
+     *         createdBy:
+     *           type: integer
+     *         updatedBy:
+     *           type: integer
+        *     
+        *     WelcomePackHistory:
         *       type: object
         *       properties:
         *         id:
         *           type: integer
-        *         mipRecipients:
+        *         templateType:
         *           type: string
-        *           description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
-        *           example: "admin@community.com, manager@community.com, supervisor@community.com"
-        *         mopRecipients:
+        *           enum: [welcome-pack]
+        *           description: Type of template history entry
+        *         occupancyRequestWelcomePack:
+        *           type: object
+        *           nullable: true
+        *           properties:
+        *             id:
+        *               type: integer
+        *             masterCommunityId:
+        *               type: integer
+        *             communityId:
+        *               type: integer
+        *             towerId:
+        *               type: integer
+        *               nullable: true
+        *             templateString:
+        *               type: string
+        *               description: Base64 encoded file content for welcome pack
+        *             isActive:
+        *               type: boolean
+        *         masterCommunityId:
+        *           type: integer
+        *         communityId:
+        *           type: integer
+        *         towerId:
+        *           type: integer
+        *           nullable: true
+        *         templateString:
         *           type: string
-        *           description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
-        *           example: "admin@community.com, manager@community.com, supervisor@community.com"
+        *           description: Base64 encoded file content for welcome pack
         *         isActive:
         *           type: boolean
         *         createdAt:
@@ -1266,4 +1582,8 @@ export default router;
         *         updatedAt:
         *           type: string
         *           format: date-time
+        *         createdBy:
+        *           type: integer
+        *         updatedBy:
+        *           type: integer
         */
