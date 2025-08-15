@@ -7,14 +7,20 @@ export class DocumentsValidation {
         masterCommunityIds: Joi.string().required().description('Filter by master community IDs (comma-separated) - Required'),
         communityIds: Joi.string().optional().description('Filter by community IDs (comma-separated)'),
         towerIds: Joi.string().optional().description('Filter by tower IDs (comma-separated)'),
-        isActive: Joi.boolean().optional().description('Filter by active status (true/false)'),
+        isActive: Joi.alternatives().try(
+            Joi.boolean(),
+            Joi.string().valid('true', 'false')
+        ).optional().description('Filter by active status (true/false). If not specified, shows all records (both active and inactive)'),
         startDate: Joi.date().iso().optional().description('Filter by start date (ISO format)'),
         endDate: Joi.date().iso().optional().description('Filter by end date (ISO format)'),
         sortBy: Joi.string().valid('id', 'masterCommunityId', 'communityId', 'towerId', 'isActive', 'createdAt', 'updatedAt').optional().description('Sort field'),
         sortOrder: Joi.string().valid('ASC', 'DESC').optional().description('Sort order (ASC/DESC)'),
         page: Joi.number().min(1).optional().description('Page number (default: 1)'),
         per_page: Joi.number().min(1).max(100).optional().description('Items per page (default: 20, max: 100)'),
-        includeFile: Joi.boolean().optional().default(false).description('Include file content in response')
+        includeFile: Joi.alternatives().try(
+            Joi.boolean(),
+            Joi.string().valid('true', 'false')
+        ).optional().default(false).description('Include file content in response (true/false)')
     });
 
     createWelcomePack = Joi.object({

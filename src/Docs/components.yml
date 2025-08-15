@@ -388,6 +388,77 @@ components:
           type: string
           format: date-time
 
+    WelcomePack:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the welcome pack
+          example: 12
+
+        templateString:
+          type: string
+          description: Base64 encoded file content (only included when includeFile=true)
+          nullable: true
+        isActive:
+          type: integer
+          description: Active status of the welcome pack (1 for active, 0 for inactive)
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2025-08-13T10:44:46.291Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2025-08-13T10:44:46.291Z"
+        createdBy:
+          type: string
+          description: ID of the user who created the welcome pack
+          example: "4"
+        updatedBy:
+          type: string
+          description: ID of the user who last updated the welcome pack
+          example: "4"
+        masterCommunity:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              description: Master community ID
+              example: 28
+            name:
+              type: string
+              description: Master community name
+              example: "Sobha Central"
+        community:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              description: Community ID
+              example: 70
+            name:
+              type: string
+              description: Community name
+              example: "The Horizon"
+        tower:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              description: Tower ID
+              example: 142
+            name:
+              type: string
+              description: Tower name
+              example: "The Horizon"
+
   securitySchemes:
     bearerAuth:
       type: http

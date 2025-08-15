@@ -16,7 +16,17 @@ export class DocumentsController {
     // Welcome Pack Methods
     async getWelcomePackList(req: Request, res: Response) {
         const { query }: Record<string, any> = req;
-        const { data, pagination } = await documentsService.getWelcomePackList(query);
+        const { includeFile, ...otherQueryParams } = query;
+        
+        // Convert includeFile to boolean
+        const includeFileFlag = includeFile === 'true' || includeFile === true;
+        
+        // Pass the processed query parameters to the service
+        const { data, pagination } = await documentsService.getWelcomePackList({
+            ...otherQueryParams,
+            includeFile: includeFileFlag
+        });
+        
         return successResponseWithPaginationData(res, APICodes.COMMON_SUCCESS, data, pagination);
     }
 
@@ -258,9 +268,5 @@ export class DocumentsController {
         return successResponseWithData(res, APICodes.COMMON_SUCCESS, result);
     }
 
-    async getWelcomePackHistory(req: Request, res: Response) {
-        const { id } = req.params;
-        const result = await documentsService.getWelcomePackHistory(parseInt(id));
-        return successResponseWithData(res, APICodes.COMMON_SUCCESS, result);
-    }
+
 }

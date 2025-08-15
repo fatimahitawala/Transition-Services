@@ -20,7 +20,7 @@ export class DocumentsService {
         try {
             logger.info(`Starting getWelcomePackList with query: ${JSON.stringify(query)}`);
             
-            let { page = 1, per_page = 20, masterCommunityIds = '', communityIds = '', towerIds = '', search = '', isActive, startDate, endDate, sortBy = 'createdAt', sortOrder = 'DESC', includeFile = false } = query;
+            let { page = 1, per_page = 20, masterCommunityIds = '', communityIds = '', towerIds = '', search = '', isActive, startDate, endDate, sortBy = 'id', sortOrder = 'DESC', includeFile = false } = query;
 
             // Validate that masterCommunityIds is provided
             if (!masterCommunityIds || masterCommunityIds.trim() === '') {
@@ -47,27 +47,15 @@ export class DocumentsService {
             const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
             logger.info('Repository obtained successfully');
             
-            // Start with a simple query to test basic functionality
-            let getWelcomePackList = welcomePackRepository.createQueryBuilder('welcomePack');
-            
-            // Handle field selection based on includeFile parameter
-            if (includeFile === 'true' || includeFile === true) {
-                // When includeFile is true, select all fields including templateString
-                getWelcomePackList.addSelect('welcomePack.templateString');
-            } else {
-                // When includeFile is false, explicitly select only the fields we want (excluding templateString)
-                getWelcomePackList.select([
-                    'welcomePack.id',
-                    'welcomePack.masterCommunityId',
-                    'welcomePack.communityId',
-                    'welcomePack.towerId',
-                    'welcomePack.isActive',
-                    'welcomePack.createdAt',
-                    'welcomePack.updatedAt',
-                    'welcomePack.createdBy',
-                    'welcomePack.updatedBy'
-                ]);
+            // Check database connection status
+            if (!AppDataSource.isInitialized) {
+                logger.error('Database connection not initialized');
+                throw new ApiError(httpStatus.SERVICE_UNAVAILABLE, 'Database connection not available', 'EC503');
             }
+            
+            logger.info('Database connection is initialized and available');
+            
+            // Query building will be done separately for count and data queries
 
             // Base condition - show all records by default, filter by isActive only when specified
             let whereClause = "1=1";
@@ -96,7 +84,7 @@ export class DocumentsService {
 
             // Add search functionality
             if (search && search.trim() !== '') {
-                whereClause += " AND (welcomePack.masterCommunityId IN (SELECT id FROM master_communities WHERE name LIKE :search) OR welcomePack.communityId IN (SELECT id FROM communities WHERE name LIKE :search) OR welcomePack.towerId IN (SELECT id FROM towers WHERE name LIKE :search))";
+                whereClause += " AND (masterCommunity.name LIKE :search OR community.name LIKE :search OR tower.name LIKE :search)";
                 whereParams.search = `%${search.trim()}%`;
             }
 
@@ -114,37 +102,121 @@ export class DocumentsService {
             logger.info(`Where clause: ${whereClause}`);
             logger.info(`Where params: ${JSON.stringify(whereParams)}`);
 
-            getWelcomePackList.where(whereClause, whereParams);
+            // Create separate query builders for count and data
+            const countQuery = welcomePackRepository.createQueryBuilder('welcomePack')
+                .leftJoin('welcomePack.masterCommunity', 'masterCommunity')
+                .leftJoin('welcomePack.community', 'community')
+                .leftJoin('welcomePack.tower', 'tower')
+                .where(whereClause, whereParams);
 
-            // Add sorting
-            getWelcomePackList.orderBy(`welcomePack.${sortBy}`, sortOrder);
+            logger.info('Count query builder created successfully');
+            logger.info(`Count query where clause: ${whereClause}`);
+            logger.info(`Count query parameters: ${JSON.stringify(whereParams)}`);
+
+            const dataQuery = welcomePackRepository.createQueryBuilder('welcomePack')
+                .leftJoinAndSelect('welcomePack.masterCommunity', 'masterCommunity')
+                .leftJoinAndSelect('welcomePack.community', 'community')
+                .leftJoinAndSelect('welcomePack.tower', 'tower')
+                .where(whereClause, whereParams);
+
+            logger.info('Data query builder created successfully');
+            logger.info(`Data query where clause: ${whereClause}`);
+            logger.info(`Data query parameters: ${JSON.stringify(whereParams)}`);
+
+            // Handle field selection for data query
+            if (includeFile === 'true' || includeFile === true) {
+                dataQuery.select([
+                    'welcomePack.id',
+                    'welcomePack.masterCommunityId',
+                    'welcomePack.communityId',
+                    'welcomePack.towerId',
+                    'welcomePack.templateString',
+                    'welcomePack.isActive',
+                    'welcomePack.createdAt',
+                    'welcomePack.updatedAt',
+                    'welcomePack.createdBy',
+                    'welcomePack.updatedBy',
+                    'masterCommunity.id',
+                    'masterCommunity.name',
+                    'community.id',
+                    'community.name',
+                    'tower.id',
+                    'tower.name'
+                ]);
+            } else {
+                dataQuery.select([
+                    'welcomePack.id',
+                    'welcomePack.masterCommunityId',
+                    'welcomePack.communityId',
+                    'welcomePack.towerId',
+                    'welcomePack.isActive',
+                    'masterCommunity.id',
+                    'masterCommunity.name',
+                    'community.id',
+                    'community.name',
+                    'tower.id',
+                    'tower.name'
+                ]);
+            }
+
+            // Add sorting to data query
+            dataQuery.orderBy(`welcomePack.${sortBy}`, sortOrder);
 
             // Get total count for pagination
             logger.info('Getting total count...');
-            const totalCount = await getWelcomePackList.getCount();
-            logger.info(`Total count: ${totalCount}`);
+            logger.info(`Count query SQL: ${countQuery.getSql()}`);
+            logger.info(`Count query parameters: ${JSON.stringify(countQuery.getParameters())}`);
+            
+            let totalCount: number;
+            try {
+                totalCount = await countQuery.getCount();
+                logger.info(`Total count: ${totalCount}`);
+            } catch (countError: any) {
+                logger.error(`Error getting count: ${JSON.stringify(countError)}`);
+                logger.error(`Count error stack: ${countError.stack}`);
+                throw countError;
+            }
 
-            // Add pagination
+            // Add pagination to data query
             const offset = (page - 1) * per_page;
-            getWelcomePackList.skip(offset).take(per_page);
+            dataQuery.skip(offset).take(per_page);
 
-            // Execute query
-            logger.info('Executing query...');
-            const data = await getWelcomePackList.getMany();
-            logger.info(`Query executed successfully, got ${data.length} records`);
+            // Execute data query
+            logger.info('Executing data query...');
+            logger.info(`Data query SQL: ${dataQuery.getSql()}`);
+            logger.info(`Data query parameters: ${JSON.stringify(dataQuery.getParameters())}`);
+            
+            let data: any[];
+            try {
+                data = await dataQuery.getMany();
+                logger.info(`Data query executed successfully, got ${data.length} records`);
+            } catch (dataError: any) {
+                logger.error(`Error getting data: ${JSON.stringify(dataError)}`);
+                logger.error(`Data error stack: ${dataError.stack}`);
+                throw dataError;
+            }
 
-            // Format response data - simplified without joins for now
+            // Format response data with nested objects
             const formattedData = data.map((item: any) => ({
                 id: item.id,
-                masterCommunityId: item.masterCommunityId,
-                communityId: item.communityId,
-                towerId: item.towerId,
                 templateString: item.templateString,
                 isActive: item.isActive,
                 createdAt: item.createdAt,
                 updatedAt: item.updatedAt,
                 createdBy: item.createdBy,
-                updatedBy: item.updatedBy
+                updatedBy: item.updatedBy,
+                masterCommunity: item.masterCommunity ? {
+                    id: item.masterCommunity.id,
+                    name: item.masterCommunity.name
+                } : null,
+                community: item.community ? {
+                    id: item.community.id,
+                    name: item.community.name
+                } : null,
+                tower: item.tower ? {
+                    id: item.tower.id,
+                    name: item.tower.name
+                } : null
             }));
 
             logger.info('Data formatted successfully');
@@ -161,6 +233,28 @@ export class DocumentsService {
         } catch (error: any) {
             logger.error(`Error in getWelcomePackList: ${JSON.stringify(error)}`);
             logger.error(`Error stack: ${error.stack}`);
+            logger.error(`Error name: ${error.name}`);
+            logger.error(`Error message: ${error.message}`);
+            
+            // Check if it's a database connection error
+            if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+                logger.error('Database connection error detected');
+                throw new ApiError(httpStatus.SERVICE_UNAVAILABLE, 'Database connection failed', 'EC503');
+            }
+            
+            // Check if it's a database query error
+            if (error.code === 'ER_NO_SUCH_TABLE' || error.code === 'ER_BAD_FIELD_ERROR' || error.code === 'ER_PARSE_ERROR' || 
+                error.code === 'ER_KEY_COLUMN_DOES_NOT_EXIST' || error.code === 'ER_CANNOT_ADD_FOREIGN' || 
+                error.code === 'ER_NO_REFERENCED_ROW' || error.code === 'ER_NO_REFERENCED_ROW_2' ||
+                error.code === 'ER_ROW_IS_REFERENCED' || error.code === 'ER_ROW_IS_REFERENCED_2') {
+                logger.error('Database query error detected');
+                logger.error(`Database error code: ${error.code}`);
+                logger.error(`Database error message: ${error.message}`);
+                logger.error(`Database error sql: ${error.sql}`);
+                logger.error(`Database error sqlMessage: ${error.sqlMessage}`);
+                throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid database query', 'EC400');
+            }
+            
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
             throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
@@ -365,30 +459,83 @@ export class DocumentsService {
             const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
             
             let queryBuilder = welcomePackRepository.createQueryBuilder('welcomePack')
+                .leftJoinAndSelect('welcomePack.masterCommunity', 'masterCommunity')
+                .leftJoinAndSelect('welcomePack.community', 'community')
+                .leftJoinAndSelect('welcomePack.tower', 'tower')
                 .where('welcomePack.id = :id', { id });
 
             if (includeFile) {
-                // When includeFile is true, select all fields including templateString
-                queryBuilder.addSelect('welcomePack.templateString');
+                // When includeFile is true, select all fields including templateString and select: false fields
+                queryBuilder.select([
+                    'welcomePack.id',
+                    'welcomePack.masterCommunityId',
+                    'welcomePack.communityId',
+                    'welcomePack.towerId',
+                    'welcomePack.templateString',
+                    'welcomePack.isActive',
+                    'welcomePack.createdAt',
+                    'welcomePack.updatedAt',
+                    'welcomePack.createdBy',
+                    'welcomePack.updatedBy',
+                    'masterCommunity.id',
+                    'masterCommunity.name',
+                    'community.id',
+                    'community.name',
+                    'tower.id',
+                    'tower.name'
+                ]);
             } else {
-                // When includeFile is false, explicitly select only the fields we want (excluding templateString)
+                // When includeFile is false, explicitly select only the fields we want (excluding templateString and select: false fields)
                 queryBuilder.select([
                     'welcomePack.id',
                     'welcomePack.masterCommunityId',
                     'welcomePack.communityId',
                     'welcomePack.towerId',
                     'welcomePack.isActive',
-                    'welcomePack.createdAt',
-                    'welcomePack.updatedAt',
-                    'welcomePack.createdBy',
-                    'welcomePack.updatedBy'
+                    'masterCommunity.id',
+                    'masterCommunity.name',
+                    'community.id',
+                    'community.name',
+                    'tower.id',
+                    'tower.name'
                 ]);
             }
 
             const welcomePack = await queryBuilder.getOne();
 
+            if (!welcomePack) {
+                return null;
+            }
+
+            // Format the data to return nested objects instead of flat IDs
+            const formattedData: any = {
+                id: welcomePack.id,
+                isActive: welcomePack.isActive,
+                createdAt: welcomePack.createdAt,
+                updatedAt: welcomePack.updatedAt,
+                createdBy: welcomePack.createdBy,
+                updatedBy: welcomePack.updatedBy,
+                masterCommunity: welcomePack.masterCommunity ? {
+                    id: welcomePack.masterCommunity.id,
+                    name: welcomePack.masterCommunity.name
+                } : null,
+                community: welcomePack.community ? {
+                    id: welcomePack.community.id,
+                    name: welcomePack.community.name
+                } : null,
+                tower: welcomePack.tower ? {
+                    id: welcomePack.tower.id,
+                    name: welcomePack.tower.name
+                } : null
+            };
+
+            // Add templateString if includeFile is true
+            if (includeFile && welcomePack.templateString) {
+                formattedData.templateString = welcomePack.templateString;
+            }
+
             // Return null instead of throwing error - let the controller handle the "not found" case
-            return welcomePack;
+            return formattedData;
         } catch (error: any) {
             logger.error(`Error in getWelcomePackById: ${JSON.stringify(error)}`);
             
@@ -412,7 +559,8 @@ export class DocumentsService {
                 throw new ApiError(404, 'Welcome pack not found', APICodes.NOT_FOUND.code);
             }
 
-            if (!welcomePack.templateString) {
+            // Check if templateString exists and is a string
+            if (!('templateString' in welcomePack) || typeof (welcomePack as any).templateString !== 'string') {
                 throw new ApiError(404, 'Welcome pack file not found', APICodes.NOT_FOUND.code);
             }
 
@@ -420,7 +568,7 @@ export class DocumentsService {
             let fileName = `welcome-pack-${id}`;
 
             // Convert Base64 string back to Buffer
-            const fileBuffer = Buffer.from(welcomePack.templateString, 'base64');
+            const fileBuffer = Buffer.from((welcomePack as any).templateString, 'base64');
 
             // Try to determine if it's PDF or HTML based on content
             if (fileBuffer.length >= 4 && 
@@ -477,8 +625,8 @@ export class DocumentsService {
                     .andWhere('welcomePack.communityId = :communityId', { communityId: welcomePack.communityId })
                     .andWhere('welcomePack.isActive = :isActive', { isActive: true });
 
-                if (welcomePack.towerId) {
-                    queryBuilder.andWhere('welcomePack.towerId = :towerId', { towerId: welcomePack.towerId });
+                if ((welcomePack as any).towerId) {
+                    queryBuilder.andWhere('welcomePack.towerId = :towerId', { towerId: (welcomePack as any).towerId });
                 } else {
                     queryBuilder.andWhere('welcomePack.towerId IS NULL');
                 }
@@ -697,25 +845,48 @@ export class DocumentsService {
             // Start with a simple query to test basic functionality
             const queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplates)
                 .createQueryBuilder('template')
+                .leftJoinAndSelect('template.masterCommunity', 'masterCommunity')
+                .leftJoinAndSelect('template.community', 'community')
+                .leftJoinAndSelect('template.tower', 'tower')
                 .where('template.templateType IN (:...templateTypes)', { templateTypes: ['move-in', 'move-out'] });
 
             // Handle field selection based on includeFile parameter
             if (includeFile === 'true' || includeFile === true) {
-                // When includeFile is true, select all fields including templateString
-                queryBuilder.addSelect('template.templateString');
-            } else {
-                // When includeFile is false, explicitly select only the fields we want (excluding templateString)
+                // When includeFile is true, select all fields including templateString and select: false fields
                 queryBuilder.select([
                     'template.id',
+                    'template.masterCommunityId',
+                    'template.communityId',
+                    'template.towerId',
                     'template.templateType',
+                    'template.templateString',
                     'template.isActive',
                     'template.createdAt',
                     'template.updatedAt',
                     'template.createdBy',
                     'template.updatedBy',
+                    'masterCommunity.id',
+                    'masterCommunity.name',
+                    'community.id',
+                    'community.name',
+                    'tower.id',
+                    'tower.name'
+                ]);
+            } else {
+                // When includeFile is false, explicitly select only the fields we want (excluding templateString and select: false fields)
+                queryBuilder.select([
+                    'template.id',
                     'template.masterCommunityId',
                     'template.communityId',
-                    'template.towerId'
+                    'template.towerId',
+                    'template.templateType',
+                    'template.isActive',
+                    'masterCommunity.id',
+                    'masterCommunity.name',
+                    'community.id',
+                    'community.name',
+                    'tower.id',
+                    'tower.name'
                 ]);
             }
 
@@ -967,21 +1138,35 @@ export class DocumentsService {
                 .where('template.id = :id', { id });
 
             if (includeFile) {
-                // When includeFile is true, select all fields including templateString
-                queryBuilder.addSelect('template.templateString');
-            } else {
-                // When includeFile is false, explicitly select only the fields we want (excluding templateString)
+                // When includeFile is true, select all fields including templateString and select: false fields
                 queryBuilder.select([
                     'template.id',
+                    'template.masterCommunityId',
+                    'template.communityId',
+                    'template.towerId',
                     'template.templateType',
+                    'template.templateString',
                     'template.isActive',
                     'template.createdAt',
                     'template.updatedAt',
                     'template.createdBy',
                     'template.updatedBy',
+                    'masterCommunity.id',
+                    'masterCommunity.name',
+                    'community.id',
+                    'community.name',
+                    'tower.id',
+                    'tower.name'
+                ]);
+            } else {
+                // When includeFile is false, explicitly select only the fields we want (excluding templateString and select: false fields)
+                queryBuilder.select([
+                    'template.id',
                     'template.masterCommunityId',
                     'template.communityId',
                     'template.towerId',
+                    'template.templateType',
+                    'template.isActive',
                     'masterCommunity.id',
                     'masterCommunity.name',
                     'community.id',
@@ -1255,70 +1440,191 @@ export class DocumentsService {
     }
 
     async getUnifiedHistory(templateType: string, id: number) {
+        logger.info(`Getting unified history for templateType: ${templateType}, id: ${id}`);
+        
+        if (!AppDataSource.isInitialized) {
+            logger.error('Database connection not available');
+            throw new ApiError(500, 'Database connection not available', APICodes.INTERNAL_SERVER_ERROR.code);
+        }
+
+        logger.info(`Database connection status: ${AppDataSource.isInitialized}`);
+        logger.info(`Database driver: ${AppDataSource.driver.constructor.name}`);
+
+        let history;
+        let queryBuilder;
+        
         try {
-            logger.info(`Getting unified history for templateType: ${templateType}, id: ${id}`);
-
-            // Validate template type
-            const validTypes = ['move-in', 'move-out', 'welcome-pack', 'recipient-mail'];
-            if (!validTypes.includes(templateType)) {
-                throw new ApiError(400, `Invalid template type. Must be one of: ${validTypes.join(', ')}`, APICodes.UNKNOWN_ERROR.code);
-            }
-
-            let history;
-            
             switch (templateType) {
-                case 'move-in':
-                case 'move-out':
-                    // For move-in and move-out templates
-                    history = await AppDataSource.getRepository(OccupancyRequestTemplateHistory)
-                        .createQueryBuilder('history')
-                        .leftJoinAndSelect('history.occupancyRequestTemplates', 'template')
-                        .where('template.id = :id', { id })
-                        .andWhere('history.templateType = :templateType', { templateType })
-                        .orderBy('history.createdAt', 'DESC')
-                        .getMany();
-                    break;
-                    
-                case 'welcome-pack':
-                    // For welcome pack templates
-                    history = await AppDataSource.getRepository(OccupancyRequestTemplateHistory)
-                        .createQueryBuilder('history')
-                        .leftJoinAndSelect('history.occupancyRequestWelcomePack', 'welcomePack')
-                        .where('welcomePack.id = :id', { id })
-                        .andWhere('history.templateType = :templateType', { templateType })
-                        .orderBy('history.createdAt', 'DESC')
-                        .getMany();
-                    break;
-                    
-                case 'recipient-mail':
-                    // For email recipient templates
-                    history = await AppDataSource.getRepository(OccupancyRequestTemplateHistory)
-                        .createQueryBuilder('history')
-                        .leftJoinAndSelect('history.occupancyRequestEmailRecipients', 'recipients')
-                        .where('recipients.id = :id', { id })
-                        .andWhere('history.templateType = :templateType', { templateType })
-                        .orderBy('history.createdAt', 'DESC')
-                        .getMany();
-                    break;
-                    
-                default:
-                    throw new ApiError(400, `Unsupported template type: ${templateType}`, APICodes.UNKNOWN_ERROR.code);
+            case 'move-in':
+            case 'move-out':
+                // For move-in and move-out templates
+                queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplateHistory)
+                    .createQueryBuilder('history')
+                    .addSelect('history.createdAt')
+                    .addSelect('history.updatedAt')
+                    .addSelect('history.createdBy')
+                    .addSelect('history.updatedBy')
+                    .addSelect('history.masterCommunityId')
+                    .addSelect('history.communityId')
+                    .addSelect('history.towerId')
+                    .addSelect('history.templateString')
+                    .addSelect('history.isActive')
+                    .addSelect('history.mipRecipients')
+                    .addSelect('history.mopRecipients')
+                    .where('history.occupancyRequestTemplatesId = :id', { id })
+                    .andWhere('history.templateType = :templateType', { templateType })
+                    .orderBy('history.createdAt', 'DESC');
+                
+                logger.info(`Executing query for ${templateType}: ${queryBuilder.getSql()}`);
+                logger.info(`Query parameters: id=${id}, templateType=${templateType}`);
+                try {
+                    history = await queryBuilder.getMany();
+                } catch (queryError: any) {
+                    logger.error(`Query execution error for ${templateType}: ${JSON.stringify(queryError)}`);
+                    logger.error(`Query error stack: ${queryError.stack}`);
+                    throw queryError;
+                }
+                break;
+                
+            case 'welcome-pack':
+                // For welcome pack templates
+                queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplateHistory)
+                    .createQueryBuilder('history')
+                    .addSelect('history.createdAt')
+                    .addSelect('history.updatedAt')
+                    .addSelect('history.createdBy')
+                    .addSelect('history.updatedBy')
+                    .addSelect('history.masterCommunityId')
+                    .addSelect('history.communityId')
+                    .addSelect('history.towerId')
+                    .addSelect('history.templateString')
+                    .addSelect('history.isActive')
+                    .addSelect('history.mipRecipients')
+                    .addSelect('history.mopRecipients')
+                    .where('history.occupancyRequestWelcomePackId = :id', { id })
+                    .andWhere('history.templateType = :templateType', { templateType })
+                    .orderBy('history.createdAt', 'DESC');
+                
+                logger.info(`Executing query for ${templateType}: ${queryBuilder.getSql()}`);
+                logger.info(`Query parameters: id=${id}, templateType=${templateType}`);
+                try {
+                    history = await queryBuilder.getMany();
+                } catch (queryError: any) {
+                    logger.error(`Query execution error for ${templateType}: ${JSON.stringify(queryError)}`);
+                    logger.error(`Query error stack: ${queryError.stack}`);
+                    throw queryError;
+                }
+                break;
+                
+            case 'recipient-mail':
+                // For email recipient templates
+                queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplateHistory)
+                    .createQueryBuilder('history')
+                    .addSelect('history.createdAt')
+                    .addSelect('history.updatedAt')
+                    .addSelect('history.createdBy')
+                    .addSelect('history.updatedBy')
+                    .addSelect('history.masterCommunityId')
+                    .addSelect('history.communityId')
+                    .addSelect('history.towerId')
+                    .addSelect('history.templateString')
+                    .addSelect('history.isActive')
+                    .addSelect('history.mipRecipients')
+                    .addSelect('history.mopRecipients')
+                    .where('history.occupancyRequestEmailRecipientsId = :id', { id })
+                    .andWhere('history.templateType = :templateType', { templateType })
+                    .orderBy('history.createdAt', 'DESC');
+                
+                logger.info(`Executing query for ${templateType}: ${queryBuilder.getSql()}`);
+                logger.info(`Query parameters: id=${id}, templateType=${templateType}`);
+                try {
+                    history = await queryBuilder.getMany();
+                } catch (queryError: any) {
+                    logger.error(`Query execution error for ${templateType}: ${JSON.stringify(queryError)}`);
+                    logger.error(`Query error stack: ${queryError.stack}`);
+                    throw queryError;
+                }
+                break;
+                
+            default:
+                logger.error(`Unsupported template type: ${templateType}`);
+                throw new ApiError(400, `Unsupported template type: ${templateType}`, APICodes.BAD_REQUEST.code);
             }
-
+            
             if (!history || history.length === 0) {
-                throw new ApiError(404, `No history found for ${templateType} template with ID ${id}`, APICodes.NOT_FOUND.code);
+                logger.info(`No history found for templateType: ${templateType}, id: ${id}`);
+                return [];
             }
+            
+            logger.info(`Found ${history.length} history records for templateType: ${templateType}, id: ${id}`);
+            
+            // Transform the data to include nested objects for masterCommunity, community, and tower
+            const transformedHistory = history.map((record: any) => {
+                const transformed: any = {
+                    id: record.id,
+                    templateType: record.templateType,
+                    templateString: record.templateString,
+                    isActive: record.isActive,
+                    createdAt: record.createdAt,
+                    updatedAt: record.updatedAt,
+                    createdBy: record.createdBy,
+                    updatedBy: record.updatedBy,
+                    mipRecipients: record.mipRecipients,
+                    mopRecipients: record.mopRecipients
+                };
 
-            logger.info(`Successfully retrieved ${history.length} history records for ${templateType} template ID ${id}`);
-            return history;
+                // Add nested objects for masterCommunity, community, and tower using IDs
+                if (record.masterCommunityId) {
+                    transformed.masterCommunity = {
+                        id: record.masterCommunityId,
+                        name: 'Unknown' // You can fetch this separately if needed
+                    };
+                }
+
+                if (record.communityId) {
+                    transformed.community = {
+                        id: record.communityId,
+                        name: 'Unknown' // You can fetch this separately if needed
+                    };
+                }
+
+                if (record.towerId) {
+                    transformed.tower = {
+                        id: record.towerId,
+                        name: 'Unknown' // You can fetch this separately if needed
+                    };
+                }
+
+                // Add the specific template relationship based on type
+                switch (templateType) {
+                    case 'move-in':
+                    case 'move-out':
+                        if (record.occupancyRequestTemplates) {
+                            transformed.occupancyRequestTemplates = record.occupancyRequestTemplates;
+                        }
+                        break;
+                    case 'welcome-pack':
+                        if (record.occupancyRequestWelcomePack) {
+                            transformed.occupancyRequestWelcomePack = record.occupancyRequestWelcomePack;
+                        }
+                        break;
+                    case 'recipient-mail':
+                        if (record.occupancyRequestEmailRecipients) {
+                            transformed.occupancyRequestEmailRecipients = record.occupancyRequestEmailRecipients;
+                        }
+                        break;
+                }
+
+                return transformed;
+            });
+            
+            logger.info(`Successfully transformed ${transformedHistory.length} history records`);
+            return transformedHistory;
             
         } catch (error: any) {
             logger.error(`Error in getUnifiedHistory: ${JSON.stringify(error)}`);
-            if (error instanceof ApiError) {
-                throw error;
-            }
-            const apiCode = Object.values(APICodes).find((item: any) => (item as any).code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+            logger.error(`Error stack: ${error.stack}`);
+            throw new ApiError(500, 'Unknown error occurred.', APICodes.INTERNAL_SERVER_ERROR.code);
         }
     }
 
@@ -1735,24 +2041,7 @@ export class DocumentsService {
         }
     }
 
-    async getWelcomePackHistory(id: number) {
-        try {
 
-            const history = await AppDataSource.getRepository(OccupancyRequestTemplateHistory)
-                .createQueryBuilder('history')
-                .leftJoinAndSelect('history.occupancyRequestWelcomePack', 'welcomePack')
-                .where('welcomePack.id = :id', { id })
-                .andWhere('history.templateType = :templateType', { templateType: 'welcome-pack' })
-                .orderBy('history.createdAt', 'DESC')
-                .getMany();
-
-            return history;
-        } catch (error: any) {
-            logger.error(`Error in getWelcomePackHistory: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
-        }
-    }
 
 
 

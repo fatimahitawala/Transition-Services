@@ -17,10 +17,10 @@ const router = express.Router();
 // Welcome Pack Routes (Admin routes) - All routes require authentication
 router.get('/welcome-pack', authMiddleware.auth(), validate(documentsValidation.getWelcomePackList), catchAsync(documentsController.getWelcomePackList));
 router.post('/welcome-pack', authMiddleware.auth(), welcomePackSingleUpload, validate(documentsValidation.createWelcomePack), catchAsync(documentsController.createWelcomePack));
-router.get('/welcome-pack/:id', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.getWelcomePackById));
 router.get('/welcome-pack/:id/download', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.downloadWelcomePackFile));
+
+router.get('/welcome-pack/:id', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.getWelcomePackById));
 router.put('/welcome-pack/:id', authMiddleware.auth(), welcomePackSingleUpload, validate(documentsValidation.updateWelcomePack), catchAsync(documentsController.updateWelcomePack));
-router.get('/welcome-pack/:id/history', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.getWelcomePackHistory));
 
 // Unified History Route - handles all template types (move-in, move-out, welcome-pack, recipient-mail)
 router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documentsValidation.getUnifiedHistory), catchAsync(documentsController.getUnifiedHistory));
@@ -991,8 +991,11 @@ export default router;
  *       - in: query
  *         name: isActive
  *         schema:
- *           type: boolean
- *         description: Filter by active status (true/false). If not specified, shows all records (both active and inactive)
+ *           oneOf:
+ *             - type: boolean
+ *             - type: string
+ *               enum: ['true', 'false']
+ *         description: Filter by active status (true/false or "true"/"false"). If not specified, shows all records (both active and inactive)
  *       - in: query
  *         name: startDate
  *         schema:
@@ -1035,9 +1038,12 @@ export default router;
  *       - in: query
  *         name: includeFile
  *         schema:
- *           type: boolean
+ *           oneOf:
+ *             - type: boolean
+ *             - type: string
+ *               enum: ['true', 'false']
  *           default: false
- *         description: Include file content in response (true/false)
+ *         description: Include file content in response (true/false or "true"/"false")
  *     responses:
  *       200:
  *         description: List of welcome packs with pagination
