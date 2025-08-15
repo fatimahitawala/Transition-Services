@@ -6,20 +6,25 @@ import { OccupancyRequestEmailRecipients } from '../../Entities/OccupancyRequest
 import { MasterCommunities } from '../../Entities/MasterCommunities.entity';
 import { Communities } from '../../Entities/Communities.entity';
 import { Towers } from '../../Entities/Towers.entity';
+import { logger } from '../../Common/Utils/logger';
 
 import ApiError from '../../Common/Utils/ApiError';
 import { APICodes } from '../../Common/Constants/apiCodes.en';
-import { logger } from '../../Common/Utils/logger';
+
 import httpStatus from 'http-status';
 import { WelcomeKitService, WelcomeKitData } from './welcomeKit.service';
 
 export class DocumentsService {
 
     // Welcome Pack Methods
+    /**
+     * Get Welcome Pack List
+     * @returns {Promise<any>}
+     * @throws {Error}
+     * @param query
+     */
     async getWelcomePackList(query: any) {
         try {
-            logger.info(`Starting getWelcomePackList with query: ${JSON.stringify(query)}`);
-            
             let { page = 1, per_page = 20, masterCommunityIds = '', communityIds = '', towerIds = '', search = '', isActive, startDate, endDate, sortBy = 'id', sortOrder = 'DESC', includeFile = false } = query;
 
             // Validate that masterCommunityIds is provided
@@ -42,18 +47,12 @@ export class DocumentsService {
                 throw new ApiError(httpStatus.BAD_REQUEST, 'At least one valid masterCommunityId is required', 'EC400');
             }
 
-            logger.info(`Parsed IDs - masterCommunityIds: ${JSON.stringify(masterCommunityIds)}, communityIds: ${JSON.stringify(communityIds)}, towerIds: ${JSON.stringify(towerIds)}`);
-
             const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
-            logger.info('Repository obtained successfully');
             
             // Check database connection status
             if (!AppDataSource.isInitialized) {
-                logger.error('Database connection not initialized');
                 throw new ApiError(httpStatus.SERVICE_UNAVAILABLE, 'Database connection not available', 'EC503');
             }
-            
-            logger.info('Database connection is initialized and available');
             
             // Query building will be done separately for count and data queries
 
@@ -99,9 +98,6 @@ export class DocumentsService {
                 whereParams.endDate = endDate;
             }
 
-            logger.info(`Where clause: ${whereClause}`);
-            logger.info(`Where params: ${JSON.stringify(whereParams)}`);
-
             // Create separate query builders for count and data
             const countQuery = welcomePackRepository.createQueryBuilder('welcomePack')
                 .leftJoin('welcomePack.masterCommunity', 'masterCommunity')
@@ -109,19 +105,11 @@ export class DocumentsService {
                 .leftJoin('welcomePack.tower', 'tower')
                 .where(whereClause, whereParams);
 
-            logger.info('Count query builder created successfully');
-            logger.info(`Count query where clause: ${whereClause}`);
-            logger.info(`Count query parameters: ${JSON.stringify(whereParams)}`);
-
             const dataQuery = welcomePackRepository.createQueryBuilder('welcomePack')
                 .leftJoinAndSelect('welcomePack.masterCommunity', 'masterCommunity')
                 .leftJoinAndSelect('welcomePack.community', 'community')
                 .leftJoinAndSelect('welcomePack.tower', 'tower')
                 .where(whereClause, whereParams);
-
-            logger.info('Data query builder created successfully');
-            logger.info(`Data query where clause: ${whereClause}`);
-            logger.info(`Data query parameters: ${JSON.stringify(whereParams)}`);
 
             // Handle field selection for data query
             if (includeFile === 'true' || includeFile === true) {
@@ -163,14 +151,9 @@ export class DocumentsService {
             dataQuery.orderBy(`welcomePack.${sortBy}`, sortOrder);
 
             // Get total count for pagination
-            logger.info('Getting total count...');
-            logger.info(`Count query SQL: ${countQuery.getSql()}`);
-            logger.info(`Count query parameters: ${JSON.stringify(countQuery.getParameters())}`);
-            
             let totalCount: number;
             try {
                 totalCount = await countQuery.getCount();
-                logger.info(`Total count: ${totalCount}`);
             } catch (countError: any) {
                 logger.error(`Error getting count: ${JSON.stringify(countError)}`);
                 logger.error(`Count error stack: ${countError.stack}`);
@@ -182,17 +165,10 @@ export class DocumentsService {
             dataQuery.skip(offset).take(per_page);
 
             // Execute data query
-            logger.info('Executing data query...');
-            logger.info(`Data query SQL: ${dataQuery.getSql()}`);
-            logger.info(`Data query parameters: ${JSON.stringify(dataQuery.getParameters())}`);
-            
             let data: any[];
             try {
                 data = await dataQuery.getMany();
-                logger.info(`Data query executed successfully, got ${data.length} records`);
             } catch (dataError: any) {
-                logger.error(`Error getting data: ${JSON.stringify(dataError)}`);
-                logger.error(`Data error stack: ${dataError.stack}`);
                 throw dataError;
             }
 
@@ -219,8 +195,6 @@ export class DocumentsService {
                 } : null
             }));
 
-            logger.info('Data formatted successfully');
-
             return {
                 data: formattedData,
                 pagination: {
@@ -231,49 +205,29 @@ export class DocumentsService {
                 }
             };
         } catch (error: any) {
-            logger.error(`Error in getWelcomePackList: ${JSON.stringify(error)}`);
-            logger.error(`Error stack: ${error.stack}`);
-            logger.error(`Error name: ${error.name}`);
-            logger.error(`Error message: ${error.message}`);
-            
-            // Check if it's a database connection error
-            if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
-                logger.error('Database connection error detected');
-                throw new ApiError(httpStatus.SERVICE_UNAVAILABLE, 'Database connection failed', 'EC503');
-            }
-            
-            // Check if it's a database query error
-            if (error.code === 'ER_NO_SUCH_TABLE' || error.code === 'ER_BAD_FIELD_ERROR' || error.code === 'ER_PARSE_ERROR' || 
-                error.code === 'ER_KEY_COLUMN_DOES_NOT_EXIST' || error.code === 'ER_CANNOT_ADD_FOREIGN' || 
-                error.code === 'ER_NO_REFERENCED_ROW' || error.code === 'ER_NO_REFERENCED_ROW_2' ||
-                error.code === 'ER_ROW_IS_REFERENCED' || error.code === 'ER_ROW_IS_REFERENCED_2') {
-                logger.error('Database query error detected');
-                logger.error(`Database error code: ${error.code}`);
-                logger.error(`Database error message: ${error.message}`);
-                logger.error(`Database error sql: ${error.sql}`);
-                logger.error(`Database error sqlMessage: ${error.sqlMessage}`);
-                throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid database query', 'EC400');
-            }
-            
+            logger.error(`Error in getWelcomePackList: ${JSON.stringify(error)}`);  
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
             throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
+    /**
+     * Create Welcome Pack
+     * @return {Promise<OccupancyRequestWelcomePack>}
+     * @throws {Error}
+     * @param data
+     * @param file
+     * @param userId
+     */
     async createWelcomePack(data: any, file: any, userId: number) {
         try {
-            logger.info(`createWelcomePack called with data: ${JSON.stringify(data)}, file: ${file ? 'present' : 'missing'}, userId: ${userId} (type: ${typeof userId})`);
-
             const { masterCommunityId, communityId, towerId, isActive = true } = data;
-            logger.info(`Raw data received - masterCommunityId: ${masterCommunityId} (type: ${typeof masterCommunityId}), communityId: ${communityId} (type: ${typeof communityId}), towerId: ${towerId} (type: ${typeof towerId}), isActive: ${isActive} (type: ${typeof isActive})`);
             
             // Validate and convert data types
             const validatedMasterCommunityId = parseInt(masterCommunityId);
             const validatedCommunityId = parseInt(communityId);
             const validatedTowerId = towerId ? parseInt(towerId) : null;
             const validatedIsActive = isActive === 'true' || isActive === true;
-            
-            logger.info(`Converted values - validatedMasterCommunityId: ${validatedMasterCommunityId}, validatedCommunityId: ${validatedCommunityId}, validatedTowerId: ${validatedTowerId}, validatedIsActive: ${validatedIsActive}`);
             
             // Validate converted values
             if (isNaN(validatedMasterCommunityId)) {
@@ -288,12 +242,8 @@ export class DocumentsService {
                 logger.error(`Invalid towerId: ${towerId} cannot be converted to number`);
                 throw new ApiError(400, 'Invalid towerId: must be a number', APICodes.UNKNOWN_ERROR.code);
             }
-            
-            logger.info(`Data validation passed - masterCommunityId: ${validatedMasterCommunityId}, communityId: ${validatedCommunityId}, towerId: ${validatedTowerId}, isActive: ${validatedIsActive}`);
 
             // Validate file
-            logger.info(`File validation - file: ${file ? 'present' : 'missing'}, file type: ${typeof file}, file keys: ${file ? Object.keys(file).join(', ') : 'N/A'}`);
-            
             if (!file) {
                 logger.error('File is missing');
                 throw new ApiError(400, 'File is required', APICodes.UNKNOWN_ERROR.code);
@@ -314,11 +264,8 @@ export class DocumentsService {
                 logger.error(`File type ${file.mimetype} not allowed. Allowed types: ${allowedTypes.join(', ')}`);
                 throw new ApiError(400, 'Only PDF and HTML files are allowed', APICodes.UNKNOWN_ERROR.code);
             }
-            
-            logger.info(`File validation passed. File size: ${file.size}, MIME type: ${file.mimetype}, Buffer length: ${file.buffer?.length}`);
 
             // Deactivate existing active welcome packs for the same combination
-            logger.info('Checking for existing active welcome packs...');
             let existingPack: any = null;
             try {
                 const existingWelcomePack = await AppDataSource.getRepository(OccupancyRequestWelcomePack)
@@ -334,34 +281,29 @@ export class DocumentsService {
                 }
 
                 existingPack = await existingWelcomePack.getOne();
-                logger.info(`Found ${existingPack ? 1 : 0} existing active welcome pack(s)`);
             } catch (queryError: any) {
                 logger.error(`Error querying existing welcome packs: ${JSON.stringify(queryError)}`);
                 throw queryError;
             }
 
             if (existingPack) {
-                logger.info('Deactivating existing welcome pack...');
                 existingPack.isActive = false;
                 existingPack.updatedBy = userId;
                 await AppDataSource.getRepository(OccupancyRequestWelcomePack).save(existingPack);
                 
-                                   // Create history record for deactivated welcome pack
-                   const deactivatedHistoryData = {
-                       templateType: 'welcome-pack',
-                       occupancyRequestWelcomePack: { id: existingPack.id },
-                       masterCommunityId: existingPack.masterCommunityId,
-                       communityId: existingPack.communityId,
-                       towerId: existingPack.towerId,
-                       templateString: existingPack.templateString,
-                       isActive: false, // Mark as deactivated
-                       createdBy: userId,
-                       updatedBy: userId
-                   };
+                // Create history record for deactivated welcome pack
+                const deactivatedHistoryData = {
+                    templateType: 'welcome-pack',
+                    occupancyRequestWelcomePack: { id: existingPack.id },
+                    masterCommunityId: existingPack.masterCommunityId,
+                    communityId: existingPack.communityId,
+                    towerId: existingPack.towerId,
+                    templateString: existingPack.templateString,
+                    isActive: false, // Mark as deactivated
+                    createdBy: userId,
+                    updatedBy: userId
+                };
                 await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(deactivatedHistoryData);
-                logger.info('History record created for deactivated welcome pack');
-                
-                logger.info('Existing welcome pack deactivated successfully');
             }
 
             // Create new welcome pack
@@ -383,25 +325,11 @@ export class DocumentsService {
                 throw new ApiError(500, 'Missing required fields: masterCommunityId, communityId, file buffer, or userId', APICodes.INTERNAL_SERVER_ERROR.code);
             }
             
-            logger.info(`Welcome pack data prepared: ${JSON.stringify({
-                ...welcomePackData,
-                templateString: `Buffer of length ${welcomePackData.templateString?.length}`
-            })}`);
-
-            const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
-            logger.info(`Creating welcome pack with data: ${JSON.stringify({
-                ...welcomePackData,
-                templateString: `Buffer of length ${welcomePackData.templateString?.length}`
-            })}`);
+            const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);         
             
             try {
-                logger.info('Creating welcome pack entity...');
                 const welcomePack = welcomePackRepository.create(welcomePackData);
-                logger.info('Welcome pack entity created, attempting to save...');
-                
-                logger.info('Saving welcome pack to database...');
                 const savedWelcomePack = await welcomePackRepository.save(welcomePack);
-                logger.info('Welcome pack saved successfully');
                 
                 // Ensure we have a single entity, not an array
                 if (Array.isArray(savedWelcomePack)) {
@@ -410,10 +338,8 @@ export class DocumentsService {
                 
                 // Type assertion after array check
                 const welcomePackEntity = savedWelcomePack as OccupancyRequestWelcomePack;
-                logger.info(`Welcome pack saved successfully with ID: ${welcomePackEntity.id}`);
 
                 // Create history record
-                logger.info('Preparing history record data...');
                 const historyData = {
                     templateType: 'welcome-pack',
                     occupancyRequestWelcomePack: { id: welcomePackEntity.id },
@@ -426,36 +352,25 @@ export class DocumentsService {
                     updatedBy: userId
                 };
 
-                logger.info('Creating history record...');
                 await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyData);
-                logger.info('History record created successfully');
-
-                logger.info('Welcome pack creation completed successfully');
                 return welcomePackEntity;
-            } catch (saveError: any) {
-                logger.error(`Error during welcome pack save or history creation: ${JSON.stringify(saveError)}`);
-                logger.error(`Save error stack: ${saveError.stack}`);
-                logger.error(`Save error name: ${saveError.name}`);
-                logger.error(`Save error message: ${saveError.message}`);
+            } catch (saveError: any) {      
                 throw saveError;
             }
-        } catch (error: any) {
-            logger.error(`Error in createWelcomePack: ${JSON.stringify(error)}`);
-            
-            // If it's already an ApiError, preserve the original error code
-            if (error instanceof ApiError) {
-                throw error;
-            }
-            
-            // For other errors, convert to internal server error
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Get Welcome Pack By ID
+     * @return {Promise<OccupancyRequestWelcomePack>}
+     * @throws {Error}
+     * @param id
+     * @param includeFile
+     */
     async getWelcomePackById(id: number, includeFile: boolean = false) {
         try {
-
             const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
             
             let queryBuilder = welcomePackRepository.createQueryBuilder('welcomePack')
@@ -536,23 +451,19 @@ export class DocumentsService {
 
             // Return null instead of throwing error - let the controller handle the "not found" case
             return formattedData;
-        } catch (error: any) {
-            logger.error(`Error in getWelcomePackById: ${JSON.stringify(error)}`);
-            
-            // If it's already an ApiError, preserve the original error code
-            if (error instanceof ApiError) {
-                throw error;
-            }
-            
-            // For other errors, convert to internal server error
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Download Welcome Pack File
+     * @return {Promise<any>}
+     * @throws {Error}
+     * @param id
+     */
     async downloadWelcomePackFile(id: number) {
         try {
-
             const welcomePack = await this.getWelcomePackById(id, true);
 
             if (!welcomePack) {
@@ -588,25 +499,22 @@ export class DocumentsService {
                 contentType,
                 fileName
             };
-        } catch (error: any) {
-            logger.error(`Error in downloadWelcomePackFile: ${JSON.stringify(error)}`);
-            
-            // If it's already an ApiError, preserve the original error code
-            if (error instanceof ApiError) {
-                throw error;
-            }
-            
-            // For other errors, convert to internal server error
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Update Welcome Pack
+     * @return {Promise<OccupancyRequestWelcomePack>}
+     * @throws {Error}
+     * @param id
+     * @param data
+     * @param file
+     * @param userId
+     */
     async updateWelcomePack(id: number, data: any, file: any, userId: number) {
         try {
-            logger.info(`Update data received: ${JSON.stringify(data)}`);
-            logger.info(`User ID: ${userId}`);
-
             const welcomePack = await this.getWelcomePackById(id);
 
             if (!welcomePack) {
@@ -657,21 +565,9 @@ export class DocumentsService {
                 }
             }
 
-            // Update welcome pack data
-            logger.info(`File object received: ${JSON.stringify({
-                hasFile: !!file,
-                hasBuffer: !!(file && file.buffer),
-                bufferLength: file?.buffer?.length || 0,
-                fileSize: file?.size || 0,
-                mimetype: file?.mimetype || 'none'
-            })}`);
-            
             // Clean up the data object to remove unwanted fields
             const cleanData = { ...data };
             delete cleanData.welcomePackFile; // Remove the empty file field
-            
-            logger.info(`Original data: ${JSON.stringify(data)}`);
-            logger.info(`Cleaned data: ${JSON.stringify(cleanData)}`);
             
             if (file && file.buffer && file.buffer.length > 0 && file.size > 0 && file.mimetype) {
                 // Validate file type and size
@@ -706,8 +602,6 @@ export class DocumentsService {
                 throw new ApiError(400, 'No fields to update. Please provide isActive status or upload a file.', APICodes.UNKNOWN_ERROR.code);
             }
             
-            logger.info(`Updating welcome pack with: isActive=${cleanData.isActive !== undefined ? isActiveBoolean : 'unchanged'}, hasFile=${!!(file && file.buffer && file.buffer.length > 0)}`);
-            
             welcomePack.updatedBy = userId;
             const updatedWelcomePack = await AppDataSource.getRepository(OccupancyRequestWelcomePack).save(welcomePack);
 
@@ -731,23 +625,21 @@ export class DocumentsService {
             await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyData);
 
             return updatedWelcomePack;
-        } catch (error: any) {
-            logger.error(`Error in updateWelcomePack: ${JSON.stringify(error)}`);
-            
-            // If it's already an ApiError, preserve the original error code
-            if (error instanceof ApiError) {
-                throw error;
-            }
-            
-            // For other errors, convert to internal server error
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Get Active Welcome Pack
+     * @return {Promise<OccupancyRequestWelcomePack>}
+     * @throws {Error}
+     * @param masterCommunityId
+     * @param communityId
+     * @param towerId
+     */
     async getActiveWelcomePack(masterCommunityId: number, communityId: number, towerId?: number) {
         try {
-
             const queryBuilder = AppDataSource.getRepository(OccupancyRequestWelcomePack)
                 .createQueryBuilder('welcomePack')
                 .leftJoinAndSelect('welcomePack.masterCommunity', 'masterCommunity')
@@ -770,16 +662,18 @@ export class DocumentsService {
             }
 
             return welcomePack;
-        } catch (error: any) {
-            logger.error(`Error in getActiveWelcomePack: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Ensure Data Consistency
+     * @return {Promise<any>}
+     * @throws {Error}
+     */
     async ensureDataConsistency() {
         try {
-
             // Find all active welcome packs
             const activeWelcomePacks = await AppDataSource.getRepository(OccupancyRequestWelcomePack)
                 .createQueryBuilder('welcomePack')
@@ -816,18 +710,20 @@ export class DocumentsService {
                 message: 'Data consistency check completed',
                 deactivatedCount: activeWelcomePacks.length - groupedWelcomePacks.size
             };
-        } catch (error: any) {
-            logger.error(`Error in ensureDataConsistency: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
-    // Consolidated template service methods
+    /**
+     * Get Template List
+     * @return {Promise<any>}
+     * @throws {Error}
+     * @param query
+     * @param userId
+     */
     async getTemplateList(query: any, userId: string) {
         try {
-            logger.info(`Starting getTemplateList with query: ${JSON.stringify(query)}`);
-
             const { page = 1, per_page = 20, search, masterCommunityIds = '', communityIds = '', towerIds = '', templateType, includeFile = false, sortBy = 'createdAt', sortOrder = 'DESC', isActive } = query;
 
             // Parse comma-separated IDs and filter out empty values
@@ -839,8 +735,6 @@ export class DocumentsService {
             const parsedMasterCommunityIds = parseIds(masterCommunityIds);
             const parsedCommunityIds = parseIds(communityIds);
             const parsedTowerIds = parseIds(towerIds);
-
-            logger.info(`Parsed IDs - masterCommunityIds: ${JSON.stringify(parsedMasterCommunityIds)}, communityIds: ${JSON.stringify(parsedCommunityIds)}, towerIds: ${JSON.stringify(parsedTowerIds)}`);
 
             // Start with a simple query to test basic functionality
             const queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplates)
@@ -934,9 +828,7 @@ export class DocumentsService {
             queryBuilder.orderBy(`template.${sortBy}`, sortOrder);
 
             // Get total count for pagination
-            logger.info('Getting total count...');
             const total = await queryBuilder.getCount();
-            logger.info(`Total count: ${total}`);
 
             // Add pagination
             const offset = (page - 1) * per_page;
@@ -944,8 +836,6 @@ export class DocumentsService {
                 .skip(offset)
                 .take(per_page)
                 .getMany();
-
-            logger.info(`Query executed successfully, got ${templates.length} templates out of ${total} total`);
 
             // Note: File content handling is now done at the query level
             // When includeFile is false, templateString is not selected
@@ -960,25 +850,21 @@ export class DocumentsService {
                     itemsPerPage: per_page
                 }
             };
-        } catch (error: any) {
-            logger.error(`Error in getTemplateList: ${JSON.stringify(error)}`);
-            logger.error(`Error stack: ${error.stack}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Create Template
+     * @return {Promise<OccupancyRequestTemplates>}
+     * @throws {Error}
+     * @param data
+     * @param templateFile
+     * @param userId
+     */
     async createTemplate(data: any, templateFile: any, userId: string) {
         try {
-            logger.info(`Starting createTemplate with data: ${JSON.stringify(data)}`);
-            logger.info(`Template file info: ${JSON.stringify({
-                originalname: templateFile?.originalname,
-                mimetype: templateFile?.mimetype,
-                size: templateFile?.size,
-                bufferLength: templateFile?.buffer?.length
-            })}`);
-            logger.info(`User ID: ${userId}`);
-
             // Convert form data to proper types
             const masterCommunityId = parseInt(data.masterCommunityId);
             const communityId = parseInt(data.communityId);
@@ -997,8 +883,6 @@ export class DocumentsService {
                 throw new ApiError(400, 'Invalid towerId: must be a number', APICodes.UNKNOWN_ERROR.code);
             }
 
-            logger.info(`Converted data - masterCommunityId: ${masterCommunityId} (${typeof masterCommunityId}), communityId: ${communityId} (${typeof communityId}), towerId: ${towerId} (${typeof towerId}), templateType: ${templateType}, isActive: ${isActive} (${typeof isActive})`);
-
             // Validate file type and size
             if (!templateFile) {
                 throw new ApiError(400, 'Template file is required', APICodes.UNKNOWN_ERROR.code);
@@ -1012,8 +896,6 @@ export class DocumentsService {
             if (!allowedTypes.includes(templateFile.mimetype)) {
                 throw new ApiError(400, 'Only PDF and HTML files are allowed', APICodes.UNKNOWN_ERROR.code);
             }
-
-            logger.info(`File validation passed. Checking for existing templates...`);
 
             // Deactivate existing active templates for the same combination
             const queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplates)
@@ -1029,12 +911,9 @@ export class DocumentsService {
                 queryBuilder.andWhere('template.towerId IS NULL');
             }
 
-            logger.info(`Query built: ${queryBuilder.getQuery()}`);
             const existingTemplates = await queryBuilder.getMany();
-            logger.info(`Found ${existingTemplates.length} existing templates`);
 
             if (existingTemplates.length > 0) {
-                logger.info('Creating history records for existing templates...');
                 // Create history records for existing templates
                 for (const template of existingTemplates) {
                     try {
@@ -1046,29 +925,24 @@ export class DocumentsService {
                             updatedBy: parseInt(userId)
                         });
                         await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
-                        logger.info(`History record created for template ${template.id}`);
                     } catch (historyError) {
                         logger.error(`Error creating history record: ${JSON.stringify(historyError)}`);
                         throw historyError;
                     }
                 }
 
-                logger.info('Deactivating existing templates...');
                 // Deactivate existing templates
                 for (const template of existingTemplates) {
                     try {
                         template.isActive = false;
                         template.updatedBy = parseInt(userId);
                         await AppDataSource.getRepository(OccupancyRequestTemplates).save(template);
-                        logger.info(`Template ${(template as any).id} deactivated`);
                     } catch (deactivateError) {
                         logger.error(`Error deactivating template: ${JSON.stringify(deactivateError)}`);
                         throw deactivateError;
                     }
                 }
             }
-
-            logger.info('Creating new template...');
             // Create new template
             const templateData: any = {
                 masterCommunityId,
@@ -1084,23 +958,15 @@ export class DocumentsService {
                 templateData.towerId = towerId;
             }
 
-            logger.info(`Template data prepared: ${JSON.stringify({
-                ...templateData,
-                templateString: `Buffer of length ${templateData.templateString?.length}`
-            })}`);
-
             let savedTemplate: any;
             try {
                 const template = AppDataSource.getRepository(OccupancyRequestTemplates).create(templateData);
-                logger.info('Template entity created, attempting to save...');
                 savedTemplate = await AppDataSource.getRepository(OccupancyRequestTemplates).save(template);
-                logger.info(`Template saved successfully with ID: ${savedTemplate.id}`);
             } catch (saveError) {
                 logger.error(`Error saving template: ${JSON.stringify(saveError)}`);
                 throw saveError;
             }
 
-            logger.info('Creating history record for new template...');
             // Create history record
             try {
                 const historyRecord = AppDataSource.getRepository(OccupancyRequestTemplateHistory).create({
@@ -1112,21 +978,24 @@ export class DocumentsService {
                 });
 
                 await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
-                logger.info('History record created successfully');
             } catch (historyError) {
                 logger.error(`Error creating history record for new template: ${JSON.stringify(historyError)}`);
                 throw historyError;
             }
 
-            logger.info('Template creation completed successfully');
             return savedTemplate;
-        } catch (error: any) {
-            logger.error(`Error in createTemplate: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Get Template By ID
+     * @return {Promise<OccupancyRequestTemplates>}
+     * @throws {Error}
+     * @param id
+     * @param includeFile
+     */
     async getTemplateById(id: number, includeFile: boolean = false) {
         try {
             const templateRepository = AppDataSource.getRepository(OccupancyRequestTemplates);
@@ -1183,20 +1052,17 @@ export class DocumentsService {
             }
 
             return template;
-        } catch (error: any) {
-            logger.error(`Error in getTemplateById: ${JSON.stringify(error)}`);
-            
-            // If it's already an ApiError, preserve the original error code
-            if (error instanceof ApiError) {
-                throw error;
-            }
-            
-            // For other errors, convert to internal server error
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Download Template File
+     * @return {Promise<any>}
+     * @throws {Error}
+     * @param id
+     */
     async downloadTemplateFile(id: number) {
         try {
             const template = await AppDataSource.getRepository(OccupancyRequestTemplates)
@@ -1233,20 +1099,20 @@ export class DocumentsService {
                 contentType,
                 fileName
             };
-        } catch (error: any) {
-            logger.error(`Error in downloadTemplateFile: ${JSON.stringify(error)}`);
-            
-            // If it's already an ApiError, preserve the original error code
-            if (error instanceof ApiError) {
-                throw error;
-            }
-            
-            // For other errors, convert to internal server error
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Update Template
+     * @return {Promise<OccupancyRequestTemplates>}
+     * @throws {Error}
+     * @param id
+     * @param data
+     * @param templateFile
+     * @param userId
+     */
     async updateTemplate(id: number, data: any, templateFile: any, userId: string) {
         try {
             logger.info(`Update template data received: ${JSON.stringify(data)}`);
@@ -1396,21 +1262,17 @@ export class DocumentsService {
 
             logger.info(`Template updated successfully with ID: ${updatedTemplate.id}`);
             return updatedTemplate;
-            
-        } catch (error: any) {
-            logger.error(`Error in updateTemplate: ${JSON.stringify(error)}`);
-            
-            // If it's already an ApiError, preserve the original error code
-            if (error instanceof ApiError) {
-                throw error;
-            }
-            
-            // For other errors, convert to internal server error
-            const apiCode = Object.values(APICodes).find((item: any) => (item as any).code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Get Template History
+     * @return {Promise<any>}
+     * @throws {Error}
+     * @param id
+     */
     async getTemplateHistory(id: number) {
         try {
             logger.info(`Getting template history for template ID: ${id}`);
@@ -1429,16 +1291,18 @@ export class DocumentsService {
 
             logger.info(`Successfully retrieved ${history.length} history records for template ID ${id}`);
             return history;
-        } catch (error: any) {
-            logger.error(`Error in getTemplateHistory: ${JSON.stringify(error)}`);
-            if (error instanceof ApiError) {
-                throw error;
-            }
-            const apiCode = Object.values(APICodes).find((item: any) => (item as any).code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Get Unified History
+     * @return {Promise<any>}
+     * @throws {Error}
+     * @param templateType
+     * @param id
+     */
     async getUnifiedHistory(templateType: string, id: number) {
         logger.info(`Getting unified history for templateType: ${templateType}, id: ${id}`);
         
@@ -1620,15 +1484,17 @@ export class DocumentsService {
             
             logger.info(`Successfully transformed ${transformedHistory.length} history records`);
             return transformedHistory;
-            
-        } catch (error: any) {
-            logger.error(`Error in getUnifiedHistory: ${JSON.stringify(error)}`);
-            logger.error(`Error stack: ${error.stack}`);
-            throw new ApiError(500, 'Unknown error occurred.', APICodes.INTERNAL_SERVER_ERROR.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
-    // Email Recipients Methods
+    /**
+     * Get Email Recipients List
+     * @return {Promise<any>}
+     * @throws {Error}
+     * @param query
+     */
     async getEmailRecipientsList(query: any) {
         try {
             logger.info(`Starting getEmailRecipientsList with query: ${JSON.stringify(query)}`);
@@ -1733,14 +1599,18 @@ export class DocumentsService {
                     itemsPerPage: per_page
                 }
             };
-        } catch (error: any) {
-            logger.error(`Error in getEmailRecipientsList: ${JSON.stringify(error)}`);
-            logger.error(`Error stack: ${error.stack}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Create Email Recipients
+     * @return {Promise<OccupancyRequestEmailRecipients>}
+     * @throws {Error}
+     * @param data
+     * @param userId
+     */
     async createEmailRecipients(data: any, userId: number) {
         try {
             logger.info(`Starting createEmailRecipients with data: ${JSON.stringify(data)}`);
@@ -1879,16 +1749,19 @@ export class DocumentsService {
                 logger.error(`Error saving email recipients: ${JSON.stringify(saveError)}`);
                 throw new ApiError(500, `Failed to save email recipients: ${saveError.message}`, APICodes.INTERNAL_SERVER_ERROR.code);
             }
-        } catch (error: any) {
-            logger.error(`Error in createEmailRecipients: ${JSON.stringify(error)}`);
-            if (error instanceof ApiError) {
-                throw error;
-            }
-            const apiCode = Object.values(APICodes).find((item: any) => (item as any).code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Update Email Recipients
+     * @return {Promise<OccupancyRequestEmailRecipients>}
+     * @throws {Error}
+     * @param id
+     * @param data
+     * @param userId
+     */
     async updateEmailRecipients(id: number, data: any, userId: number) {
         try {
             logger.info(`Starting updateEmailRecipients with id: ${id}, data: ${JSON.stringify(data)}`);
@@ -2015,16 +1888,19 @@ export class DocumentsService {
 
             logger.info('Email recipients updated successfully');
             return updatedRecipients;
-        } catch (error: any) {
-            logger.error(`Error in updateEmailRecipients: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
+    /**
+     * Get Email Recipients History
+     * @return {Promise<any>}
+     * @throws {Error}
+     * @param id
+     */
     async getEmailRecipientsHistory(id: number) {
         try {
-
             const history = await AppDataSource.getRepository(OccupancyRequestTemplateHistory)
                 .createQueryBuilder('history')
                 .leftJoinAndSelect('history.occupancyRequestEmailRecipients', 'recipients')
@@ -2034,10 +1910,8 @@ export class DocumentsService {
                 .getMany();
 
             return history;
-        } catch (error: any) {
-            logger.error(`Error in getEmailRecipientsHistory: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
@@ -2062,10 +1936,8 @@ export class DocumentsService {
             
             logger.info('Welcome Kit PDF generated successfully');
             return pdfBuffer;
-        } catch (error: any) {
-            logger.error(`Error generating Welcome Kit PDF: ${JSON.stringify(error)}`);
-            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        } catch (error) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
         }
     }
 
