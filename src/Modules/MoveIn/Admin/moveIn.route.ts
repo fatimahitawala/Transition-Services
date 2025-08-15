@@ -18,4 +18,6 @@ router.get(
   catchAsync(moveInController.getAllMoveInRequestList)
 ); // Use the validation directly
 
+router.get('/moveInDetails/:requestId', validate(moveInValidation.getAdminMoveInDetails), catchAsync(moveInController.getAllMoveInDetailsList));
+
 export default router;

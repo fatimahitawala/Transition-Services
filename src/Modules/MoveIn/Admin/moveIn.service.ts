@@ -4,6 +4,11 @@ import { APICodes } from "../../../Common/Constants";
 import { MoveInRequests } from "../../../Entities/MoveInRequests.entity";
 import { getPaginationInfo } from "../../../Common/Utils/paginationUtils";
 import { checkAdminPermission } from "../../../Common/Utils/adminAccess";
+import { logger } from "../../../Common/Utils/logger";
+import { MOVE_REQUEST_STATUS, MOVE_IN_USER_TYPES } from "../../../Entities/EntityTypes";
+import { MoveInRequestDetailsHhcCompany } from "../../../Entities/MoveInRequestDetailsHhcCompany.entity";
+import { MoveInRequestDetailsHhoOwner } from "../../../Entities/MoveInRequestDetailsHhoOwner.entity";
+import { MoveInRequestDetailsTenant } from "../../../Entities/MoveInRequestDetailsTenant.entity";
 
 export class MoveInService {
   createMoveInRequest(body: any) {
@@ -113,4 +118,99 @@ export class MoveInService {
       );
     }
   }
+
+  async getMoveInRequestById(requestId: number, user: any) {
+    try {
+      let query = MoveInRequests.getRepository()
+        .createQueryBuilder("mv")
+        .select([
+          "mv.id",
+          "masterCommunity.name",
+          "community.name",
+          "tower.name",
+          "unit.unitName",
+          "unit.unitNumber",
+          "tower.id",
+          "community.id",
+          "masterCommunity.id",
+          "unit.id",
+          "user.firstName",
+          "user.middleName",
+          "user.lastName",
+          "user.email",
+          "user.mobile",
+          "mv.requestType",
+          "mv.moveInDate",
+          "mv.comments",
+          "mv.moveInRequestNo",
+          "mv.createdBy",
+          "mv.status",
+          "mv.createdAt",
+          "mv.updatedAt",
+        ])
+        .innerJoin("mv.user", "user", "user.isActive = true")
+        .innerJoin("mv.unit", "unit", "unit.isActive = true")
+        .innerJoin("unit.masterCommunity", "masterCommunity", "masterCommunity.isActive = true")
+        .innerJoin("unit.tower", "tower", "tower.isActive = true")
+        .innerJoin("unit.community", "community", "community.isActive = true")
+        .where("mv.isActive = true AND mv.id = :requestId", { requestId });
+
+      // query = checkAdminPermission(
+      //   query,
+      //   { towerId: "tower.id", communityId: "community.id", masterCommunityId: "masterCommunity.id" },
+      //   user
+      // );
+
+      let result: any = await query.getOne();
+
+      if (!result) {
+        throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
+      }
+
+      const detailsMap: Record<string, { repo: any; alias: string; key: string }> = {
+        [MOVE_IN_USER_TYPES.HHO_COMPANY]: {
+          repo: MoveInRequestDetailsHhcCompany,
+          alias: "moveInCompany",
+          key: "moveInCompanyDetails",
+        },
+        [MOVE_IN_USER_TYPES.HHO_OWNER]: {
+          repo: MoveInRequestDetailsHhoOwner,
+          alias: "moveInHHO",
+          key: "moveInHHOOwnerDetails",
+        },
+        [MOVE_IN_USER_TYPES.TENANT]: {
+          repo: MoveInRequestDetailsTenant,
+          alias: "moveInTenant",
+          key: "moveInTenantDetails",
+        },
+        [MOVE_IN_USER_TYPES.OWNER]: {
+          repo: MoveInRequestDetailsTenant,
+          alias: "moveInOwner",
+          key: "moveInOwnerDetails",
+        },
+      };
+
+      const typeConfig = detailsMap[result.requestType];
+      if (typeConfig) {
+        const details = await typeConfig.repo
+          .getRepository()
+          .createQueryBuilder(typeConfig.alias)
+          .where(`${typeConfig.alias}.moveInRequest.id = :id AND ${typeConfig.alias}.isActive = true`, { id: result.id })
+          .getOne();
+
+        result = { ...result, [typeConfig.key]: details };
+      }
+
+      return result;
+    } catch (error) {
+      logger.error(error);
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        APICodes.UNKNOWN_ERROR.message,
+        APICodes.UNKNOWN_ERROR.code,
+        error
+      );
+    }
+  }
 }
+

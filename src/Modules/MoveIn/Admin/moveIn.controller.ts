@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { MoveInService } from "./moveIn.service";
 import {
+    notFoundResponse,
   successResponseWithData,
   successResponseWithPaginationData,
 } from "../../../Common/Utils/apiResponse";
@@ -30,5 +31,15 @@ export class MoveInController {
       APICodes.LISTING_SUCCESS,
       result
     );
+  }
+
+  async getAllMoveInDetailsList(req: Request, res: Response) {
+    const { user }: Record<string, any> = req;
+    const { requestId } = req.params;
+    const moveOutRequest = await moveInService.getMoveInRequestById(Number(requestId), user);
+    if (!moveOutRequest) {
+        return notFoundResponse(res, APICodes.NOT_FOUND)
+    }
+    return successResponseWithData(res, APICodes.COMMON_SUCCESS, moveOutRequest);
   }
 }
