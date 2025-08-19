@@ -20,7 +20,7 @@ export class MoveInService {
     return { success: true, name: "krishnan", data };
   }
 
-  async getAlMoveInRequestList(query: any) {
+  async getAllMoveInRequestList(query: any) {
     try {
       const { page = 1, per_page = 20 } = query;
       const skip = (page - 1) * per_page;
