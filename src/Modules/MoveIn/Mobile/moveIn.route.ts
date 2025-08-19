@@ -11,16 +11,7 @@ const auth = new AuthMiddleware();
 
 const router = Router();
 
-router.get(
-  '/request',
-  validate(moveInValidation.getMobileMoveIn),
-  catchAsync(moveInController.getAllMoveInRequestList)
-);
-
-router.get(
-  '/request/:unitId',
-  validate(moveInValidation.getMobileMoveIn),
-  catchAsync(moveInController.getAllMoveInRequestList)
-);
+router.get('/request', validate(moveInValidation.getMobileMoveIn), catchAsync(moveInController.getAllMoveInRequestList));
+router.get('/request/:unitId', validate(moveInValidation.getMobileMoveIn), catchAsync(moveInController.getAllMoveInRequestList));
 
 export default router;
