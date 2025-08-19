@@ -4,6 +4,26 @@ export class TransitionServiceChanges1754457338441 implements MigrationInterface
     name = 'TransitionServiceChanges1754457338441'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`CREATE TABLE \`move_in_requests\` (
+            \`id\` int NOT NULL AUTO_INCREMENT,
+            \`move_in_request_no\` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+            \`request_type\` enum('owner','tenant','hho_company','hho_owner') COLLATE utf8mb4_general_ci NOT NULL,
+            \`status\` enum('new','rfi-pending','rfi-submitted','approved','user-cancelled','cancelled','closed') COLLATE utf8mb4_general_ci NOT NULL,
+            \`move_in_date\` date DEFAULT NULL,
+            \`move_out_date\` date DEFAULT NULL,
+            \`comments\` text COLLATE utf8mb4_general_ci,
+            \`additional_info\` text COLLATE utf8mb4_general_ci,
+            \`created_by\` bigint NOT NULL,
+            \`updated_by\` bigint NOT NULL,
+            \`is_active\` tinyint NOT NULL DEFAULT '1',
+            \`created_at\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+            \`updated_at\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+            \`user_id\` int DEFAULT NULL,
+            \`unit_id\` int NOT NULL,
+            PRIMARY KEY (\`id\`),
+            UNIQUE KEY \`IDX_0958b52fe725d6bd01425ae8bf\` (\`move_in_request_no\`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;`);
+
         await queryRunner.query(`ALTER TABLE \`move_in_requests\` ADD CONSTRAINT \`FK_597eff900d432183fa61d3e6451\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE NO ACTION ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE \`move_in_requests\` ADD CONSTRAINT \`FK_a8813c0239e755b1aaf7b5b04ec\` FOREIGN KEY (\`unit_id\`) REFERENCES \`units\`(\`id\`) ON DELETE NO ACTION ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE \`move_in_request_details_hhc_company\` ADD CONSTRAINT \`FK_2ee3f05cdc12863c453b9066317\` FOREIGN KEY (\`move_in_request_id\`) REFERENCES \`move_in_requests\`(\`id\`) ON DELETE NO ACTION ON UPDATE NO ACTION`);
@@ -32,6 +52,7 @@ export class TransitionServiceChanges1754457338441 implements MigrationInterface
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`DROP TABLE \`move_in_requests\``);
         await queryRunner.query(`ALTER TABLE \`occupancy_request_welcome_pack\` DROP FOREIGN KEY \`FK_9e859a9e7cc3ce82866616b3053\``);
         await queryRunner.query(`ALTER TABLE \`occupancy_request_welcome_pack\` DROP FOREIGN KEY \`FK_3715a5f17678f1492fcd586f08a\``);
         await queryRunner.query(`ALTER TABLE \`occupancy_request_welcome_pack\` DROP FOREIGN KEY \`FK_59f1841b5a1227146273250ae44\``);
