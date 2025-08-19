@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { MoveInService } from "./moveIn.service";
 import {
-    notFoundResponse,
+  notFoundResponse,
   successResponseWithData,
   successResponseWithPaginationData,
 } from "../../../Common/Utils/apiResponse";
@@ -12,8 +12,8 @@ const moveInService = new MoveInService();
 export class MoveInController {
   async getAllMoveInRequestList(req: Request, res: Response) {
     const { query } = req;
-
-    const moveInRequestList = await moveInService.getAdminMoveIn(query);
+    const { user }: Record<string, any> = req;
+    const moveInRequestList = await moveInService.getAdminMoveIn(query, user);
 
     return successResponseWithPaginationData(
       res,
@@ -38,7 +38,7 @@ export class MoveInController {
     const { requestId } = req.params;
     const moveOutRequest = await moveInService.getMoveInRequestById(Number(requestId), user);
     if (!moveOutRequest) {
-        return notFoundResponse(res, APICodes.NOT_FOUND)
+      return notFoundResponse(res, APICodes.NOT_FOUND)
     }
     return successResponseWithData(res, APICodes.COMMON_SUCCESS, moveOutRequest);
   }

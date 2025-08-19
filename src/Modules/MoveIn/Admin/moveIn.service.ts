@@ -3,9 +3,9 @@ import ApiError from "../../../Common/Utils/ApiError";
 import { APICodes } from "../../../Common/Constants";
 import { MoveInRequests } from "../../../Entities/MoveInRequests.entity";
 import { getPaginationInfo } from "../../../Common/Utils/paginationUtils";
-import { checkAdminPermission } from "../../../Common/Utils/adminAccess";
+import { checkAdminPermission, checkIsSecurity } from "../../../Common/Utils/adminAccess";
 import { logger } from "../../../Common/Utils/logger";
-import { MOVE_REQUEST_STATUS, MOVE_IN_USER_TYPES } from "../../../Entities/EntityTypes";
+import { MOVE_REQUEST_STATUS, MOVE_IN_USER_TYPES, MOVE_IN_AND_OUT_REQUEST_STATUS } from "../../../Entities/EntityTypes";
 import { MoveInRequestDetailsHhcCompany } from "../../../Entities/MoveInRequestDetailsHhcCompany.entity";
 import { MoveInRequestDetailsHhoOwner } from "../../../Entities/MoveInRequestDetailsHhoOwner.entity";
 import { MoveInRequestDetailsTenant } from "../../../Entities/MoveInRequestDetailsTenant.entity";
@@ -41,8 +41,9 @@ export class MoveInService {
     }
   }
 
-  async getAdminMoveIn(query: any) {
+  async getAdminMoveIn(query: any, user: any) {
     try {
+      const isSecurity = await checkIsSecurity(user);
       let {
         page = 1,
         per_page = 20,
@@ -102,7 +103,9 @@ export class MoveInService {
 
       getMoveInList.where(whereClause, { masterCommunityIds, communityIds, towerIds });
 
-      // getMoveInList = checkAdminPermission(getMoveInList, { towerId: 't.id', communityId: 'c.id', masterCommunityId: 'mc.id' }, query.user);
+      if (isSecurity) {
+        getMoveInList.andWhere("am.status IN (:...allowedStatuses)", { allowedStatuses: [MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED, MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED] });
+      }
       getMoveInList.offset((page - 1) * per_page).limit(per_page);
 
       const list = await getMoveInList.getMany();
@@ -160,6 +163,12 @@ export class MoveInService {
       //   { towerId: "tower.id", communityId: "community.id", masterCommunityId: "masterCommunity.id" },
       //   user
       // );
+
+      const isSecurity = await checkIsSecurity(user);
+
+      if (isSecurity) {
+        query.andWhere("mv.status IN (:...allowedStatuses)", { allowedStatuses: [MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED, MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED] });
+      }
 
       let result: any = await query.getOne();
 
