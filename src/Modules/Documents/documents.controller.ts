@@ -1,12 +1,12 @@
 import type { Request, Response } from 'express';
 import { DocumentsService } from './documents.service'
 import {
-  successResponseWithData,
-  successResponseWithPaginationData,
-  notFoundResponse,
-  validationErrorWithData,
-  successResponseWithBinaryData,
-  successResponseWithPDFData,
+    successResponseWithData,
+    successResponseWithPaginationData,
+    notFoundResponse,
+    validationErrorWithData,
+    //   successResponseWithBinaryData,
+    //   successResponseWithPDFData,
 } from '../../Common/Utils/apiResponse';
 import { APICodes } from '../../Common/Constants/apiCodes.en';
 import { WelcomeKitData } from './welcomeKit.service';
@@ -19,16 +19,16 @@ export class DocumentsController {
     async getWelcomePackList(req: Request, res: Response) {
         const { query }: Record<string, any> = req;
         const { includeFile, ...otherQueryParams } = query;
-        
+
         // Convert includeFile to boolean
         const includeFileFlag = includeFile === 'true' || includeFile === true;
-        
+
         // Pass the processed query parameters to the service
         const { data, pagination } = await documentsService.getWelcomePackList({
             ...otherQueryParams,
             includeFile: includeFileFlag
         });
-        
+
         return successResponseWithPaginationData(res, APICodes.COMMON_SUCCESS, data, pagination);
     }
 
@@ -51,8 +51,9 @@ export class DocumentsController {
     async downloadWelcomePackFile(req: Request, res: Response) {
         const { params: { id } }: Record<string, any> = req;
         const result = await documentsService.downloadWelcomePackFile(parseInt(id));
-        
-        return successResponseWithBinaryData(res, APICodes.COMMON_SUCCESS, result.buffer, result.contentType, result.fileName);
+
+        // return successResponseWithBinaryData(res, APICodes.COMMON_SUCCESS, result.buffer, result.contentType, result.fileName);
+        return successResponseWithData(res, APICodes.COMMON_SUCCESS, {})
     }
 
     async updateWelcomePack(req: Request, res: Response) {
@@ -91,7 +92,7 @@ export class DocumentsController {
     // Welcome Kit PDF Generation Methods
     async generateWelcomeKitPDF(req: Request, res: Response) {
         const { body }: Record<string, any> = req;
-        
+
         // Validate required fields
         if (!body.residentName || !body.unitNumber || !body.buildingName) {
             return validationErrorWithData(res, {
@@ -113,14 +114,16 @@ export class DocumentsController {
         };
 
         const pdfBuffer = await documentsService.generateWelcomeKitPDF(welcomeKitData);
-        
-        return successResponseWithPDFData(res, APICodes.COMMON_SUCCESS, pdfBuffer, `welcome-kit-${welcomeKitData.referenceNumber}.pdf`);
+
+        // return successResponseWithPDFData(res, APICodes.COMMON_SUCCESS, pdfBuffer, `welcome-kit-${welcomeKitData.referenceNumber}.pdf`);
+        return successResponseWithData(res, APICodes.COMMON_SUCCESS, {})
+
     }
 
     async generateWelcomeKitPDFFromTemplate(req: Request, res: Response) {
         const { params: { id }, body }: Record<string, any> = req;
         const templateId = parseInt(id);
-        
+
         if (isNaN(templateId)) {
             return validationErrorWithData(res, {
                 code: 'VALIDATION_ERROR',
@@ -129,14 +132,18 @@ export class DocumentsController {
         }
 
         const pdfBuffer = await documentsService.generateWelcomeKitPDFFromTemplate(templateId, body);
-        
-        return successResponseWithPDFData(res, APICodes.COMMON_SUCCESS, pdfBuffer, `welcome-kit-template-${templateId}.pdf`);
+
+        // return successResponseWithPDFData(res, APICodes.COMMON_SUCCESS, pdfBuffer, `welcome-kit-template-${templateId}.pdf`);
+        return successResponseWithData(res, APICodes.COMMON_SUCCESS, {})
+
     }
 
     async downloadTemplateFile(req: Request, res: Response) {
         const { id } = req.params;
         const result = await documentsService.downloadTemplateFile(parseInt(id));
-        return successResponseWithBinaryData(res, APICodes.COMMON_SUCCESS, result.buffer, result.contentType, result.fileName);
+        // return successResponseWithBinaryData(res, APICodes.COMMON_SUCCESS, result.buffer, result.contentType, result.fileName);
+        return successResponseWithData(res, APICodes.COMMON_SUCCESS, {})
+
     }
 
     async updateTemplate(req: Request, res: Response) {
