@@ -12,7 +12,7 @@ const auth = new AuthMiddleware();
 
 const router = Router();
 
-router.get("/request", auth.auth(), validate(moveInValidation.getAdminMoveIn), catchAsync(moveInController.getAllMoveInRequestList)); // Use the validation directly
+router.get("/request", auth.auth(), validate(moveInValidation.getAdminMoveIn), catchAsync(moveInController.getAllMoveInRequestList));
 router.get('/moveInDetails/:requestId', auth.auth(), validate(moveInValidation.getAdminMoveInDetails), catchAsync(moveInController.getAllMoveInDetailsList));
 
 export default router;

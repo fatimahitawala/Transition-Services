@@ -5,7 +5,7 @@ import { MoveInRequests } from "../../../Entities/MoveInRequests.entity";
 import { getPaginationInfo } from "../../../Common/Utils/paginationUtils";
 import { checkAdminPermission, checkIsSecurity } from "../../../Common/Utils/adminAccess";
 import { logger } from "../../../Common/Utils/logger";
-import { MOVE_REQUEST_STATUS, MOVE_IN_USER_TYPES, MOVE_IN_AND_OUT_REQUEST_STATUS } from "../../../Entities/EntityTypes";
+import { MOVE_IN_USER_TYPES, MOVE_IN_AND_OUT_REQUEST_STATUS } from "../../../Entities/EntityTypes";
 import { MoveInRequestDetailsHhcCompany } from "../../../Entities/MoveInRequestDetailsHhcCompany.entity";
 import { MoveInRequestDetailsHhoOwner } from "../../../Entities/MoveInRequestDetailsHhoOwner.entity";
 import { MoveInRequestDetailsTenant } from "../../../Entities/MoveInRequestDetailsTenant.entity";
@@ -99,6 +99,8 @@ export class MoveInService {
       getMoveInList.innerJoinAndSelect("u.tower", "t", "t.isActive=1");
 
       getMoveInList.where(whereClause, { masterCommunityIds, communityIds, towerIds });
+
+      getMoveInList = checkAdminPermission(getMoveInList, { towerId: 't.id', communityId: 'c.id', masterCommunityId: 'mc.id' }, query.user);
 
       if (isSecurity) {
         getMoveInList.andWhere("am.status IN (:...allowedStatuses)", { allowedStatuses: [MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED, MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED] });
