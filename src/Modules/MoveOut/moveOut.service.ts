@@ -63,8 +63,9 @@ export class MoveOutService {
             const pagination = getPaginationInfo(page, per_page, count);
             return { allMoveOutRequests: list, pagination };
         } catch (error) {
-            logger.error(error)
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+            logger.error('Error in getAllMoveOutListAdmin : ' + JSON.stringify(error));
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
         }
     }
 
@@ -97,8 +98,9 @@ export class MoveOutService {
                 return result;
             }
         } catch (error) {
-            logger.error(error)
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+            logger.error(`Error in adminApproveOrCancelRequest : ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
         }
     }
 
@@ -142,8 +144,9 @@ export class MoveOutService {
             const pagination = getPaginationInfo(page, per_page, count);
             return { moveOutList: list, pagination };
         } catch (error) {
-            logger.error(error)
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+            logger.error(`Error in getMoveOutList : ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
         }
 
     }
@@ -187,8 +190,9 @@ export class MoveOutService {
             const result = await moveOutRequest.getOne();
             return result;
         } catch (error) {
-            logger.error(error);
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+            logger.error(`Error in getMoveOutRequestById : ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
         }
     }
 
@@ -205,8 +209,9 @@ export class MoveOutService {
                 return moveOutRequest;
             }
         } catch (error) {
-            logger.error(error);
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+            logger.error(`Error in cancelMoveOutRequestByUser : ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
         }
     }
 
@@ -231,12 +236,9 @@ export class MoveOutService {
                 .where({ id })
                 .getOne();
         } catch (error) {
-            throw new ApiError(
-                httpStatus.INTERNAL_SERVER_ERROR,
-                APICodes.UNKNOWN_ERROR.message,
-                APICodes.UNKNOWN_ERROR.code,
-                error
-            );
+            logger.error(`Error in getUnitById : ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
         }
     }
 

@@ -15,7 +15,7 @@ export class MoveOutValidation {
         }),
         body: Joi.object().keys({
             moveOutDate: Joi.date().required(),
-            reason: Joi.string().allow('').optional().default("N/A")
+            reason: Joi.string().allow('', null).optional().default("N/A")
         })
     }
 
@@ -24,7 +24,7 @@ export class MoveOutValidation {
             requestId: Joi.number().required()
         }),
         body: Joi.object().keys({
-            reason: Joi.string().allow('').optional().default("N/A")
+            reason: Joi.string().allow('', null).optional().default("N/A")
         })
     }
 } 
