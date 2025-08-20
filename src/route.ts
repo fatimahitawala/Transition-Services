@@ -14,7 +14,6 @@ const router = express.Router();
 const defaultRoutes: Record<string, any>[] = [
     { path: '/move-in', route: moveInRoutes },
     { path: '/admin/move-in', route: MoveInAdmin },
-
     { path: '/move-out', route: moveOutRoutes },
     { path: '/renewal', route: renewalRoutes },
     { path: '/documents', route: documentsRoutes },

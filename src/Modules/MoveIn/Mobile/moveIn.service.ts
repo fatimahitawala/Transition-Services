@@ -5,6 +5,7 @@ import { MoveInRequests } from "../../../Entities/MoveInRequests.entity";
 import { getPaginationInfo } from "../../../Common/Utils/paginationUtils";
 import { checkAdminPermission } from "../../../Common/Utils/adminAccess";
 import { Units } from "../../../Entities/Units.entity";
+import { logger } from "../../../Common/Utils/logger";
 
 export class MoveInService {
   createMoveInRequest(body: any) {
@@ -13,7 +14,7 @@ export class MoveInService {
 
   async createMoveIn(data: any) {
     // TODO: Implement business logicxxw
-    return { success: true, name: "krishnan", data };
+    return { success: true, name: data };
   }
 
   async getAllMoveInRequestList(query: any) {
@@ -31,12 +32,9 @@ export class MoveInService {
       const pagination = getPaginationInfo(page, per_page, count);
       return { data, pagination };
     } catch (error) {
-      throw new ApiError(
-        httpStatus.INTERNAL_SERVER_ERROR,
-        APICodes.UNKNOWN_ERROR.message,
-        APICodes.UNKNOWN_ERROR.code,
-        error
-      );
+      logger.error(`Error in getAllMoveInRequestList : ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
     }
   }
 
@@ -44,11 +42,7 @@ export class MoveInService {
     const unit = await this.getUnitById(unitId);
 
     if (!unit) {
-      throw new ApiError(
-        httpStatus.NOT_FOUND,
-        APICodes.UNIT_NOT_FOUND.message,
-        APICodes.UNIT_NOT_FOUND.code
-      );
+      throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
     }
     try {
       let {
@@ -131,12 +125,10 @@ export class MoveInService {
       const pagination = getPaginationInfo(page, per_page, count);
       return { data: list, pagination };
     } catch (error) {
-      throw new ApiError(
-        httpStatus.INTERNAL_SERVER_ERROR,
-        APICodes.UNKNOWN_ERROR.message,
-        APICodes.UNKNOWN_ERROR.code,
-        error
-      );
+      logger.error(`Error in getMobileMoveIn : ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
+
     }
   }
 
@@ -161,12 +153,10 @@ export class MoveInService {
         .where({ id })
         .getOne();
     } catch (error) {
-      throw new ApiError(
-        httpStatus.INTERNAL_SERVER_ERROR,
-        APICodes.UNKNOWN_ERROR.message,
-        APICodes.UNKNOWN_ERROR.code,
-        error
-      );
+      logger.error(`Error in getUnitById : ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
+
     }
   }
 }

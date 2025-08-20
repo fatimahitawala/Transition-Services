@@ -32,12 +32,9 @@ export class MoveInService {
       const pagination = getPaginationInfo(page, per_page, count);
       return { data, pagination };
     } catch (error) {
-      throw new ApiError(
-        httpStatus.INTERNAL_SERVER_ERROR,
-        APICodes.UNKNOWN_ERROR.message,
-        APICodes.UNKNOWN_ERROR.code,
-        error
-      );
+      logger.error(`Error in MoveInRequestList : ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
     }
   }
 
@@ -113,12 +110,9 @@ export class MoveInService {
       const pagination = getPaginationInfo(page, per_page, count);
       return { data: list, pagination };
     } catch (error) {
-      throw new ApiError(
-        httpStatus.INTERNAL_SERVER_ERROR,
-        APICodes.UNKNOWN_ERROR.message,
-        APICodes.UNKNOWN_ERROR.code,
-        error
-      );
+      logger.error(`Error in getAdminMoveIn : ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
     }
   }
 
@@ -157,12 +151,6 @@ export class MoveInService {
         .innerJoin("unit.tower", "tower", "tower.isActive = true")
         .innerJoin("unit.community", "community", "community.isActive = true")
         .where("mv.isActive = true AND mv.id = :requestId", { requestId });
-
-      // query = checkAdminPermission(
-      //   query,
-      //   { towerId: "tower.id", communityId: "community.id", masterCommunityId: "masterCommunity.id" },
-      //   user
-      // );
 
       const isSecurity = await checkIsSecurity(user);
 
@@ -212,13 +200,9 @@ export class MoveInService {
 
       return result;
     } catch (error) {
-      logger.error(error);
-      throw new ApiError(
-        httpStatus.INTERNAL_SERVER_ERROR,
-        APICodes.UNKNOWN_ERROR.message,
-        APICodes.UNKNOWN_ERROR.code,
-        error
-      );
+      logger.error(`Error in MoveInRequestById : ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
     }
   }
 }
