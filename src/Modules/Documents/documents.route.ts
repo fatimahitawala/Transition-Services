@@ -25,6 +25,20 @@ router.put('/welcome-pack/:id', authMiddleware.auth(), welcomePackSingleUpload, 
 // Unified History Route - handles all template types (move-in, move-out, welcome-pack, recipient-mail)
 router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documentsValidation.getUnifiedHistory), catchAsync(documentsController.getUnifiedHistory));
 
+router.post('/welcome-kit/generate', authMiddleware.auth(), validate(documentsValidation.generateWelcomeKit), catchAsync(documentsController.generateWelcomeKitPDF));
+router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validate(documentsValidation.generateWelcomeKitFromTemplate), catchAsync(documentsController.generateWelcomeKitPDFFromTemplate));
+router.get('/templates', authMiddleware.auth(), validate(documentsValidation.getTemplateList), catchAsync(documentsController.getTemplateList));
+router.post('/templates', authMiddleware.auth(), templateSingleUpload, validate(documentsValidation.createTemplate), catchAsync(documentsController.createTemplate));
+router.get('/templates/:id', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateById));
+router.get('/templates/:id/download', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.downloadTemplateFile));
+router.put('/templates/:id', authMiddleware.auth(), templateSingleUpload, validate(documentsValidation.updateTemplate), catchAsync(documentsController.updateTemplate));
+router.get('/templates/:id/history', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateHistory));
+router.get('/email-recipients', authMiddleware.auth(), validate(documentsValidation.getEmailRecipientsList), catchAsync(documentsController.getEmailRecipientsList));
+router.post('/email-recipients', authMiddleware.auth(), validate(documentsValidation.createEmailRecipients), catchAsync(documentsController.createEmailRecipients));
+router.put('/email-recipients/:id', authMiddleware.auth(), validate(documentsValidation.updateEmailRecipients), catchAsync(documentsController.updateEmailRecipients));
+router.get('/email-recipients/:id/history', authMiddleware.auth(), validate(documentsValidation.getEmailRecipientsById), catchAsync(documentsController.getEmailRecipientsHistory));
+
+
 /**
  * @swagger
  * /documents/welcome-pack/{id}:
@@ -160,7 +174,6 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
  *       500:
  *         $ref: '#/components/responses/ErrorResponse'
  */
-router.post('/welcome-kit/generate', authMiddleware.auth(), validate(documentsValidation.generateWelcomeKit), catchAsync(documentsController.generateWelcomeKitPDF));
 
 /**
  * @swagger
@@ -235,7 +248,6 @@ router.post('/welcome-kit/generate', authMiddleware.auth(), validate(documentsVa
  *       500:
  *         $ref: '#/components/responses/ErrorResponse'
  */
-router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validate(documentsValidation.generateWelcomeKitFromTemplate), catchAsync(documentsController.generateWelcomeKitPDFFromTemplate));
 
        // Move-in and Move-out Templates Routes (Admin routes) - All routes require authentication
 
@@ -357,8 +369,7 @@ router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validat
         *       500:
         *         description: Internal server error
         */
-       router.get('/templates', authMiddleware.auth(), validate(documentsValidation.getTemplateList), catchAsync(documentsController.getTemplateList));
-
+       
        /**
         * @swagger
         * /documents/templates:
@@ -420,8 +431,7 @@ router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validat
         *       500:
         *         description: Internal server error
         */
-       router.post('/templates', authMiddleware.auth(), templateSingleUpload, validate(documentsValidation.createTemplate), catchAsync(documentsController.createTemplate));
-
+      
        /**
         * @swagger
         * /documents/templates/{id}:
@@ -464,8 +474,7 @@ router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validat
         *       500:
         *         description: Internal server error
         */
-       router.get('/templates/:id', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateById));
-
+      
        /**
         * @swagger
         * /documents/templates/{id}/download:
@@ -499,8 +508,7 @@ router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validat
         *       500:
         *         description: Internal server error
         */
-       router.get('/templates/:id/download', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.downloadTemplateFile));
-
+     
        /**
         * @swagger
         * /documents/templates/{id}:
@@ -553,8 +561,7 @@ router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validat
         *       500:
         *         description: Internal server error
         */
-       router.put('/templates/:id', authMiddleware.auth(), templateSingleUpload, validate(documentsValidation.updateTemplate), catchAsync(documentsController.updateTemplate));
-
+      
        /**
         * @swagger
         * /documents/templates/{id}/history:
@@ -593,8 +600,7 @@ router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validat
         *       500:
         *         description: Internal server error
         */
-       router.get('/templates/:id/history', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateHistory));
-
+      
        // Email Recipients Routes
        /**
         * @swagger
@@ -703,8 +709,7 @@ router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validat
         *       500:
         *         description: Internal server error
         */
-       router.get('/email-recipients', authMiddleware.auth(), validate(documentsValidation.getEmailRecipientsList), catchAsync(documentsController.getEmailRecipientsList));
-
+     
        /**
         * @swagger
         * /documents/email-recipients:
@@ -779,8 +784,7 @@ router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validat
         *       500:
         *         description: Internal server error
         */
-       router.post('/email-recipients', authMiddleware.auth(), validate(documentsValidation.createEmailRecipients), catchAsync(documentsController.createEmailRecipients));
-
+      
        /**
         * @swagger
         * /documents/email-recipients/{id}:
@@ -843,8 +847,7 @@ router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validat
         *       500:
         *         description: Internal server error
         */
-       router.put('/email-recipients/:id', authMiddleware.auth(), validate(documentsValidation.updateEmailRecipients), catchAsync(documentsController.updateEmailRecipients));
-
+      
        /**
         * @swagger
         * /documents/email-recipients/{id}/history:
@@ -883,9 +886,7 @@ router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validat
         *       500:
         *         description: Internal server error
         */
-       router.get('/email-recipients/:id/history', authMiddleware.auth(), validate(documentsValidation.getEmailRecipientsById), catchAsync(documentsController.getEmailRecipientsHistory));
-
-
+      
         
 
 

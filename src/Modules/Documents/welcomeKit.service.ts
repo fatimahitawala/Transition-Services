@@ -1,5 +1,6 @@
 import puppeteer from 'puppeteer';
 import { logger } from '../../Common/Utils/logger';
+import { APICodes } from '../../Common/Constants/apiCodes.en';
 
 export interface WelcomeKitData {
     residentName: string;
@@ -48,18 +49,18 @@ export class WelcomeKitService {
             
             await browser.close();
             
-            logger.info('Welcome Kit PDF generated successfully');
+            logger.info(APICodes.WELCOME_KIT_PDF_GENERATED_SUCCESS.message);
             return Buffer.from(pdfBuffer);
 
         } catch (error) {
             logger.error('Error generating Welcome Kit PDF:', error);
-            throw new Error('Failed to generate Welcome Kit PDF');
+            throw new Error(APICodes.WELCOME_KIT_PDF_GENERATION_FAILED.message);
         }
     }
 
     private generateHTMLTemplate(data: WelcomeKitData): string {
         // Set default values
-        const welcomeDate = data.moveInDate || 'today';
+        const welcomeDate = data.moveInDate || APICodes.DEFAULT_WELCOME_DATE.message;
         const moveInTimingsWeekdays = data.moveInTimingsWeekdays || '9:00 AM - 6:00 PM';
         const moveInTimingsSundays = data.moveInTimingsSundays || '10:00 AM - 4:00 PM';
         const contactNumber = data.contactNumber || '800 SOBHA (76242)';

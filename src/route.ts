@@ -2,7 +2,6 @@ import express from 'express';
 
 import swaggerRoute from './Docs/swagger.route';
 import config from './Common/Config/config';
-import moveInRoutes from './Modules/MoveIn/moveIn.route';
 import moveOutRoutes from './Modules/MoveOut/moveOut.route';
 import renewalRoutes from './Modules/Renewal/renewal.route';
 import documentsRoutes from './Modules/Documents/documents.route';
@@ -12,7 +11,7 @@ import webhookRoutes from './Modules/Webhook/webhook.route';
 const router = express.Router();
 
 const defaultRoutes = [
-    { path: '/move-in', route: moveInRoutes },
+   
     { path: '/move-out', route: moveOutRoutes },
     { path: '/renewal', route: renewalRoutes },
     { path: '/documents', route: documentsRoutes },

@@ -1,6 +1,7 @@
 import { WelcomeKitService, WelcomeKitData } from './welcomeKit.service';
 import * as fs from 'fs';
 import * as path from 'path';
+import { APICodes } from '../../Common/Constants/apiCodes.en';
 
 async function testWelcomeKitPDF() {
     try {
@@ -9,15 +10,15 @@ async function testWelcomeKitPDF() {
         // Test 1: Default data
         console.log('Testing default data...');
         const defaultData: WelcomeKitData = {
-            residentName: 'ADI NEGRU',
+            residentName: APICodes.TEST_RESIDENT_NAME.message,
             unitNumber: '1003',
-            buildingName: 'Creek Vistas Grande',
-            communityName: 'Creek Vistas Grande',
-            masterCommunityName: 'Sobha Hartland',
+            buildingName: APICodes.TEST_BUILDING_NAME.message,
+            communityName: APICodes.TEST_COMMUNITY_NAME.message,
+            masterCommunityName: APICodes.TEST_MASTER_COMMUNITY_NAME.message,
             dateOfIssue: '29-06-2025',
             moveInDate: '05-07-2025',
             referenceNumber: 'WK-6844',
-            contactNumber: '800 SOBHA (76242)',
+            contactNumber: APICodes.DEFAULT_CONTACT_NUMBER.message,
             moveInTimingsWeekdays: '9:00 AM - 6:00 PM',
             moveInTimingsSundays: '10:00 AM - 4:00 PM'
         };
