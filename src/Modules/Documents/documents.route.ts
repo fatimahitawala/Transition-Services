@@ -12,32 +12,43 @@ const authMiddleware = new AuthMiddleware();
 
 const router = express.Router();
 
-
-
-// Welcome Pack Routes (Admin routes) - All routes require authentication
+// Template-based routes organized by templateType
+// All routes require authentication
+// 
+// Route Organization by Template Type:
+// - welcome-pack: Welcome pack documents (templateType: welcome-pack)
+// - occupancytemplate/:templateType: Move-in and move-out templates (templateType: move-in, move-out)
+// - email-recipients: Email recipient configurations (templateType: recipient-mail)
+// - history: Unified history tracking for all template types
+//
+// Welcome Pack Routes (templateType: welcome-pack)
 router.get('/welcome-pack', authMiddleware.auth(), validate(documentsValidation.getWelcomePackList), catchAsync(documentsController.getWelcomePackList));
 router.post('/welcome-pack', authMiddleware.auth(), welcomePackSingleUpload, validate(documentsValidation.createWelcomePack), catchAsync(documentsController.createWelcomePack));
 router.get('/welcome-pack/:id/download', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.downloadWelcomePackFile));
-
 router.get('/welcome-pack/:id', authMiddleware.auth(), validate(documentsValidation.getWelcomePackById), catchAsync(documentsController.getWelcomePackById));
 router.put('/welcome-pack/:id', authMiddleware.auth(), welcomePackSingleUpload, validate(documentsValidation.updateWelcomePack), catchAsync(documentsController.updateWelcomePack));
 
-// Unified History Route - handles all template types (move-in, move-out, welcome-pack, recipient-mail)
-router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documentsValidation.getUnifiedHistory), catchAsync(documentsController.getUnifiedHistory));
-
+// Welcome Kit PDF Generation Routes
 router.post('/welcome-kit/generate', authMiddleware.auth(), validate(documentsValidation.generateWelcomeKit), catchAsync(documentsController.generateWelcomeKitPDF));
 router.post('/welcome-kit/template/:id/generate', authMiddleware.auth(), validate(documentsValidation.generateWelcomeKitFromTemplate), catchAsync(documentsController.generateWelcomeKitPDFFromTemplate));
-router.get('/templates', authMiddleware.auth(), validate(documentsValidation.getTemplateList), catchAsync(documentsController.getTemplateList));
-router.post('/templates', authMiddleware.auth(), templateSingleUpload, validate(documentsValidation.createTemplate), catchAsync(documentsController.createTemplate));
-router.get('/templates/:id', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateById));
-router.get('/templates/:id/download', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.downloadTemplateFile));
-router.put('/templates/:id', authMiddleware.auth(), templateSingleUpload, validate(documentsValidation.updateTemplate), catchAsync(documentsController.updateTemplate));
-router.get('/templates/:id/history', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateHistory));
+
+// Template Routes (templateType: move-in, move-out)
+// All routes now use /occupancytemplate/:templateType pattern
+router.get('/occupancytemplate/:templateType', authMiddleware.auth(), validate(documentsValidation.getTemplateList), catchAsync(documentsController.getTemplateList));
+router.post('/occupancytemplate/:templateType', authMiddleware.auth(), templateSingleUpload, validate(documentsValidation.createTemplate), catchAsync(documentsController.createTemplate));
+router.get('/occupancytemplate/:templateType/:id', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateById));
+router.get('/occupancytemplate/:templateType/:id/download', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.downloadTemplateFile));
+router.put('/occupancytemplate/:templateType/:id', authMiddleware.auth(), templateSingleUpload, validate(documentsValidation.updateTemplate), catchAsync(documentsController.updateTemplate));
+router.get('/occupancytemplate/:templateType/:id/history', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateHistory));
+
+// Email Recipients Routes (templateType: recipient-mail)
 router.get('/email-recipients', authMiddleware.auth(), validate(documentsValidation.getEmailRecipientsList), catchAsync(documentsController.getEmailRecipientsList));
 router.post('/email-recipients', authMiddleware.auth(), validate(documentsValidation.createEmailRecipients), catchAsync(documentsController.createEmailRecipients));
 router.put('/email-recipients/:id', authMiddleware.auth(), validate(documentsValidation.updateEmailRecipients), catchAsync(documentsController.updateEmailRecipients));
 router.get('/email-recipients/:id/history', authMiddleware.auth(), validate(documentsValidation.getEmailRecipientsById), catchAsync(documentsController.getEmailRecipientsHistory));
 
+// Unified History Route - handles all template types (move-in, move-out, welcome-pack, recipient-mail)
+router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documentsValidation.getUnifiedHistory), catchAsync(documentsController.getUnifiedHistory));
 
 /**
  * @swagger
@@ -249,7 +260,7 @@ router.get('/email-recipients/:id/history', authMiddleware.auth(), validate(docu
  *         $ref: '#/components/responses/ErrorResponse'
  */
 
-       // Move-in and Move-out Templates Routes (Admin routes) - All routes require authentication
+       // Template Routes (templateType: move-in, move-out) - All routes require authentication
 
        /**
         * @swagger
@@ -931,13 +942,15 @@ export default router;
  * @swagger
  * tags:
  *   - name: Documents
- *     description: Welcome Pack Management with complete history tracking
+ *     description: Document Management organized by template types with complete history tracking
+ *   - name: Documents - Welcome Pack
+ *     description: Welcome Pack Management (templateType: welcome-pack) with complete history tracking
  *   - name: Documents - Templates
- *     description: Consolidated Templates Management (move-in and move-out) with complete history tracking
+ *     description: Template Management (templateType: move-in, move-out) with complete history tracking
  *   - name: Documents - Email Recipients
- *     description: Email Recipients Management for Move-in and Move-out notifications with complete history tracking. Supports multiple comma-separated email addresses per community. Only one active configuration allowed per unique combination of master community/community/tower.
+ *     description: Email Recipients Management (templateType: recipient-mail) for Move-in and Move-out notifications with complete history tracking. Supports multiple comma-separated email addresses per community. Only one active configuration allowed per unique combination of master community/community/tower.
  *   - name: Documents - Unified History
- *     description: Unified history tracking for all document types (move-in, move-out, welcome-pack, recipient-mail)
+ *     description: Unified history tracking for all template types (move-in, move-out, welcome-pack, recipient-mail)
  * 
  * @swagger
  * components:
@@ -1485,112 +1498,67 @@ export default router;
         *           type: integer
         *         updatedBy:
         *           type: integer
-        *     
-             *     EmailRecipientsTemplateHistory:
-     *       type: object
-     *       properties:
-     *         id:
-     *           type: integer
-     *         templateType:
-     *           type: string
-     *           enum: [recipient-mail]
-     *           description: Type of template history entry
-     *         occupancyRequestEmailRecipients:
-     *           type: object
-     *           nullable: true
-     *           properties:
-     *             id:
-     *               type: integer
-     *             masterCommunity:
-     *               type: object
-     *               properties:
-     *                 id:
-     *                   type: integer
-     *                 name:
-     *                   type: string
-     *             community:
-     *               type: object
-     *               properties:
-     *                 id:
-     *                   type: integer
-     *                 name:
-     *                   type: string
-     *             tower:
-     *               type: object
-     *               nullable: true
-     *               properties:
-     *                 id:
-     *                   type: integer
-     *                 name:
-     *                   type: string
-     *         mipRecipients:
-     *           type: string
-     *           description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
-     *           example: "admin@community.com, manager@community.com, supervisor@community.com"
-     *         mopRecipients:
-     *           type: string
-     *           description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
-     *           example: "admin@community.com, manager@community.com, supervisor@community.com"
-     *         isActive:
-     *           type: boolean
-     *         createdAt:
-     *           type: string
-     *           format: date-time
-     *         updatedAt:
-     *           type: string
-     *           format: date-time
-     *         createdBy:
-     *           type: integer
-     *         updatedBy:
-     *           type: integer
-        *     
-        *     WelcomePackHistory:
-        *       type: object
-        *       properties:
-        *         id:
-        *           type: integer
-        *         templateType:
-        *           type: string
-        *           enum: [welcome-pack]
-        *           description: Type of template history entry
-        *         occupancyRequestWelcomePack:
-        *           type: object
-        *           nullable: true
-        *           properties:
-        *             id:
-        *               type: integer
-        *             masterCommunityId:
-        *               type: integer
-        *             communityId:
-        *               type: integer
-        *             towerId:
-        *               type: integer
-        *               nullable: true
-        *             templateString:
-        *               type: string
-        *               description: Base64 encoded file content for welcome pack
-        *             isActive:
-        *               type: boolean
-        *         masterCommunityId:
-        *           type: integer
-        *         communityId:
-        *           type: integer
-        *         towerId:
-        *           type: integer
-        *           nullable: true
-        *         templateString:
-        *           type: string
-        *           description: Base64 encoded file content for welcome pack
-        *         isActive:
-        *           type: boolean
-        *         createdAt:
-        *           type: string
-        *           format: date-time
-        *         updatedAt:
-        *           type: string
-        *           format: date-time
-        *         createdBy:
-        *           type: integer
-        *         updatedBy:
-        *           type: integer
+        */
+        
+        /**
+         * @swagger
+         * components:
+         *   schemas:
+         *     EmailRecipientsTemplateHistory:
+         *       type: object
+         *       properties:
+         *         id:
+         *           type: integer
+         *         templateType:
+         *           type: string
+         *           enum: [recipient-mail]
+         *           description: Type of template history entry
+         *         occupancyRequestEmailRecipients:
+         *           type: object
+         *           nullable: true
+         *           properties:
+         *             id:
+         *               type: integer
+         *             masterCommunity:
+         *               type: object
+         *               properties:
+         *                 id:
+         *                   type: integer
+         *                 name:
+         *                   type: string
+         *             community:
+         *               type: object
+         *               properties:
+         *                 id:
+         *                   type: integer
+         *                 name:
+         *                   type: string
+         *             tower:
+         *               type: object
+         *           nullable: true
+         *           properties:
+         *             id:
+         *               type: integer
+         *             name:
+         *               type: string
+         *         mipRecipients:
+         *           type: string
+         *           description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+         *           example: "admin@community.com, manager@community.com, supervisor@community.com"
+         *         mopRecipients:
+         *           type: string
+         *           description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+         *           example: "admin@community.com, manager@community.com, supervisor@community.com"
+         *         isActive:
+         *           type: boolean
+         *         createdAt:
+         *           type: string
+         *           format: date-time
+         *         updatedAt:
+         *           type: string
+         *           format: date-time
+         *         createdBy:
+         *           type: integer
+         *         updatedBy:
+         *           type: integer
         */
