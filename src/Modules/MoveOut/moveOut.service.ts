@@ -45,41 +45,15 @@ export class MoveOutService {
                 qb.andWhere("mor.status IN (:...allowedStatuses)", { allowedStatuses: [MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED, MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED] });
             }
 
-            if (requestId) {
-                qb.andWhere("mor.id = :requestId", { requestId });
-            }
-
-            if (moveOutType) {
-                qb.andWhere("mor.requestType = :moveOutType", { moveOutType });
-            }
-
-            if (masterCommunity) {
-                qb.andWhere("masterCommunity.id = :masterCommunity", { masterCommunity });
-            }
-
-            if (community) {
-                qb.andWhere("community.id = :community", { community });
-            }
-
-            if (tower) {
-                qb.andWhere("tower.id = :tower", { tower });
-            }
-
-            if (unit) {
-                qb.andWhere("unit.id = :unit", { unit });
-            }
-
-            if (requestStatus) {
-                qb.andWhere("mor.status = :requestStatus", { requestStatus });
-            }
-
-            if (createdDate) {
-                qb.andWhere("DATE(mor.createdAt) = :createdDate", { createdDate });
-            }
-
-            if (moveOutDate) {
-                qb.andWhere("DATE(mor.moveOutDate) = :moveOutDate", { moveOutDate });
-            }
+            if (requestId) qb.andWhere("mor.id = :requestId", { requestId });
+            if (moveOutType) qb.andWhere("mor.requestType = :moveOutType", { moveOutType });
+            if (masterCommunity) qb.andWhere("masterCommunity.id = :masterCommunity", { masterCommunity });
+            if (community) qb.andWhere("community.id = :community", { community });
+            if (tower) qb.andWhere("tower.id = :tower", { tower });
+            if (unit) qb.andWhere("unit.id = :unit", { unit });
+            if (requestStatus) qb.andWhere("mor.status = :requestStatus", { requestStatus });
+            if (createdDate) qb.andWhere("DATE(mor.createdAt) = :createdDate", { createdDate });
+            if (moveOutDate) qb.andWhere("DATE(mor.moveOutDate) = :moveOutDate", { moveOutDate });
 
             qb.orderBy("mor.createdAt", "DESC")
                 .offset((page - 1) * per_page)
@@ -156,12 +130,9 @@ export class MoveOutService {
                 .innerJoin("unit.community", "community", "community.isActive = true")
                 .where("mor.isActive = true");
 
-            if (status) {
-                qb.andWhere("mor.status = :status", { status });
-            }
-            if (unitIds) {
-                qb.andWhere("unit.id IN (:...unitIds)", { unitIds: unitIds.split(',').filter((e: any) => e) });
-            }
+            if (status) qb.andWhere("mor.status = :status", { status });
+            if (unitIds) qb.andWhere("unit.id IN (:...unitIds)", { unitIds: unitIds.split(',').filter((e: any) => e) });
+
             qb.orderBy("mor.createdAt", "DESC")
                 .offset((page - 1) * per_page)
                 .limit(per_page);
