@@ -3,7 +3,7 @@ import express from 'express';
 import swaggerRoute from './Docs/swagger.route';
 import config from './Common/Config/config';
 import moveInRoutes from './Modules/MoveIn/Mobile/moveIn.route';
-import moveInAdminRoutes from './Modules/MoveIn/Admin/moveIn.route';
+
 import moveOutRoutes from './Modules/MoveOut/moveOut.route';
 import renewalRoutes from './Modules/Renewal/renewal.route';
 import documentsRoutes from './Modules/Documents/documents.route';
@@ -14,7 +14,6 @@ const router = express.Router();
 
 const defaultRoutes = [
     { path: '/move-in', route: moveInRoutes },
-    { path: '/admin/move-in', route: moveInAdminRoutes },
     { path: '/move-out', route: moveOutRoutes },
     { path: '/renewal', route: renewalRoutes },
     { path: '/documents', route: documentsRoutes },

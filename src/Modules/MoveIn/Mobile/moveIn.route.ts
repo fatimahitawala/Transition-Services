@@ -13,6 +13,13 @@ const auth = new AuthMiddleware();
 
 const router = Router();
 
+/**
+ * @swagger
+ * tags:
+ *   - name: MoveIn
+ *     description: Move-in request operations
+ */
+
 // GET routes
 router.get("/request", auth.auth(), catchAsync(moveInController.getAllMoveInRequestList));
 router.get("/request/:unitId", auth.auth(), catchAsync(moveInController.getAllMoveInRequestList));

@@ -944,33 +944,18 @@ export default router;
  *   - name: Documents
  *     description: Document Management organized by template types with complete history tracking
  *   - name: Documents - Welcome Pack
- *     description: Welcome Pack Management (templateType: welcome-pack) with complete history tracking
+ *     description: Welcome Pack Management (templateType welcome-pack) with complete history tracking
  *   - name: Documents - Templates
- *     description: Template Management (templateType: move-in, move-out) with complete history tracking
+ *     description: Template Management (templateType move-in, move-out) with complete history tracking
  *   - name: Documents - Email Recipients
- *     description: Email Recipients Management (templateType: recipient-mail) for Move-in and Move-out notifications with complete history tracking. Supports multiple comma-separated email addresses per community. Only one active configuration allowed per unique combination of master community/community/tower.
+ *     description: Email Recipients Management (templateType recipient-mail) for Move-in and Move-out notifications with complete history tracking. Supports multiple comma-separated email addresses per community. Only one active configuration allowed per unique combination of master community/community/tower.
  *   - name: Documents - Unified History
  *     description: Unified history tracking for all template types (move-in, move-out, welcome-pack, recipient-mail)
  * 
  * @swagger
  * components:
  *   x-history-routes:
- *     description: |
- *       Complete History Tracking Available for All Document Types:
- *       
- *       **Welcome Pack History:**
- *       - GET /documents/welcome-pack/{id}/history - Track all welcome pack changes
- *       
- *       **Template History (Move-in/Move-out):**
- *       - GET /documents/templates/{id}/history - Track all template changes
- *       
- *       **Email Recipients History:**
- *       - GET /documents/email-recipients/{id}/history - Track all email recipient changes
- *       
- *       **Unified History:**
- *       - GET /documents/history/{templateType}/{id} - Track history for any template type (move-in, move-out, welcome-pack, recipient-mail)
- *       
- *       All history endpoints return comprehensive audit trails including who made changes, when, and what was changed.
+ *     description: Complete History Tracking Available for All Document Types. Welcome Pack History: GET /documents/welcome-pack/{id}/history - Track all welcome pack changes. Template History (Move-in/Move-out): GET /documents/templates/{id}/history - Track all template changes. Email Recipients History: GET /documents/email-recipients/{id}/history - Track all email recipient changes. Unified History: GET /documents/history/{templateType}/{id} - Track history for any template type (move-in, move-out, welcome-pack, recipient-mail). All history endpoints return comprehensive audit trails including who made changes, when, and what was changed.
  */
 
 /**
@@ -1005,10 +990,8 @@ export default router;
  *       - in: query
  *         name: isActive
  *         schema:
- *           oneOf:
- *             - type: boolean
- *             - type: string
- *               enum: ['true', 'false']
+ *           type: string
+ *           enum: ['true', 'false', true, false]
  *         description: Filter by active status (true/false or "true"/"false"). If not specified, shows all records (both active and inactive)
  *       - in: query
  *         name: startDate
@@ -1052,11 +1035,9 @@ export default router;
  *       - in: query
  *         name: includeFile
  *         schema:
- *           oneOf:
- *             - type: boolean
- *             - type: string
- *               enum: ['true', 'false']
- *           default: false
+ *           type: string
+ *           enum: ['true', 'false', true, false]
+ *           default: 'false'
  *         description: Include file content in response (true/false or "true"/"false")
  *     responses:
  *       200:

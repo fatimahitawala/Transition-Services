@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { APICodes } from '../../Common/Constants/apiCodes.en';
+import { APICodes } from '../../Common/Constants';
 
 export class DocumentsValidation {
     
@@ -40,10 +40,10 @@ export class DocumentsValidation {
 
     getWelcomePackById = Joi.object({
         id: Joi.number().required().messages({
-            'any.required': APICodes.WELCOME_PACK_ID_REQUIRED.message,
-            'number.base': APICodes.WELCOME_PACK_ID_MUST_BE_NUMBER.message
+            'any.required': 'Welcome Pack ID is required',
+            'number.base': 'Welcome Pack ID must be a number'
         }),
-        includeFile: Joi.boolean().optional().default(false).description(APICodes.INCLUDE_FILE_DESCRIPTION.message)
+        includeFile: Joi.boolean().optional().default(false)
     });
 
     updateWelcomePack = Joi.object({
