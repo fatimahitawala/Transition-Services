@@ -1,6 +1,30 @@
-import { Request, Response, NextFunction } from 'express';
+import Joi from 'joi';
 
-export function validateMoveOut(req: Request, res: Response, next: NextFunction) {
-    // TODO: Add validation logic
-    next();
-}
+export class MoveOutValidation {
+
+    public getMoveOutRequestById = {
+        params: Joi.object().keys({
+            requestId: Joi.number().required()
+        })
+    }
+
+    public adminApproveOrCancelRequest = {
+        params: Joi.object().keys({
+            action: Joi.string().valid('approve', 'cancel').required(),
+            requestId: Joi.number().required()
+        }),
+        body: Joi.object().keys({
+            moveOutDate: Joi.date().required(),
+            reason: Joi.string().allow('').optional().default("N/A")
+        })
+    }
+
+    public cancelMoveOutRequestByUser = {
+        params: Joi.object().keys({
+            requestId: Joi.number().required()
+        }),
+        body: Joi.object().keys({
+            reason: Joi.string().allow('').optional().default("N/A")
+        })
+    }
+} 

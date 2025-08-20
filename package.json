@@ -1,7 +1,7 @@
 {
    "name": "transition-services",
    "version": "1.0.1",
-  "description": "Modular Tenancy Management Backend for Sobha Smart FM. Includes MoveIn, MoveOut, Renewal, Documents, Integration, and Webhook modules with full API documentation.",
+   "description": "Modular Tenancy Management Backend for Sobha Smart FM. Includes MoveIn, MoveOut, Renewal, Documents, Integration, and Webhook modules with full API documentation.",
    "main": "dist/index.js",
    "prettier": "@company/prettier-config",
    "author": "Amrishkhan Sheik Abdullah",
