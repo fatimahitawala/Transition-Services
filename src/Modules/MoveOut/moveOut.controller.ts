@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { notFoundResponse, successResponse, successResponseWithData, successResponseWithPaginationData, validationErrorWithData } from '../../Common/Utils/apiResponse';
+import { notFoundResponse, successResponse, successResponseWithData, successResponseWithPaginationData } from '../../Common/Utils/apiResponse';
 import { MoveOutService } from './moveOut.service';
 import { APICodes } from '../../Common/Constants';
 
@@ -30,14 +30,11 @@ export class MoveOutController {
         const body = req.body;
 
         const response = await moveOutService.adminApproveOrCancelRequest(user, params, body);
-        if (!response) {
-            return notFoundResponse(res, APICodes.NOT_FOUND)
-        }
+        if (!response) return notFoundResponse(res, APICodes.NOT_FOUND)
         return successResponse(res, APICodes.UPDATE_SUCCESS);
     }
 
     async getMoveOutList(req: Request, res: Response) {
-        const { user }: Record<string, any> = req;
         const getList = await moveOutService.getMoveOutList(req.query)
         return successResponseWithPaginationData(res, APICodes.COMMON_SUCCESS, getList.moveOutList, getList.pagination)
     }
@@ -46,9 +43,7 @@ export class MoveOutController {
         const { user }: Record<string, any> = req;
         const { requestId } = req.params;
         const moveOutRequest = await moveOutService.getMoveOutRequestById(Number(requestId), user);
-        if (!moveOutRequest) {
-            return notFoundResponse(res, APICodes.NOT_FOUND)
-        }
+        if (!moveOutRequest) return notFoundResponse(res, APICodes.NOT_FOUND)
         return successResponseWithData(res, APICodes.COMMON_SUCCESS, moveOutRequest);
     }
 
@@ -56,9 +51,7 @@ export class MoveOutController {
         const { user, body }: Record<string, any> = req;
         const { requestId } = req.params;
         const moveOutRequest = await moveOutService.cancelMoveOutRequestByUser(body, Number(user.id), Number(requestId));
-        if (!moveOutRequest) {
-            return notFoundResponse(res, APICodes.NOT_FOUND)
-        }
+        if (!moveOutRequest) return notFoundResponse(res, APICodes.NOT_FOUND)
         return successResponse(res, APICodes.UPDATE_SUCCESS);
     }
 }
