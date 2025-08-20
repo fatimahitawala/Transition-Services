@@ -147,7 +147,3 @@ public/uploads/access-card/images/*.*
 
 *.changelog
 reference/*
-backup/*
-
-# Migration files
-src/Migration/*
