@@ -8,10 +8,10 @@ import renewalRoutes from './Modules/Renewal/renewal.route';
 import documentsRoutes from './Modules/Documents/documents.route';
 import integrationRoutes from './Modules/Integration/integration.route';
 import webhookRoutes from './Modules/Webhook/webhook.route';
-import MoveInAdmin from './Modules/MoveIn/Admin/moveIn.route'
+import MoveInAdmin from './Modules/MoveIn/Admin/moveIn.route';
 const router = express.Router();
 
-const defaultRoutes: Record<string, any>[] = [
+const defaultRoutes = [
     { path: '/move-in', route: moveInRoutes },
     { path: '/admin/move-in', route: MoveInAdmin },
     { path: '/move-out', route: moveOutRoutes },

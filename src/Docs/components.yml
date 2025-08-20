@@ -15,6 +15,135 @@ components:
         name: test
         description: test
 
+    WelcomeKitData:
+      type: object
+      required:
+        - residentName
+        - unitNumber
+        - buildingName
+      properties:
+        residentName:
+          type: string
+          description: Name of the resident (required)
+          example: "ADI NEGRU"
+          minLength: 1
+        unitNumber:
+          type: string
+          description: Unit number (required)
+          example: "1003"
+          minLength: 1
+        buildingName:
+          type: string
+          description: Name of the building (required)
+          example: "Creek Vistas Grande"
+          minLength: 1
+        communityName:
+          type: string
+          description: Name of the community
+          example: "Creek Vistas Grande"
+        masterCommunityName:
+          type: string
+          description: Name of the master community
+          example: "Sobha Hartland"
+        dateOfIssue:
+          type: string
+          description: Date of issue in DD-MM-YYYY format
+          example: "29-06-2025"
+          pattern: "^\\d{2}-\\d{2}-\\d{4}$"
+        moveInDate:
+          type: string
+          description: Move-in date in DD-MM-YYYY format
+          example: "05-07-2025"
+          pattern: "^\\d{2}-\\d{2}-\\d{4}$"
+        referenceNumber:
+          type: string
+          description: Reference number for the Welcome Kit (auto-generated if not provided)
+          example: "WK-6844"
+          pattern: "^WK-\\d+$"
+        contactNumber:
+          type: string
+          description: Contact number for queries and support
+          example: "800 SOBHA (76242)"
+        moveInTimingsWeekdays:
+          type: string
+          description: "Move-in timings for weekdays (default: 9:00 AM - 6:00 PM)"
+          example: "9:00 AM - 6:00 PM"
+        moveInTimingsSundays:
+          type: string
+          description: "Move-in timings for Sundays and public holidays (default: 10:00 AM - 4:00 PM)"
+          example: "10:00 AM - 4:00 PM"
+      example:
+        residentName: "ADI NEGRU"
+        unitNumber: "1003"
+        buildingName: "Creek Vistas Grande"
+        communityName: "Creek Vistas Grande"
+        masterCommunityName: "Sobha Hartland"
+        dateOfIssue: "29-06-2025"
+        moveInDate: "05-07-2025"
+        referenceNumber: "WK-6844"
+        contactNumber: "800 SOBHA (76242)"
+        moveInTimingsWeekdays: "9:00 AM - 6:00 PM"
+        moveInTimingsSundays: "10:00 AM - 4:00 PM"
+
+    WelcomeKitTemplateData:
+      type: object
+      description: All fields are optional as they can be inherited from the template
+      properties:
+        residentName:
+          type: string
+          description: Name of the resident (overrides template if provided)
+          example: "ADI NEGRU"
+        unitNumber:
+          type: string
+          description: Unit number (overrides template if provided)
+          example: "1003"
+        buildingName:
+          type: string
+          description: Name of the building (overrides template if provided)
+          example: "Creek Vistas Grande"
+        communityName:
+          type: string
+          description: Name of the community (overrides template if provided)
+          example: "Creek Vistas Grande"
+        masterCommunityName:
+          type: string
+          description: Name of the master community (overrides template if provided)
+          example: "Sobha Hartland"
+        dateOfIssue:
+          type: string
+          description: Date of issue in DD-MM-YYYY format (overrides template if provided)
+          example: "29-06-2025"
+          pattern: "^\\d{2}-\\d{2}-\\d{4}$"
+        moveInDate:
+          type: string
+          description: Move-in date in DD-MM-YYYY format (overrides template if provided)
+          example: "05-07-2025"
+          pattern: "^\\d{2}-\\d{2}-\\d{4}$"
+        referenceNumber:
+          type: string
+          description: Reference number for the Welcome Kit (overrides template if provided)
+          example: "WK-6844"
+          pattern: "^WK-\\d+$"
+        contactNumber:
+          type: string
+          description: Contact number for queries and support (overrides template if provided)
+          example: "800 SOBHA (76242)"
+        moveInTimingsWeekdays:
+          type: string
+          description: "Move-in timings for weekdays (overrides template if provided)"
+          example: "9:00 AM - 6:00 PM"
+        moveInTimingsSundays:
+          type: string
+          description: "Move-in timings for Sundays and public holidays (overrides template if provided)"
+          example: "10:00 AM - 4:00 PM"
+      example:
+        residentName: "JANE SMITH"
+        unitNumber: "B205"
+        buildingName: "Ocean View"
+        communityName: "Sobha Hartland"
+        moveInDate: "25-08-2025"
+        referenceNumber: "WK-2025-002"
+
     Error:
       type: object
       properties:
@@ -98,6 +227,237 @@ components:
             status: true
             message: Success Message
             code: SC001
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: integer
+        masterCommunity:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        community:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        tower:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        templateType:
+          type: string
+          enum: [move-in, move-out, welcome-pack]
+        templateString:
+          type: string
+          description: Base64 encoded file content (only included when includeFile=true)
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+        updatedBy:
+          type: integer
+    
+    MipTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+        masterCommunity:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        community:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        tower:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        templateType:
+          type: string
+          enum: [move-in]
+        templateString:
+          type: string
+          description: Base64 encoded file content (only included when includeFile=true)
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+        updatedBy:
+          type: integer
+    
+    MopTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+        masterCommunity:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        community:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        tower:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        templateType:
+          type: string
+          enum: [move-out]
+        templateString:
+          type: string
+          description: Base64 encoded file content (only included when includeFile=true)
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+        updatedBy:
+          type: integer
+    
+    TemplateHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+        template:
+          type: object
+          $ref: "#/components/schemas/Template"
+        action:
+          type: string
+          enum: [create, update, delete]
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+            username:
+              type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    WelcomePack:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the welcome pack
+          example: 12
+
+        templateString:
+          type: string
+          description: Base64 encoded file content (only included when includeFile=true)
+          nullable: true
+        isActive:
+          type: integer
+          description: Active status of the welcome pack (1 for active, 0 for inactive)
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2025-08-13T10:44:46.291Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2025-08-13T10:44:46.291Z"
+        createdBy:
+          type: string
+          description: ID of the user who created the welcome pack
+          example: "4"
+        updatedBy:
+          type: string
+          description: ID of the user who last updated the welcome pack
+          example: "4"
+        masterCommunity:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              description: Master community ID
+              example: 28
+            name:
+              type: string
+              description: Master community name
+              example: "Sobha Central"
+        community:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              description: Community ID
+              example: 70
+            name:
+              type: string
+              description: Community name
+              example: "The Horizon"
+        tower:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              description: Tower ID
+              example: 142
+            name:
+              type: string
+              description: Tower name
+              example: "The Horizon"
 
   securitySchemes:
     bearerAuth:
