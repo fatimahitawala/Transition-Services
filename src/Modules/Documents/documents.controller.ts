@@ -95,8 +95,8 @@ export class DocumentsController {
         // Validate required fields
         if (!body.residentName || !body.unitNumber || !body.buildingName) {
             return validationErrorWithData(res, {
-                code: 'VALIDATION_ERROR',
-                message: 'Missing required fields: residentName, unitNumber, buildingName'
+                code: APICodes.VALIDATION_ERROR_CODE.message,
+                message: APICodes.MISSING_REQUIRED_FIELDS.message
             });
         }
 
@@ -105,11 +105,11 @@ export class DocumentsController {
             unitNumber: body.unitNumber,
             buildingName: body.buildingName,
             communityName: body.communityName || body.buildingName,
-            masterCommunityName: body.masterCommunityName || 'Sobha Hartland',
+            masterCommunityName: body.masterCommunityName || APICodes.DEFAULT_MASTER_COMMUNITY.message,
             dateOfIssue: body.dateOfIssue || new Date().toLocaleDateString('en-GB'),
-            moveInDate: body.moveInDate || 'Move-in Date',
+            moveInDate: body.moveInDate || APICodes.DEFAULT_MOVE_IN_DATE.message,
             referenceNumber: body.referenceNumber || `WK-${Date.now()}`,
-            contactNumber: body.contactNumber || '800 SOBHA (76242)'
+            contactNumber: body.contactNumber || APICodes.DEFAULT_CONTACT_NUMBER.message
         };
 
         const pdfBuffer = await documentsService.generateWelcomeKitPDF(welcomeKitData);
@@ -123,8 +123,8 @@ export class DocumentsController {
         
         if (isNaN(templateId)) {
             return validationErrorWithData(res, {
-                code: 'VALIDATION_ERROR',
-                message: 'Invalid template ID'
+                code: APICodes.VALIDATION_ERROR_CODE.message,
+                message: APICodes.INVALID_TEMPLATE_ID.message
             });
         }
 
