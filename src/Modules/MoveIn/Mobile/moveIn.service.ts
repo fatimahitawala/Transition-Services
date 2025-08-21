@@ -747,17 +747,17 @@ export class MoveInService {
           email,
           dialCode,
           phoneNumber,
-          nationality: details.nationality,
+          nationality, // Add nationality from root level
           adults: details.adults,
           children: details.children,
           householdStaffs: details.householdStaffs,
           pets: details.pets,
           // peopleOfDetermination is persisted as column exists; termsAccepted not stored in tenant table
           peopleOfDetermination: details.peopleOfDetermination,
-          emiratesIdNumber: details.emiratesIdNumber,
-          emiratesIdExpiryDate: details.emiratesIdExpiryDate,
-          tenancyContractStartDate: details.tenancyContractStartDate,
-          tenancyContractEndDate: details.tenancyContractEndDate,
+          emiratesIdNumber,
+          emiratesIdExpiryDate,
+          tenancyContractStartDate: tenancyContractStartDate,
+          tenancyContractEndDate: tenancyContractEndDate,
           // HHC Company specific fields
           name,
           company,
