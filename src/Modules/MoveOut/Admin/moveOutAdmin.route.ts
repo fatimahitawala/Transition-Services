@@ -10,12 +10,10 @@ const moveOutController = new MoveOutController();
 const moveOutValidation = new MoveOutValidation();
 const authMiddleware = new AuthMiddleware();
 
-router.get('/moveOutList', authMiddleware.auth(), catchAsync(moveOutController.getAllMoveOutListAdmin));
-router.get('/moveOutDetails/:requestId', authMiddleware.auth(), validate(moveOutValidation.getMoveOutRequestById), catchAsync(moveOutController.getMoveOutRequestById));
-
+router.get('/request-list', authMiddleware.auth(), catchAsync(moveOutController.getAllMoveOutListAdmin));
+router.get('/request-details/:requestId', authMiddleware.auth(), validate(moveOutValidation.getMoveOutRequestById), catchAsync(moveOutController.getMoveOutRequestById));
 // router.post('/createRequest', authMiddleware.auth(), catchAsync(moveOutController.createMoveOutRequest));
-
-router.put('/updateStatus/:action/:requestId', authMiddleware.auth(), validate(moveOutValidation.adminApproveOrCancelRequest), catchAsync(moveOutController.adminApproveOrCancelRequest));
+router.put('/update-status/:action/:requestId', authMiddleware.auth(), validate(moveOutValidation.adminApproveOrCancelRequest), catchAsync(moveOutController.adminApproveOrCancelRequest));
 router.put('/close-request/:requestId', authMiddleware.auth(), validate(moveOutValidation.closeMoveOutRequestBySecurity), catchAsync(moveOutController.closeMoveOutRequestBySecurity));
 
 export default router;

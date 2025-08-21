@@ -2,14 +2,14 @@ import express from 'express';
 
 import swaggerRoute from './Docs/swagger.route';
 import config from './Common/Config/config';
-import moveInRoutes from './Modules/MoveIn/Mobile/moveIn.route';
-import moveOutAdminRoutes from './Modules/MoveOut/Admin/moveOutAdmin.route';
-import moveOutRoutes from './Modules/MoveOut/Mobile/moveOut.route';
 import renewalRoutes from './Modules/Renewal/renewal.route';
 import documentsRoutes from './Modules/Documents/documents.route';
 import integrationRoutes from './Modules/Integration/integration.route';
 import webhookRoutes from './Modules/Webhook/webhook.route';
+import moveInRoutes from './Modules/MoveIn/Mobile/moveIn.route';
 import MoveInAdmin from './Modules/MoveIn/Admin/moveIn.route';
+import moveOutRoutes from './Modules/MoveOut/Mobile/moveOut.route';
+import moveOutAdminRoutes from './Modules/MoveOut/Admin/moveOutAdmin.route';
 const router = express.Router();
 
 const defaultRoutes = [
@@ -17,7 +17,7 @@ const defaultRoutes = [
     { path: '/admin/move-in', route: MoveInAdmin },
     { path: '/move-out', route: moveOutRoutes },
     { path: '/admin/move-out', route: moveOutAdminRoutes },
-    { path: '/renewal', route: renewalRoutes },
+    { path: '/account-renewal', route: renewalRoutes },
     { path: '/documents', route: documentsRoutes },
     { path: '/integration', route: integrationRoutes },
     { path: '/webhook', route: webhookRoutes },
