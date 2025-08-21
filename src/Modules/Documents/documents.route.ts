@@ -904,8 +904,6 @@ export default router;
  * tags:
  *   - name: Documents
  *     description: Document Management organized by template types with complete history tracking
- *   - name: Documents - Welcome Pack
- *     description: Welcome Pack Management (templateType welcome-pack) with complete history tracking
  *   - name: Documents - Templates
  *     description: Template Management (templateType move-in, move-out) with complete history tracking
  *   - name: Documents - Email Recipients

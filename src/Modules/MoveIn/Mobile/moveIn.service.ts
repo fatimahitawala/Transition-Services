@@ -321,83 +321,117 @@ export class MoveInService {
         }
       }
 
+      // Track uploaded documents for logging
+      const uploadedDocuments: Array<{ type: string; documentType: string }> = [];
+
       // Handle Emirates ID Front (Required for Tenant)
       if (body?.[`${TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT}-file`] && body[`${TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT}-file`] !== '0' && body[`${TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT}-file`] !== 0 && body[`${TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT}-file`] !== '') {
         await this.updateMoveInRequestDocuments(body[`${TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT}-file`], TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT, requestId, user?.id);
+        uploadedDocuments.push({ type: 'emiratesIdFront', documentType: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT });
       } else if (files?.[TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT]?.length) {
         const uploadedFile: any = await uploadFile(files[TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT][0].originalname, files[TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT][0], `move-in/${requestId}/emirates-id-front/`, user?.id);
         await this.updateMoveInRequestDocuments(uploadedFile.id, TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT, requestId, user?.id);
+        uploadedDocuments.push({ type: 'emiratesIdFront', documentType: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT });
       }
 
       // Handle Emirates ID Back (Required for Tenant)
       if (body?.[`${TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK}-file`] && body[`${TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK}-file`] !== '0' && body[`${TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK}-file`] !== 0 && body[`${TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK}-file`] !== '') {
         await this.updateMoveInRequestDocuments(body[`${TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK}-file`], TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK, requestId, user?.id);
+        uploadedDocuments.push({ type: 'emiratesIdBack', documentType: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK });
       } else if (files?.[TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK]?.length) {
         const uploadedFile: any = await uploadFile(files[TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK][0].originalname, files[TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK][0], `move-in/${requestId}/emirates-id-back/`, user?.id);
         await this.updateMoveInRequestDocuments(uploadedFile.id, TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK, requestId, user?.id);
+        uploadedDocuments.push({ type: 'emiratesIdBack', documentType: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK });
       }
 
       // Handle Ejari (Required for Tenant)
       if (body?.[`${TRANSITION_DOCUMENT_TYPES.EJARI}-file`] && body[`${TRANSITION_DOCUMENT_TYPES.EJARI}-file`] !== '0' && body[`${TRANSITION_DOCUMENT_TYPES.EJARI}-file`] !== 0 && body[`${TRANSITION_DOCUMENT_TYPES.EJARI}-file`] !== '') {
         await this.updateMoveInRequestDocuments(body[`${TRANSITION_DOCUMENT_TYPES.EJARI}-file`], TRANSITION_DOCUMENT_TYPES.EJARI, requestId, user?.id);
+        uploadedDocuments.push({ type: 'ejari', documentType: TRANSITION_DOCUMENT_TYPES.EJARI });
       } else if (files?.[TRANSITION_DOCUMENT_TYPES.EJARI]?.length) {
         const uploadedFile: any = await uploadFile(files[TRANSITION_DOCUMENT_TYPES.EJARI][0].originalname, files[TRANSITION_DOCUMENT_TYPES.EJARI][0], `move-in/${requestId}/ejari/`, user?.id);
         await this.updateMoveInRequestDocuments(uploadedFile.id, TRANSITION_DOCUMENT_TYPES.EJARI, requestId, user?.id);
+        uploadedDocuments.push({ type: 'ejari', documentType: TRANSITION_DOCUMENT_TYPES.EJARI });
       }
 
-              // Handle Unit Permit (Required for HHC Company, Optional for Owner/HHO Owner)
-        if ((isHhcCompanyMoveIn || (!isTenantMoveIn && !isHhcCompanyMoveIn)) && (body?.[`${TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT}-file`] || files?.[TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT]?.length)) {
-          if (body?.[`${TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT}-file`] && body[`${TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT}-file`] !== '0' && body[`${TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT}-file`] !== 0 && body[`${TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT}-file`] !== '') {
-            await this.updateMoveInRequestDocuments(body[`${TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT}-file`], TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, requestId, user?.id);
-          } else if (files?.[TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT]?.length) {
-            const uploadedFile: any = await uploadFile(files[TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT][0].originalname, files[TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT][0], `move-in/${requestId}/unit-permit/`, user?.id);
-            await this.updateMoveInRequestDocuments(uploadedFile.id, TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, requestId, user?.id);
+      // Handle Unit Permit (Required for HHC Company, Optional for Owner/HHO Owner)
+      if ((isHhcCompanyMoveIn || (!isTenantMoveIn && !isHhcCompanyMoveIn)) && (body?.[`${TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT}-file`] || files?.[TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT]?.length)) {
+        if (body?.[`${TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT}-file`] && body[`${TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT}-file`] !== '0' && body[`${TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT}-file`] !== 0 && body[`${TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT}-file`] !== '') {
+          await this.updateMoveInRequestDocuments(body[`${TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT}-file`], TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, requestId, user?.id);
+          uploadedDocuments.push({ type: 'unitPermit', documentType: TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT });
+        } else if (files?.[TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT]?.length) {
+          const uploadedFile: any = await uploadFile(files[TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT][0].originalname, files[TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT][0], `move-in/${requestId}/unit-permit/`, user?.id);
+          await this.updateMoveInRequestDocuments(uploadedFile.id, TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, requestId, user?.id);
+          uploadedDocuments.push({ type: 'unitPermit', documentType: TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT });
+        }
+      }
+
+      // Handle Company Trade License (Required for HHC Company, Optional for Owner/HHO Owner)
+      if ((isHhcCompanyMoveIn || (!isTenantMoveIn && !isHhcCompanyMoveIn)) && (body?.[`${TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE}-file`] || files?.[TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE]?.length)) {
+        if (body?.[`${TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE}-file`] && body[`${TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE}-file`] !== '0' && body[`${TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE}-file`] !== 0 && body[`${TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE}-file`] !== '') {
+          await this.updateMoveInRequestDocuments(body[`${TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE}-file`], TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE, requestId, user?.id);
+          uploadedDocuments.push({ type: 'companyTradeLicense', documentType: TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE });
+        } else if (files?.[TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE]?.length) {
+          const uploadedFile: any = await uploadFile(files[TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE][0].originalname, files[TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE][0], `move-in/${requestId}/company-trade-license/`, user?.id);
+          await this.updateMoveInRequestDocuments(uploadedFile.id, TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE, requestId, user?.id);
+          uploadedDocuments.push({ type: 'companyTradeLicense', documentType: TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE });
+        }
+      }
+
+      // Handle Title Deed (Optional for Owner/HHO Owner, not for Tenant or HHC Company)
+      if (!isTenantMoveIn && !isHhcCompanyMoveIn && (body?.[`${TRANSITION_DOCUMENT_TYPES.TITLE_DEED}-file`] || files?.[TRANSITION_DOCUMENT_TYPES.TITLE_DEED]?.length)) {
+        if (body?.[`${TRANSITION_DOCUMENT_TYPES.TITLE_DEED}-file`] && body[`${TRANSITION_DOCUMENT_TYPES.TITLE_DEED}-file`] !== '0' && body[`${TRANSITION_DOCUMENT_TYPES.TITLE_DEED}-file`] !== 0 && body[`${TRANSITION_DOCUMENT_TYPES.TITLE_DEED}-file`] !== '') {
+          await this.updateMoveInRequestDocuments(body[`${TRANSITION_DOCUMENT_TYPES.TITLE_DEED}-file`], TRANSITION_DOCUMENT_TYPES.TITLE_DEED, requestId, user?.id);
+          uploadedDocuments.push({ type: 'titleDeed', documentType: TRANSITION_DOCUMENT_TYPES.TITLE_DEED });
+        } else if (files?.[TRANSITION_DOCUMENT_TYPES.TITLE_DEED]?.length) {
+          const uploadedFile: any = await uploadFile(files[TRANSITION_DOCUMENT_TYPES.TITLE_DEED][0].originalname, files[TRANSITION_DOCUMENT_TYPES.TITLE_DEED][0], `move-in/${requestId}/title-deed/`, user?.id);
+          await this.updateMoveInRequestDocuments(uploadedFile.id, TRANSITION_DOCUMENT_TYPES.TITLE_DEED, requestId, user?.id);
+          uploadedDocuments.push({ type: 'titleDeed', documentType: TRANSITION_DOCUMENT_TYPES.TITLE_DEED });
+        }
+      }
+
+      // Handle Other Documents (Optional for Owner/HHO Owner, not for Tenant or HHC Company)
+      if (!isTenantMoveIn && !isHhcCompanyMoveIn && (body?.[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] || files?.[TRANSITION_DOCUMENT_TYPES.OTHER]?.length)) {
+        if (body?.[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] && body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] !== '0' && body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] !== 0 && body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] !== '') {
+          const otherIds = Array.isArray(body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`]) ? 
+            body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] : 
+            [body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`]];
+          
+          for (const id of otherIds) {
+            await this.updateMoveInRequestDocuments(id, TRANSITION_DOCUMENT_TYPES.OTHER, requestId, user?.id);
+            uploadedDocuments.push({ type: 'other', documentType: TRANSITION_DOCUMENT_TYPES.OTHER });
+          }
+        } else if (files?.[TRANSITION_DOCUMENT_TYPES.OTHER]?.length) {
+          for (const file of files[TRANSITION_DOCUMENT_TYPES.OTHER]) {
+            const uploadedFile: any = await uploadFile(file.originalname, file, `move-in/${requestId}/other-documents/`, user?.id);
+            await this.updateMoveInRequestDocuments(uploadedFile.id, TRANSITION_DOCUMENT_TYPES.OTHER, requestId, user?.id);
+            uploadedDocuments.push({ type: 'other', documentType: TRANSITION_DOCUMENT_TYPES.OTHER });
           }
         }
+      }
 
-        // Handle Company Trade License (Required for HHC Company, Optional for Owner/HHO Owner)
-        if ((isHhcCompanyMoveIn || (!isTenantMoveIn && !isHhcCompanyMoveIn)) && (body?.[`${TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE}-file`] || files?.[TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE]?.length)) {
-          if (body?.[`${TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE}-file`] && body[`${TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE}-file`] !== '0' && body[`${TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE}-file`] !== 0 && body[`${TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE}-file`] !== '') {
-            await this.updateMoveInRequestDocuments(body[`${TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE}-file`], TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE, requestId, user?.id);
-          } else if (files?.[TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE]?.length) {
-            const uploadedFile: any = await uploadFile(files[TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE][0].originalname, files[TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE][0], `move-in/${requestId}/company-trade-license/`, user?.id);
-            await this.updateMoveInRequestDocuments(uploadedFile.id, TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE, requestId, user?.id);
-          }
-        }
+      // Create log entry in move_in_request_logs table
+      if (uploadedDocuments.length > 0) {
+        const log = new MoveInRequestLogs();
+        log.moveInRequest = { id: requestId } as any;
+        log.requestType = moveInRequest.requestType;
+        log.status = moveInRequest.status;
+        log.changes = `Documents uploaded: ${uploadedDocuments.map(d => d.type).join(', ')}`;
+        log.user = { id: user?.id } as any;
+        log.actionBy = ActionByTypes.USER;
+        log.details = JSON.stringify(uploadedDocuments);
+        log.comments = `Documents uploaded for move-in request ${requestId}`;
+        
+        await log.save();
+      }
 
-        // Handle Title Deed (Optional for Owner/HHO Owner, not for Tenant or HHC Company)
-        if (!isTenantMoveIn && !isHhcCompanyMoveIn && (body?.[`${TRANSITION_DOCUMENT_TYPES.TITLE_DEED}-file`] || files?.[TRANSITION_DOCUMENT_TYPES.TITLE_DEED]?.length)) {
-          if (body?.[`${TRANSITION_DOCUMENT_TYPES.TITLE_DEED}-file`] && body[`${TRANSITION_DOCUMENT_TYPES.TITLE_DEED}-file`] !== '0' && body[`${TRANSITION_DOCUMENT_TYPES.TITLE_DEED}-file`] !== 0 && body[`${TRANSITION_DOCUMENT_TYPES.TITLE_DEED}-file`] !== '') {
-            await this.updateMoveInRequestDocuments(body[`${TRANSITION_DOCUMENT_TYPES.TITLE_DEED}-file`], TRANSITION_DOCUMENT_TYPES.TITLE_DEED, requestId, user?.id);
-          } else if (files?.[TRANSITION_DOCUMENT_TYPES.TITLE_DEED]?.length) {
-            const uploadedFile: any = await uploadFile(files[TRANSITION_DOCUMENT_TYPES.TITLE_DEED][0].originalname, files[TRANSITION_DOCUMENT_TYPES.TITLE_DEED][0], `move-in/${requestId}/title-deed/`, user?.id);
-            await this.updateMoveInRequestDocuments(uploadedFile.id, TRANSITION_DOCUMENT_TYPES.TITLE_DEED, requestId, user?.id);
-          }
-        }
-
-        // Handle Other Documents (Optional for Owner/HHO Owner, not for Tenant or HHC Company)
-        if (!isTenantMoveIn && !isHhcCompanyMoveIn && (body?.[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] || files?.[TRANSITION_DOCUMENT_TYPES.OTHER]?.length)) {
-          if (body?.[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] && body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] !== '0' && body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] !== 0 && body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] !== '') {
-            const otherIds = Array.isArray(body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`]) ? 
-              body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] : 
-              [body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`]];
-            
-            for (const id of otherIds) {
-              await this.updateMoveInRequestDocuments(id, TRANSITION_DOCUMENT_TYPES.OTHER, requestId, user?.id);
-            }
-          } else if (files?.[TRANSITION_DOCUMENT_TYPES.OTHER]?.length) {
-            for (const file of files[TRANSITION_DOCUMENT_TYPES.OTHER]) {
-              const uploadedFile: any = await uploadFile(file.originalname, file, `move-in/${requestId}/other-documents/`, user?.id);
-              await this.updateMoveInRequestDocuments(uploadedFile.id, TRANSITION_DOCUMENT_TYPES.OTHER, requestId, user?.id);
-              }
-            }
-          }
-
-      logger.info(`DOCUMENTS UPLOADED: for move-in request ${requestId} by user ${user?.id}`);
+      logger.info(`DOCUMENTS UPLOADED: ${uploadedDocuments.length} documents for move-in request ${requestId} by user ${user?.id}`);
 
       return {
         requestId,
-        message: "Documents uploaded successfully"
+        message: "Documents uploaded successfully",
+        uploadedDocuments: uploadedDocuments.length,
+        documents: uploadedDocuments.map(d => d.type)
       };
     } catch (error: any) {
       logger.error(`Error in uploadDocuments: ${JSON.stringify(error)}`);
@@ -417,9 +451,9 @@ export class MoveInService {
   private async updateMoveInRequestDocuments(fileId: number, documentType: string, requestId: number, userId: number) {
     const document = new MoveInRequestDocuments();
     document.documentType = documentType;
-    document.userId = userId;
-    document.moveInRequestId = requestId;
-    document.fileId = fileId;
+    document.user = { id: userId } as any;
+    document.moveInRequest = { id: requestId } as any;
+    document.file = { id: fileId } as any;
     document.createdBy = userId;
     document.updatedBy = userId;
     document.isActive = true;
@@ -713,10 +747,17 @@ export class MoveInService {
           email,
           dialCode,
           phoneNumber,
-          emiratesIdNumber,
-          emiratesIdExpiryDate: emiratesIdExpiryDate ? new Date(emiratesIdExpiryDate) : null,
-          tenancyContractStartDate: tenancyContractStartDate ? new Date(tenancyContractStartDate) : null,
-          tenancyContractEndDate: tenancyContractEndDate ? new Date(tenancyContractEndDate) : null,
+          nationality: details.nationality,
+          adults: details.adults,
+          children: details.children,
+          householdStaffs: details.householdStaffs,
+          pets: details.pets,
+          // peopleOfDetermination is persisted as column exists; termsAccepted not stored in tenant table
+          peopleOfDetermination: details.peopleOfDetermination,
+          emiratesIdNumber: details.emiratesIdNumber,
+          emiratesIdExpiryDate: details.emiratesIdExpiryDate,
+          tenancyContractStartDate: details.tenancyContractStartDate,
+          tenancyContractEndDate: details.tenancyContractEndDate,
           // HHC Company specific fields
           name,
           company,
@@ -724,12 +765,11 @@ export class MoveInService {
           countryCode,
           operatorOfficeNumber,
           tradeLicenseNumber,
-          unitPermitStartDate: unitPermitStartDate ? new Date(unitPermitStartDate) : null,
-          unitPermitExpiryDate: unitPermitExpiryDate ? new Date(unitPermitExpiryDate) : null,
-          unitPermitNumber,
-          leaseStartDate: leaseStartDate ? new Date(leaseStartDate) : null,
-          leaseEndDate: leaseEndDate ? new Date(leaseEndDate) : null,
-          nationality,
+          unitPermitStartDate: details.unitPermitStartDate,
+          unitPermitExpiryDate: details.unitPermitExpiryDate,
+          unitPermitNumber: details.unitPermitNumber,
+          leaseStartDate: details.leaseStartDate,
+          leaseEndDate: details.leaseEndDate,
         };
         createdDetails = await this.createDetailsRecord(qr, requestType, createdMaster as MoveInRequests, detailsData, user?.id);
 
@@ -973,7 +1013,7 @@ export class MoveInService {
       case MOVE_IN_USER_TYPES.HHO_COMPANY: {
         const entity = qr.manager.create(MoveInRequestDetailsHhcCompany, {
           moveInRequest: master,
-          name: details.name,
+          name: details.name, // Now map directly to the name field
           companyName: details.company,
           companyEmail: details.companyEmail,
           countryCode: details.countryCode,

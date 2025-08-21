@@ -20,7 +20,7 @@ class Server {
                 jobProfiler.runJobs();
                 console.log("Data Source has been initialized!")
             })
-            .catch((err) => {
+            .catch((err: unknown) => {
                 console.error("Error during Data Source initialization", err)
             })
     }
