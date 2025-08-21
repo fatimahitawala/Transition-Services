@@ -215,6 +215,27 @@ export class MoveOutService {
         }
     }
 
+    async closeMoveOutRequestBySecurity(body: any, requestId: number, user: any) {
+        try {
+            const moveOutRequest = await MoveOutRequests.getRepository().findOne({
+                where: { id: requestId, status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED }
+            });
+            const isSecurity = await checkIsSecurity(user);
+
+            if (moveOutRequest && isSecurity) {
+                moveOutRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED;
+                moveOutRequest.moveOutDate = body.moveOutDate;
+                moveOutRequest.updatedBy = user.id;
+                await moveOutRequest.save();
+                return moveOutRequest;
+            }
+        } catch (error) {
+            logger.error(`Error in closeMoveOutRequestBySecurity : ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
+        }
+    }
+
     async getUnitById(id: number): Promise<Units | null> {
         try {
             return await Units.getRepository()

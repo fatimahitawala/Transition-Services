@@ -16,6 +16,7 @@ router.get('/moveOutDetails/:requestId', authMiddleware.auth(), validate(moveOut
 // router.post('/createRequest', authMiddleware.auth(), catchAsync(moveOutController.createMoveOutRequest));
 
 router.put('/updateStatus/:action/:requestId', authMiddleware.auth(), validate(moveOutValidation.adminApproveOrCancelRequest), catchAsync(moveOutController.adminApproveOrCancelRequest));
+router.put('/close-request/:requestId', authMiddleware.auth(), validate(moveOutValidation.closeMoveOutRequestBySecurity), catchAsync(moveOutController.closeMoveOutRequestBySecurity));
 
 export default router;
 
@@ -144,4 +145,30 @@ export default router;
  *     responses:
  *       200:
  *         description: Move out request status updated
+ */
+
+/**
+ * @swagger
+ * /admin/move-out/close-request/{requestId}:
+ *   put:
+ *     summary: Close a move out request
+ *     tags: [MoveOut]
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         description: The ID of the move out request
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               moveOutDate:
+ *                 type: string
+ *                 format: date
+ *     responses:
+ *       200:
+ *         description: Move out request closed
  */

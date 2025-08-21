@@ -54,4 +54,12 @@ export class MoveOutController {
         if (!moveOutRequest) return notFoundResponse(res, APICodes.NOT_FOUND)
         return successResponse(res, APICodes.UPDATE_SUCCESS);
     }
+
+    async closeMoveOutRequestBySecurity(req: Request, res: Response) {
+        const { user, body }: Record<string, any> = req;
+        const { requestId } = req.params;
+        const moveOutRequest = await moveOutService.closeMoveOutRequestBySecurity(body, Number(requestId), user);
+        if (!moveOutRequest) return notFoundResponse(res, APICodes.NOT_FOUND)
+        return successResponse(res, APICodes.UPDATE_SUCCESS);
+    }
 }

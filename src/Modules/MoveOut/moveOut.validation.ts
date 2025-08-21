@@ -27,4 +27,13 @@ export class MoveOutValidation {
             reason: Joi.string().allow('', null).optional().default("N/A")
         })
     }
+
+    public closeMoveOutRequestBySecurity = {
+        params: Joi.object().keys({
+            requestId: Joi.number().required()
+        }),
+        body: Joi.object().keys({
+            moveOutDate: Joi.date().required(),
+        })
+    }
 } 
