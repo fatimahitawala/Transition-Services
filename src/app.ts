@@ -69,7 +69,6 @@ export class App {
 
     private listenServer() {
         this.app.listen(config.port, () => {
-            console.log(`Server running on port ${config.port}`);
         })
     }
 }
