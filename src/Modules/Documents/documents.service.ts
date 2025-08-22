@@ -8,6 +8,7 @@ import { Communities } from '../../Entities/Communities.entity';
 import { Towers } from '../../Entities/Towers.entity';
 import { logger } from '../../Common/Utils/logger';
 import { getPaginationInfo } from '../../Common/Utils/paginationUtils';
+import { stringToBoolean } from '../../Common/Utils/common-utility';
 
 import ApiError from '../../Common/Utils/ApiError';
 import { APICodes } from '../../Common/Constants/apiCodes.en';
@@ -47,7 +48,7 @@ export class DocumentsService {
             }
             
             if (query.isActive !== undefined && query.isActive !== '') {
-                filters.isActive = query.isActive === 'true' || query.isActive === true;
+                filters.isActive = stringToBoolean(query.isActive);
             }
             
             if (query.startDate && query.startDate.trim().length > 0) {
@@ -126,7 +127,7 @@ export class DocumentsService {
                 .where(whereClause, whereParams);
 
             // Handle field selection for data query
-            if (includeFile === 'true' || includeFile === true) {
+            if (stringToBoolean(includeFile)) {
                 dataQuery.select([
                     'welcomePack.id',
                     'welcomePack.masterCommunityId',
@@ -235,7 +236,7 @@ export class DocumentsService {
             const validatedMasterCommunityId = parseInt(masterCommunityId);
             const validatedCommunityId = parseInt(communityId);
             const validatedTowerId = towerId ? parseInt(towerId) : null;
-            const validatedIsActive = isActive === 'true' || isActive === true;
+            const validatedIsActive = stringToBoolean(isActive);
             
             // Validate converted values
             if (isNaN(validatedMasterCommunityId)) {
@@ -536,7 +537,7 @@ export class DocumentsService {
             }
 
             // Convert string boolean to actual boolean if needed
-            const isActiveBoolean = data.isActive === 'true' ? true : data.isActive === 'false' ? false : data.isActive;
+            const isActiveBoolean = stringToBoolean(data.isActive);
             
             // If updating to active, deactivate other active welcome packs for the same combination
             if (isActiveBoolean === true) {
@@ -765,7 +766,7 @@ export class DocumentsService {
                 .where('template.templateType IN (:...templateTypes)', { templateTypes: ['move-in', 'move-out'] });
 
             // Handle field selection based on includeFile parameter
-            if (includeFile === 'true' || includeFile === true) {
+            if (stringToBoolean(includeFile)) {
                 // When includeFile is true, select all fields including templateString and select: false fields
                 queryBuilder.select([
                     'template.id',
@@ -841,7 +842,7 @@ export class DocumentsService {
 
             // Add active status filtering
             if (isActive !== undefined && isActive !== '') {
-                queryBuilder.andWhere('template.isActive = :isActive', { isActive: isActive === 'true' || isActive === true });
+                queryBuilder.andWhere('template.isActive = :isActive', { isActive: stringToBoolean(isActive) });
             }
 
             // Add sorting
@@ -886,7 +887,7 @@ export class DocumentsService {
             const communityId = parseInt(data.communityId);
             const towerId = data.towerId ? parseInt(data.towerId) : null;
             const templateType = data.templateType;
-            const isActive = data.isActive === 'true' || data.isActive === true;
+            const isActive = stringToBoolean(data.isActive);
 
             // Validate converted data
             if (isNaN(masterCommunityId)) {
@@ -1150,7 +1151,7 @@ export class DocumentsService {
             }
 
             // Convert string boolean to actual boolean if needed
-            const isActiveBoolean = data.isActive === 'true' ? true : data.isActive === 'false' ? false : data.isActive;
+            const isActiveBoolean = stringToBoolean(data.isActive);
             
             // If updating to active, deactivate other active templates for the same combination
             if (isActiveBoolean === true) {
@@ -1589,7 +1590,7 @@ export class DocumentsService {
 
             // Add active status filtering
             if (isActive !== undefined && isActive !== '') {
-                queryBuilder.andWhere('recipients.isActive = :isActive', { isActive: isActive === 'true' || isActive === true });
+                queryBuilder.andWhere('recipients.isActive = :isActive', { isActive: stringToBoolean(isActive) });
             }
 
             // Add date range filtering
@@ -1983,17 +1984,53 @@ export class DocumentsService {
                 throw new ApiError(httpStatus.NOT_FOUND, APICodes.TEMPLATE_NOT_FOUND.message, APICodes.TEMPLATE_NOT_FOUND.code);
             }
 
+            // Default values for Welcome Kit generation
+            const DEFAULT_RESIDENT_NAME = {
+                code: "EC186",
+                message: "Resident Name"
+            };
+            
+            const DEFAULT_UNIT_NUMBER = {
+                code: "EC187",
+                message: "Unit Number"
+            };
+            
+            const DEFAULT_BUILDING_NAME = {
+                code: "EC188",
+                message: "Building Name"
+            };
+            
+            const DEFAULT_COMMUNITY_NAME = {
+                code: "EC189",
+                message: "Community Name"
+            };
+            
+            const DEFAULT_MASTER_COMMUNITY_NAME = {
+                code: "EC190",
+                message: "Master Community Name"
+            };
+            
+            const DEFAULT_MOVE_IN_DATE = {
+                code: "EC185",
+                message: "Move-in Date"
+            };
+            
+            const DEFAULT_CONTACT_NUMBER = {
+                code: "EC191",
+                message: "800 SOBHA (76242)"
+            };
+
             // Merge template data with provided data
             const mergedData: WelcomeKitData = {
-                residentName: data.residentName || APICodes.DEFAULT_RESIDENT_NAME.message,
-                unitNumber: data.unitNumber || APICodes.DEFAULT_UNIT_NUMBER.message,
-                buildingName: data.buildingName || APICodes.DEFAULT_BUILDING_NAME.message,
-                communityName: data.communityName || APICodes.DEFAULT_COMMUNITY_NAME.message,
-                masterCommunityName: data.masterCommunityName || APICodes.DEFAULT_MASTER_COMMUNITY_NAME.message,
+                residentName: data.residentName || DEFAULT_RESIDENT_NAME.message,
+                unitNumber: data.unitNumber || DEFAULT_UNIT_NUMBER.message,
+                buildingName: data.buildingName || DEFAULT_BUILDING_NAME.message,
+                communityName: data.communityName || DEFAULT_COMMUNITY_NAME.message,
+                masterCommunityName: data.masterCommunityName || DEFAULT_MASTER_COMMUNITY_NAME.message,
                 dateOfIssue: data.dateOfIssue || new Date().toLocaleDateString('en-GB'),
-                moveInDate: data.moveInDate || APICodes.DEFAULT_MOVE_IN_DATE.message,
+                moveInDate: data.moveInDate || DEFAULT_MOVE_IN_DATE.message,
                 referenceNumber: data.referenceNumber || `WK-${Date.now()}`,
-                contactNumber: data.contactNumber || APICodes.DEFAULT_CONTACT_NUMBER.message
+                contactNumber: data.contactNumber || DEFAULT_CONTACT_NUMBER.message
             };
 
             return await this.generateWelcomeKitPDF(mergedData);

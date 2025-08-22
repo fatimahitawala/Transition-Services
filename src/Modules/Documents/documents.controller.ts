@@ -2,8 +2,11 @@ import type { Request, Response } from 'express';
 import { DocumentsService } from './documents.service'
 import {
     successResponseWithData, successResponseWithPaginationData, notFoundResponse,
-    validationErrorWithData, successResponseWithBinaryData, successResponseWithPDFData
+    validationErrorWithData
 } from '../../Common/Utils/apiResponse';
+import {
+successResponseWithBinaryData, successResponseWithPDFData
+} from '../../Utils/apiResponse';
 import { APICodes } from '../../Common/Constants/apiCodes.en';
 import { WelcomeKitData } from './welcomeKit.service';
 import { stringToBoolean } from '../../Common/Utils/common-utility';

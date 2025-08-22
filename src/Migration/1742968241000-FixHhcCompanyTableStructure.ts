@@ -71,10 +71,10 @@ export class FixHhcCompanyTableStructure1742968241000 implements MigrationInterf
                     
                     if (!exists) {
                         await queryRunner.query(column.ddl);
-                        console.log(`Added column: ${column.name}`);
+
                     }
                 } catch (error) {
-                    console.log(`Column ${column.name} already exists or error occurred, continuing...`);
+
                 }
             }
 
@@ -86,7 +86,7 @@ export class FixHhcCompanyTableStructure1742968241000 implements MigrationInterf
                     MODIFY COLUMN \`trade_license_number\` varchar(100) NOT NULL
                 `);
             } catch (error) {
-                console.log('Columns already have correct type, continuing...');
+
             }
         }
     }
