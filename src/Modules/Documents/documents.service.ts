@@ -17,7 +17,6 @@ import { WelcomeKitService, WelcomeKitData } from './welcomeKit.service';
 
 export class DocumentsService {
 
-    // Welcome Pack Methods
     /**
      * Get Welcome Pack List
      * @returns {Promise<any>}
@@ -26,19 +25,38 @@ export class DocumentsService {
      */
     async getWelcomePackList(query: any) {
         try {
-            let { page = 1, per_page = 20, masterCommunityIds = '', communityIds = '', towerIds = '', search = '', isActive, startDate, endDate, sortBy = 'id', sortOrder = 'DESC', includeFile = false } = query;
+            let { page = 1, per_page = 20, sortBy = 'id', sortOrder = 'DESC', includeFile = false } = query;
 
-            // Parse comma-separated IDs and filter out empty values
-            const parseIds = (ids: string) => {
-                if (!ids || ids.trim() === '') return [];
-                return ids.split(',').filter((e: any) => e && e.trim() !== '');
-            };
-
-            masterCommunityIds = parseIds(masterCommunityIds);
-            communityIds = parseIds(communityIds);
-            towerIds = parseIds(towerIds);
-
-            // When no masterCommunityIds provided, we won't filter by it (return all records)
+            // Only process meaningful filters - ignore empty/blank values
+            const filters: any = {};
+            
+            if (query.search && query.search.trim().length > 0) {
+                filters.search = query.search.trim();
+            }
+            
+            if (query.masterCommunityIds && query.masterCommunityIds.trim().length > 0) {
+                filters.masterCommunityIds = query.masterCommunityIds.split(',').filter((id: string) => id.trim() !== '');
+            }
+            
+            if (query.communityIds && query.communityIds.trim().length > 0) {
+                filters.communityIds = query.communityIds.split(',').filter((id: string) => id.trim() !== '');
+            }
+            
+            if (query.towerIds && query.towerIds.trim().length > 0) {
+                filters.towerIds = query.towerIds.split(',').filter((id: string) => id.trim() !== '');
+            }
+            
+            if (query.isActive !== undefined && query.isActive !== '') {
+                filters.isActive = query.isActive === 'true' || query.isActive === true;
+            }
+            
+            if (query.startDate && query.startDate.trim().length > 0) {
+                filters.startDate = query.startDate;
+            }
+            
+            if (query.endDate && query.endDate.trim().length > 0) {
+                filters.endDate = query.endDate;
+            }
 
             const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
             
@@ -48,50 +66,50 @@ export class DocumentsService {
                 throw new ApiError(httpStatus.SERVICE_UNAVAILABLE, APICodes.INTERNAL_SERVER_ERROR.message, APICodes.INTERNAL_SERVER_ERROR.code);
             }
             
-            // Query building will be done separately for count and data queries
-
-            // Base condition - show all records by default, filter by isActive only when specified
+            // Build where clause based on meaningful filters only
             let whereClause = "1=1";
             let whereParams: any = {};
             
-            if (isActive !== undefined && isActive !== '') {
+            if (filters.isActive !== undefined) {
                 whereClause += " AND welcomePack.isActive = :isActive";
-                whereParams.isActive = isActive === 'true' || isActive === true;
+                whereParams.isActive = filters.isActive;
             }
 
-            // Add filtering by master community - only if IDs are provided
-            if (masterCommunityIds && masterCommunityIds.length > 0) {
+            if (filters.masterCommunityIds && filters.masterCommunityIds.length > 0) {
                 whereClause += " AND welcomePack.masterCommunityId IN (:...masterCommunityIds)";
-                whereParams.masterCommunityIds = masterCommunityIds;
+                whereParams.masterCommunityIds = filters.masterCommunityIds;
             }
 
-            // Add filtering by community - only if IDs are provided
-            if (communityIds && communityIds.length > 0) {
+            if (filters.communityIds && filters.communityIds.length > 0) {
                 whereClause += " AND welcomePack.communityId IN (:...communityIds)";
-                whereParams.communityIds = communityIds;
+                whereParams.communityIds = filters.communityIds;
             }
 
-            // Add filtering by tower - only if IDs are provided
-            if (towerIds && towerIds.length > 0) {
+            if (filters.towerIds && filters.towerIds.length > 0) {
                 whereClause += " AND welcomePack.towerId IN (:...towerIds)";
-                whereParams.towerIds = towerIds;
+                whereParams.towerIds = filters.towerIds;
             }
 
-            // Add search functionality
-            if (search && search.trim() !== '') {
+            if (filters.search) {
                 whereClause += " AND (masterCommunity.name LIKE :search OR community.name LIKE :search OR tower.name LIKE :search)";
-                whereParams.search = `%${search.trim()}%`;
+                whereParams.search = `%${filters.search}%`;
             }
 
-            // Add date range filtering
-            if (startDate && startDate.trim() !== '') {
+            if (filters.startDate) {
                 whereClause += " AND DATE(welcomePack.createdAt) >= DATE(:startDate)";
-                whereParams.startDate = startDate;
+                whereParams.startDate = filters.startDate;
             }
 
-            if (endDate && endDate.trim() !== '') {
+            if (filters.endDate) {
                 whereClause += " AND DATE(welcomePack.createdAt) <= DATE(:endDate)";
-                whereParams.endDate = endDate;
+                whereParams.endDate = filters.endDate;
+            }
+
+            // Log applied filters for debugging
+            if (Object.keys(filters).length > 0) {
+                logger.info(`Welcome Pack List - Applied filters: ${JSON.stringify(filters)}`);
+            } else {
+                logger.info('Welcome Pack List - No filters applied, returning all records');
             }
 
             // Create separate query builders for count and data
