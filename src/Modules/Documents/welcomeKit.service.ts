@@ -60,7 +60,7 @@ export class WelcomeKitService {
 
     private generateHTMLTemplate(data: WelcomeKitData): string {
         // Set default values
-        const welcomeDate = data.moveInDate || APICodes.DEFAULT_WELCOME_DATE.message;
+        const welcomeDate = data.moveInDate || new Date().toLocaleDateString('en-GB');
         const moveInTimingsWeekdays = data.moveInTimingsWeekdays || '9:00 AM - 6:00 PM';
         const moveInTimingsSundays = data.moveInTimingsSundays || '10:00 AM - 4:00 PM';
         const contactNumber = data.contactNumber || '800 SOBHA (76242)';

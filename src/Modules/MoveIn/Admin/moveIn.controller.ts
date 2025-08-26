@@ -71,4 +71,76 @@ export class MoveInController {
     const result = await moveInService.uploadDocuments(Number(requestId), files, body, req.user);
     return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
   }
+
+  // ==================== STATUS MANAGEMENT CONTROLLERS ====================
+
+  /**
+   * Approve move-in request (UC-136)
+   * Business Rules:
+   * - Only requests in Submitted, RFI Submitted status can be approved
+   * - No active overlapping move-in request exists for the same unit
+   * - MIP template must be active for the unit
+   * - SLA: Move-in request max 30 days validity
+   */
+  async approveMoveInRequest(req: AuthenticatedRequest, res: Response) {
+    const { requestId } = req.params;
+    const { comments } = req.body;
+    
+    logger.debug(`MOVE-IN | APPROVE REQUEST | ADMIN | REQUEST ID: ${requestId} | USER: ${req.user?.id} | COMMENTS: ${comments}`);
+    
+    const result = await moveInService.approveMoveInRequest(Number(requestId), comments, req.user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
+
+  /**
+   * Mark move-in request as RFI (UC-135)
+   * Business Rules:
+   * - Only requests in Submitted status can be marked as RFI
+   * - Admin must provide remarks
+   * - Status transition: Submitted → RFI Pending
+   */
+  async markRequestAsRFI(req: AuthenticatedRequest, res: Response) {
+    const { requestId } = req.params;
+    const { comments } = req.body;
+    
+    logger.debug(`MOVE-IN | MARK RFI | ADMIN | REQUEST ID: ${requestId} | USER: ${req.user?.id} | COMMENTS: ${comments}`);
+    
+    const result = await moveInService.markRequestAsRFI(Number(requestId), comments, req.user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
+
+  /**
+   * Cancel/Reject move-in request (UC-138)
+   * Business Rules:
+   * - Only requests in Submitted, RFI Submitted, or Approved status can be cancelled
+   * - Cancellation remarks are mandatory
+   * - Status changes to Cancelled
+   */
+  async cancelMoveInRequest(req: AuthenticatedRequest, res: Response) {
+    const { requestId } = req.params;
+    const { cancellationRemarks } = req.body;
+    
+    logger.debug(`MOVE-IN | CANCEL REQUEST | ADMIN | REQUEST ID: ${requestId} | USER: ${req.user?.id} | REMARKS: ${cancellationRemarks}`);
+    
+    const result = await moveInService.cancelMoveInRequest(Number(requestId), cancellationRemarks, req.user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
+
+  /**
+   * Close move-in request by security (UC-139)
+   * Business Rules:
+   * - Only requests in Approved status can be closed
+   * - Security team can close requests
+   * - Unit is linked to user and marked as occupied
+   * - Previous user access is invalidated
+   */
+  async closeMoveInRequest(req: AuthenticatedRequest, res: Response) {
+    const { requestId } = req.params;
+    const { closureRemarks, actualMoveInDate } = req.body;
+    
+    logger.debug(`MOVE-IN | CLOSE REQUEST | SECURITY/ADMIN | REQUEST ID: ${requestId} | USER: ${req.user?.id} | REMARKS: ${closureRemarks} | DATE: ${actualMoveInDate}`);
+    
+    const result = await moveInService.closeMoveInRequest(Number(requestId), closureRemarks, new Date(actualMoveInDate), req.user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
 }

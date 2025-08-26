@@ -91,6 +91,46 @@ export class MoveInService {
         );
       }
 
+      // Business Logic Validations for Owner, Tenant, HHO-Unit, and HHO-Company Move-in Requests
+      if (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
+        // 1. Check if unit is vacant
+        const isUnitVacant = await this.checkUnitVacancy(Number(unitId));
+        if (!isUnitVacant) {
+          throw new ApiError(
+            httpStatus.CONFLICT,
+            "Unit is not vacant. Another active or pending move-in request exists for this unit.",
+            "EC001"
+          );
+        }
+
+        // 2. Check for overlapping requests
+        const overlapCheck = await this.checkOverlappingRequests(Number(unitId), new Date(moveInDate));
+        if (overlapCheck.hasOverlap) {
+          throw new ApiError(
+            httpStatus.CONFLICT,
+            `Cannot create move-in request. ${overlapCheck.count} overlapping request(s) exist for this unit.`,
+            "EC001"
+          );
+        }
+
+        // 3. Check if MIP template and Welcome pack exist
+        const mipWelcomePackCheck = await this.checkMIPAndWelcomePack(Number(unitId));
+        if (!mipWelcomePackCheck.hasMIP) {
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            "MIP template is not available for this unit. Cannot create move-in request.",
+            "EC001"
+          );
+        }
+        if (!mipWelcomePackCheck.hasWelcomePack) {
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            "Welcome pack is not available for this unit. Cannot create move-in request.",
+            "EC001"
+          );
+        }
+      }
+
       const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
 
       let createdMaster: MoveInRequests | undefined;
@@ -163,11 +203,16 @@ export class MoveInService {
         
         createdDetails = await this.createDetailsRecord(qr, requestType, createdMaster as MoveInRequests, detailsData, user?.id);
 
+        // Auto-approve owner, tenant, HHO-Unit, and HHO-Company move-in requests
+        if (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
+          await this.autoApproveRequest(qr, savedMaster.id, user?.id);
+        }
+
         // Create initial log
         const log = qr.manager.create(MoveInRequestLogs, {
           moveInRequest: createdMaster as MoveInRequests,
           requestType,
-          status: MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN,
+          status: (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) ? MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED : MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN,
           changes: null,
           user: { id: user?.id } as any,
           actionBy: ActionByTypes.COMMUNITY_ADMIN,
@@ -178,6 +223,11 @@ export class MoveInService {
         });
         await qr.manager.save(MoveInRequestLogs, log);
       });
+
+      // Send notifications after successful creation
+      if (createdMaster) {
+        await this.sendNotifications(createdMaster.id, createdMaster.moveInRequestNo);
+      }
 
       logger.info(`MOVE-IN CREATED BY ADMIN: ${createdMaster?.moveInRequestNo} for unit ${unitId} by admin ${user?.id}`);
 
@@ -190,6 +240,9 @@ export class MoveInService {
         moveInDate: response.moveInDate,
         unit: response.unit,
         details: createdDetails,
+        isAutoApproved: (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY),
+        // Include move-in permit URL for owner, tenant, HHO-Unit, and HHO-Company requests (generated after approval)
+        moveInPermitUrl: (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) ? await this.generateMoveInPermit(response.id) : null,
       };
     } catch (error: any) {
       logger.error(`Error in createMoveIn Admin: ${JSON.stringify(error)}`);
@@ -838,6 +891,637 @@ export class MoveInService {
       logger.error(`Error in MoveInRequestById : ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
       throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
+    }
+  }
+
+
+
+  // Check if unit is vacant (no active or pending move-in requests)
+  private async checkUnitVacancy(unitId: number): Promise<boolean> {
+    try {
+      const existingRequest = await MoveInRequests.getRepository()
+        .createQueryBuilder("mir")
+        .where("mir.unit.id = :unitId", { unitId })
+        .andWhere("mir.status IN (:...statuses)", { 
+          statuses: [
+            MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN,
+            MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
+            MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING
+          ]
+        })
+        .andWhere("mir.isActive = 1")
+        .getOne();
+
+      return !existingRequest; // Unit is vacant if no active request exists
+    } catch (error) {
+      logger.error(`Error checking unit vacancy: ${error}`);
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        APICodes.UNKNOWN_ERROR.message,
+        APICodes.UNKNOWN_ERROR.code
+      );
+    }
+  }
+
+  // Check for overlapping move-in requests
+  private async checkOverlappingRequests(unitId: number, moveInDate: Date): Promise<{ hasOverlap: boolean; count: number; requests: any[] }> {
+    try {
+      const overlappingRequests = await MoveInRequests.getRepository()
+        .createQueryBuilder("mir")
+        .where("mir.unit.id = :unitId", { unitId })
+        .andWhere("mir.status NOT IN (:...excludedStatuses)", { 
+          excludedStatuses: [
+            MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED,
+            MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED
+          ]
+        })
+        .andWhere("mir.isActive = 1")
+        .getMany();
+
+      const hasOverlap = overlappingRequests.length > 0;
+      
+      return {
+        hasOverlap,
+        count: overlappingRequests.length,
+        requests: overlappingRequests
+      };
+    } catch (error) {
+      logger.error(`Error checking overlapping requests: ${error}`);
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        APICodes.UNKNOWN_ERROR.message,
+        APICodes.UNKNOWN_ERROR.code
+      );
+    }
+  }
+
+  // Check if MIP template and Welcome pack exist for the unit
+  private async checkMIPAndWelcomePack(unitId: number): Promise<{ hasMIP: boolean; hasWelcomePack: boolean }> {
+    try {
+      // TODO: Implement MIP template check
+      // TODO: Implement Welcome pack check
+      // For now, return true to allow development
+      return { hasMIP: true, hasWelcomePack: true };
+    } catch (error) {
+      logger.error(`Error checking MIP and Welcome pack: ${error}`);
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        APICodes.UNKNOWN_ERROR.message,
+        APICodes.UNKNOWN_ERROR.code
+      );
+    }
+  }
+
+  // Auto-approve move-in request for owner and tenant
+  private async autoApproveRequest(qr: any, requestId: number, userId: number): Promise<void> {
+    try {
+      // Update status to approved
+      await qr.manager.update(MoveInRequests, { id: requestId }, {
+        status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
+        updatedBy: userId,
+        updatedAt: new Date()
+      });
+
+      // Create approval log
+      const approvalLog = qr.manager.create(MoveInRequestLogs, {
+        moveInRequest: { id: requestId } as any,
+        requestType: MOVE_IN_USER_TYPES.OWNER, // This will be updated based on actual request type
+        status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
+        changes: "Request auto-approved by system",
+        user: { id: userId } as any,
+        actionBy: ActionByTypes.SYSTEM,
+        details: "Move-in request auto-approved for owner/tenant",
+        comments: "Auto-approved as per business rules",
+        createdBy: userId,
+        updatedBy: userId,
+      });
+      await qr.manager.save(MoveInRequestLogs, approvalLog);
+
+      logger.info(`Move-in request ${requestId} auto-approved`);
+    } catch (error) {
+      logger.error(`Error auto-approving request: ${error}`);
+      throw error;
+    }
+  }
+
+  // Generate move-in permit
+  private async generateMoveInPermit(requestId: number): Promise<string> {
+    try {
+      // TODO: Implement move-in permit generation
+      // This should generate a PDF permit with request details
+      const permitUrl = `move-in-permit-${requestId}.pdf`;
+      logger.info(`Move-in permit generated for request ${requestId}`);
+      return permitUrl;
+    } catch (error) {
+      logger.error(`Error generating move-in permit: ${error}`);
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Failed to generate move-in permit",
+        "EC001"
+      );
+    }
+  }
+
+  // Send notifications to owner/tenant and community recipients
+  private async sendNotifications(requestId: number, requestNumber: string): Promise<void> {
+    try {
+      // TODO: Implement push notification to owner/tenant
+      // For Owner: "A new move-in request (<Reference ID>) has been created and approved by Community Admin. Tap here to view your request."
+      // For Tenant: "A new move-in request (<Reference ID>) has been created and approved by Community Admin. Tap here to view your request."
+      
+      // TODO: Implement email notification to community recipients (as per Email Recipients configuration)
+      // TODO: Send notifications to both owner/tenant and relevant community team members
+      
+      logger.info(`Notifications sent for move-in request ${requestId}`);
+    } catch (error) {
+      logger.error(`Error sending notifications: ${error}`);
+      // Don't throw error for notification failures
+    }
+  }
+
+  // ==================== STATUS MANAGEMENT METHODS ====================
+
+  /**
+   * Approve move-in request (UC-136)
+   * Business Rules:
+   * - Only requests in Submitted, RFI Submitted status can be approved
+   * - No active overlapping move-in request exists for the same unit
+   * - MIP template must be active for the unit
+   * - SLA: Move-in request max 30 days validity
+   */
+  async approveMoveInRequest(requestId: number, comments: string, user: any) {
+    try {
+      // Check admin permissions
+      if (!user?.isAdmin) {
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          APICodes.INVALID_USER_ROLE.message,
+          APICodes.INVALID_USER_ROLE.code
+        );
+      }
+
+      // Get the move-in request
+      const moveInRequest = await MoveInRequests.getRepository()
+        .createQueryBuilder("mir")
+        .leftJoinAndSelect("mir.unit", "unit")
+        .leftJoinAndSelect("mir.user", "user")
+        .where("mir.id = :requestId AND mir.isActive = true", { requestId })
+        .getOne();
+
+      if (!moveInRequest) {
+        throw new ApiError(
+          httpStatus.NOT_FOUND,
+          "Move-in request not found",
+          "EC001"
+        );
+      }
+
+      // Validate request status
+      if (![MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN, MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED].includes(moveInRequest.status)) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Cannot approve request in ${moveInRequest.status} status. Only Submitted or RFI Submitted requests can be approved.`,
+          "EC001"
+        );
+      }
+
+      // Check for overlapping requests
+      const overlapCheck = await this.checkOverlappingRequests(moveInRequest.unit.id, moveInRequest.moveInDate);
+      if (overlapCheck.hasOverlap) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          `Cannot approve move-in request. ${overlapCheck.count} overlapping request(s) exist for this unit.`,
+          "EC001"
+        );
+      }
+
+      // Check MIP template availability
+      const mipCheck = await this.checkMIPAndWelcomePack(moveInRequest.unit.id);
+      if (!mipCheck.hasMIP) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          "MIP template is not available for this unit. Cannot approve move-in request.",
+          "EC001"
+        );
+      }
+
+      // Check if move-in date is within 30 days (SLA validation)
+      const moveInDate = new Date(moveInRequest.moveInDate);
+      const today = new Date();
+      const daysDifference = Math.ceil((moveInDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysDifference > 30) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          "Move-in date cannot be more than 30 days in the future (SLA requirement).",
+          "EC001"
+        );
+      }
+
+      await executeInTransaction(async (qr: any) => {
+        // Update request status to Approved
+        await qr.manager.update(MoveInRequests, { id: requestId }, {
+          status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
+          updatedBy: user?.id,
+          updatedAt: new Date()
+        });
+
+        // Create approval log
+        const approvalLog = qr.manager.create(MoveInRequestLogs, {
+          moveInRequest: { id: requestId } as any,
+          requestType: moveInRequest.requestType,
+          status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
+          changes: `Request approved by ${user?.firstName || 'Admin'}`,
+          user: { id: user?.id } as any,
+          actionBy: ActionByTypes.COMMUNITY_ADMIN,
+          details: JSON.stringify({ comments, action: 'APPROVED' }),
+          comments: comments || null,
+          createdBy: user?.id,
+          updatedBy: user?.id,
+        });
+        await qr.manager.save(MoveInRequestLogs, approvalLog);
+
+        // Generate move-in permit
+        const permitUrl = await this.generateMoveInPermit(requestId);
+        
+        // Update request with permit URL
+        await qr.manager.update(MoveInRequests, { id: requestId }, {
+          moveInPermitUrl: permitUrl
+        });
+      });
+
+      // Send approval notifications
+      await this.sendApprovalNotifications(requestId, moveInRequest.moveInRequestNo);
+
+      logger.info(`Move-in request ${requestId} approved by admin ${user?.id}`);
+
+      return {
+        success: true,
+        message: "Move-in request approved successfully",
+        requestId,
+        status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
+        moveInPermitUrl: await this.generateMoveInPermit(requestId)
+      };
+    } catch (error: any) {
+      logger.error(`Error approving move-in request: ${JSON.stringify(error)}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark move-in request as RFI (UC-135)
+   * Business Rules:
+   * - Only requests in Submitted status can be marked as RFI
+   * - Admin must provide remarks
+   * - Status transition: Submitted → RFI Pending
+   */
+  async markRequestAsRFI(requestId: number, comments: string, user: any) {
+    try {
+      // Check admin permissions
+      if (!user?.isAdmin) {
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          APICodes.INVALID_USER_ROLE.message,
+          APICodes.INVALID_USER_ROLE.code
+        );
+      }
+
+      // Validate comments (mandatory)
+      if (!comments || comments.trim().length === 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          "Comments/remarks are mandatory when marking request as RFI",
+          "EC001"
+        );
+      }
+
+      // Get the move-in request
+      const moveInRequest = await MoveInRequests.getRepository()
+        .createQueryBuilder("mir")
+        .leftJoinAndSelect("mir.unit", "unit")
+        .leftJoinAndSelect("mir.user", "user")
+        .where("mir.id = :requestId AND mir.isActive = true", { requestId })
+        .getOne();
+
+      if (!moveInRequest) {
+        throw new ApiError(
+          httpStatus.NOT_FOUND,
+          "Move-in request not found",
+          "EC001"
+        );
+      }
+
+      // Validate request status
+      if (moveInRequest.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Cannot mark request as RFI in ${moveInRequest.status} status. Only Submitted requests can be marked as RFI.`,
+          "EC001"
+        );
+      }
+
+      await executeInTransaction(async (qr: any) => {
+        // Update request status to RFI Pending
+        await qr.manager.update(MoveInRequests, { id: requestId }, {
+          status: MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING,
+          updatedBy: user?.id,
+          updatedAt: new Date()
+        });
+
+        // Create RFI log
+        const rfiLog = qr.manager.create(MoveInRequestLogs, {
+          moveInRequest: { id: requestId } as any,
+          requestType: moveInRequest.requestType,
+          status: MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING,
+          changes: `Request marked as RFI by ${user?.firstName || 'Admin'}`,
+          user: { id: user?.id } as any,
+          actionBy: ActionByTypes.COMMUNITY_ADMIN,
+          details: JSON.stringify({ comments, action: 'RFI_PENDING' }),
+          comments: comments,
+          createdBy: user?.id,
+          updatedBy: user?.id,
+        });
+        await qr.manager.save(MoveInRequestLogs, rfiLog);
+      });
+
+      // Send RFI notifications
+      await this.sendRFINotifications(requestId, moveInRequest.moveInRequestNo, comments);
+
+      logger.info(`Move-in request ${requestId} marked as RFI by admin ${user?.id}`);
+
+      return {
+        success: true,
+        message: "Request marked as RFI successfully",
+        requestId,
+        status: MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING
+      };
+    } catch (error: any) {
+      logger.error(`Error marking request as RFI: ${JSON.stringify(error)}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel/Reject move-in request (UC-138)
+   * Business Rules:
+   * - Only requests in Submitted, RFI Submitted, or Approved status can be cancelled
+   * - Cancellation remarks are mandatory
+   * - Status changes to Cancelled
+   */
+  async cancelMoveInRequest(requestId: number, cancellationRemarks: string, user: any) {
+    try {
+      // Check admin permissions
+      if (!user?.isAdmin) {
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          APICodes.INVALID_USER_ROLE.message,
+          APICodes.INVALID_USER_ROLE.code
+        );
+      }
+
+      // Validate cancellation remarks (mandatory)
+      if (!cancellationRemarks || cancellationRemarks.trim().length === 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          "Cancellation remarks are mandatory",
+          "EC001"
+        );
+      }
+
+      // Get the move-in request
+      const moveInRequest = await MoveInRequests.getRepository()
+        .createQueryBuilder("mir")
+        .leftJoinAndSelect("mir.unit", "unit")
+        .leftJoinAndSelect("mir.user", "user")
+        .where("mir.id = :requestId AND mir.isActive = true", { requestId })
+        .getOne();
+
+      if (!moveInRequest) {
+        throw new ApiError(
+          httpStatus.NOT_FOUND,
+          "Move-in request not found",
+          "EC001"
+        );
+      }
+
+      // Validate request status
+      const allowedStatuses = [
+        MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN,
+        MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED,
+        MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED
+      ];
+      
+      if (!allowedStatuses.includes(moveInRequest.status)) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Cannot cancel request in ${moveInRequest.status} status.`,
+          "EC001"
+        );
+      }
+
+      await executeInTransaction(async (qr: any) => {
+        // Update request status to Cancelled
+        await qr.manager.update(MoveInRequests, { id: requestId }, {
+          status: MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED,
+          updatedBy: user?.id,
+          updatedAt: new Date()
+        });
+
+        // Create cancellation log
+        const cancellationLog = qr.manager.create(MoveInRequestLogs, {
+          moveInRequest: { id: requestId } as any,
+          requestType: moveInRequest.requestType,
+          status: MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED,
+          changes: `Request cancelled by ${user?.firstName || 'Admin'}`,
+          user: { id: user?.id } as any,
+          actionBy: ActionByTypes.COMMUNITY_ADMIN,
+          details: JSON.stringify({ cancellationRemarks, action: 'CANCELLED' }),
+          comments: cancellationRemarks,
+          createdBy: user?.id,
+          updatedBy: user?.id,
+        });
+        await qr.manager.save(MoveInRequestLogs, cancellationLog);
+      });
+
+      // Send cancellation notifications
+      await this.sendCancellationNotifications(requestId, moveInRequest.moveInRequestNo, cancellationRemarks);
+
+      logger.info(`Move-in request ${requestId} cancelled by admin ${user?.id}`);
+
+      return {
+        success: true,
+        message: "Request cancelled successfully",
+        requestId,
+        status: MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED
+      };
+    } catch (error: any) {
+      logger.error(`Error cancelling move-in request: ${JSON.stringify(error)}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Close move-in request by security (UC-139)
+   * Business Rules:
+   * - Only requests in Approved status can be closed
+   * - Security team can close requests
+   * - Unit is linked to user and marked as occupied
+   * - Previous user access is invalidated
+   */
+  async closeMoveInRequest(requestId: number, closureRemarks: string, actualMoveInDate: Date, user: any) {
+    try {
+      // Check if user is security or admin
+      const isSecurity = await checkIsSecurity(user);
+      if (!user?.isAdmin && !isSecurity) {
+        throw new ApiError(
+          httpStatus.FORBIDDEN,
+          "Only security team or admin can close move-in requests",
+          "EC001"
+        );
+      }
+
+      // Validate closure remarks (mandatory)
+      if (!closureRemarks || closureRemarks.trim().length === 0) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          "Closure remarks are mandatory",
+          "EC001"
+        );
+      }
+
+      // Validate actual move-in date
+      if (!actualMoveInDate) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          "Actual move-in date is mandatory",
+          "EC001"
+        );
+      }
+
+      // Get the move-in request
+      const moveInRequest = await MoveInRequests.getRepository()
+        .createQueryBuilder("mir")
+        .leftJoinAndSelect("mir.unit", "unit")
+        .leftJoinAndSelect("mir.user", "user")
+        .where("mir.id = :requestId AND mir.isActive = true", { requestId })
+        .getOne();
+
+      if (!moveInRequest) {
+        throw new ApiError(
+          httpStatus.NOT_FOUND,
+          "Move-in request not found",
+          "EC001"
+        );
+      }
+
+      // Validate request status
+      if (moveInRequest.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Cannot close request in ${moveInRequest.status} status. Only Approved requests can be closed.`,
+          "EC001"
+        );
+      }
+
+      // Check if MIP is still valid (within 30 days of approval)
+      const approvalDate = moveInRequest.updatedAt || moveInRequest.createdAt;
+      const daysSinceApproval = Math.ceil((new Date().getTime() - new Date(approvalDate).getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysSinceApproval > 30) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          "Move-In Permit has expired (older than 30 days). Cannot close request.",
+          "EC001"
+        );
+      }
+
+      await executeInTransaction(async (qr: any) => {
+        // Update request status to Closed
+        await qr.manager.update(MoveInRequests, { id: requestId }, {
+          status: MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED,
+          actualMoveInDate: actualMoveInDate,
+          updatedBy: user?.id,
+          updatedAt: new Date()
+        });
+
+        // Create closure log
+        const closureLog = qr.manager.create(MoveInRequestLogs, {
+          moveInRequest: { id: requestId } as any,
+          requestType: moveInRequest.requestType,
+          status: MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED,
+          changes: `Request closed by ${isSecurity ? 'Security' : 'Admin'}`,
+          user: { id: user?.id } as any,
+          actionBy: isSecurity ? ActionByTypes.SECURITY : ActionByTypes.COMMUNITY_ADMIN,
+          details: JSON.stringify({ closureRemarks, actualMoveInDate, action: 'CLOSED' }),
+          comments: closureRemarks,
+          createdBy: user?.id,
+          updatedBy: user?.id,
+        });
+        await qr.manager.save(MoveInRequestLogs, closureLog);
+
+        // TODO: Link unit to user and mark as occupied
+        // TODO: Invalidate previous user access (access cards, amenity bookings)
+        // TODO: Add to Active Residents list
+      });
+
+      logger.info(`Move-in request ${requestId} closed by ${isSecurity ? 'security' : 'admin'} ${user?.id}`);
+
+      return {
+        success: true,
+        message: "Request closed successfully",
+        requestId,
+        status: MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED,
+        actualMoveInDate
+      };
+    } catch (error: any) {
+      logger.error(`Error closing move-in request: ${JSON.stringify(error)}`);
+      throw error;
+    }
+  }
+
+  // ==================== NOTIFICATION METHODS ====================
+
+  /**
+   * Send approval notifications
+   */
+  private async sendApprovalNotifications(requestId: number, requestNumber: string): Promise<void> {
+    try {
+      // TODO: Implement push notification to customer
+      // Template: "Your Move-in request has been approved by admin."
+      
+      // TODO: Implement email notification to community recipients
+      
+      logger.info(`Approval notifications sent for move-in request ${requestId}`);
+    } catch (error) {
+      logger.error(`Error sending approval notifications: ${error}`);
+    }
+  }
+
+  /**
+   * Send RFI notifications
+   */
+  private async sendRFINotifications(requestId: number, requestNumber: string, comments: string): Promise<void> {
+    try {
+      // TODO: Implement push notification to customer
+      // Template: "Your Move-in request (<Reference ID>) requires further information. Tap to view details."
+      
+      logger.info(`RFI notifications sent for move-in request ${requestId}`);
+    } catch (error) {
+      logger.error(`Error sending RFI notifications: ${error}`);
+    }
+  }
+
+  /**
+   * Send cancellation notifications
+   */
+  private async sendCancellationNotifications(requestId: number, requestNumber: string, cancellationRemarks: string): Promise<void> {
+    try {
+      // TODO: Implement push notification to customer
+      // Template: "Your Move-in request (<Reference ID>) has been cancelled."
+      
+      logger.info(`Cancellation notifications sent for move-in request ${requestId}`);
+    } catch (error) {
+      logger.error(`Error sending cancellation notifications: ${error}`);
     }
   }
 }

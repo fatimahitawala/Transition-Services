@@ -395,15 +395,27 @@ components:
           type: integer
           description: Unique identifier for the welcome pack
           example: 12
-
+        masterCommunityId:
+          type: integer
+          description: Master Community ID
+          example: 28
+        communityId:
+          type: integer
+          description: Community ID
+          example: 70
+        towerId:
+          type: integer
+          nullable: true
+          description: Tower ID
+          example: 142
         templateString:
           type: string
           description: Base64 encoded file content (only included when includeFile=true)
           nullable: true
         isActive:
-          type: integer
-          description: Active status of the welcome pack (1 for active, 0 for inactive)
-          example: 1
+          type: boolean
+          description: Active status of the welcome pack
+          example: true
         createdAt:
           type: string
           format: date-time
@@ -415,13 +427,13 @@ components:
           description: Last update timestamp
           example: "2025-08-13T10:44:46.291Z"
         createdBy:
-          type: string
+          type: integer
           description: ID of the user who created the welcome pack
-          example: "4"
+          example: 4
         updatedBy:
-          type: string
+          type: integer
           description: ID of the user who last updated the welcome pack
-          example: "4"
+          example: 4
         masterCommunity:
           type: object
           nullable: true
@@ -458,6 +470,44 @@ components:
               type: string
               description: Tower name
               example: "The Horizon"
+
+    WelcomePackHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the history entry
+        templateType:
+          type: string
+          enum: [welcome-pack]
+          description: Type of template history entry
+        welcomePack:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            masterCommunityId:
+              type: integer
+            communityId:
+              type: integer
+            towerId:
+              type: integer
+              nullable: true
+            isActive:
+              type: boolean
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+        updatedBy:
+          type: integer
 
   securitySchemes:
     bearerAuth:

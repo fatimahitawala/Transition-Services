@@ -26,7 +26,7 @@ router.post('/occupancytemplate/:templateType', authMiddleware.auth(), templateS
 router.get('/occupancytemplate/:templateType/:id', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateById));
 router.get('/occupancytemplate/:templateType/:id/download', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.downloadTemplateFile));
 router.put('/occupancytemplate/:templateType/:id', authMiddleware.auth(), templateSingleUpload, validate(documentsValidation.updateTemplate), catchAsync(documentsController.updateTemplate));
-router.get('/occupancytemplate/:templateType/:id/history', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateHistory));;
+router.get('/occupancytemplate/:templateType/:id/history', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateHistory));
 
 // Email Recipients Routes (templateType: recipient-mail)
 router.get('/email-recipients', authMiddleware.auth(), validate(documentsValidation.getEmailRecipientsList), catchAsync(documentsController.getEmailRecipientsList));
@@ -251,14 +251,14 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
 
 /**
  * @swagger
- * /documents/templates:
+ * /documents/occupancytemplate/{templateType}:
  *   get:
  *     summary: Get list of templates (move-in and move-out only)
  *     tags: [Documents - Templates]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
+ *       - in: path
  *         name: templateType
  *         required: true
  *         schema:
@@ -370,12 +370,20 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
 
 /**
  * @swagger
- * /documents/templates:
+ * /documents/occupancytemplate/{templateType}:
  *   post:
  *     summary: Create a new template (move-in or move-out only)
  *     tags: [Documents - Templates]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: templateType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [move-in, move-out]
+ *         description: Type of template (move-in = Move In Permit, move-out = Move Out Permit)
  *     requestBody:
  *       required: true
  *       content:
@@ -385,7 +393,6 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
  *             required:
  *               - masterCommunityId
  *               - communityId
- *               - templateType
  *               - templateFile
  *             properties:
  *               masterCommunityId:
@@ -397,10 +404,6 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
  *               towerId:
  *                 type: integer
  *                 description: Tower ID (optional)
- *               templateType:
- *                 type: string
- *                 enum: [move-in, move-out]
- *                 description: Type of template (move-in = Move In Permit, move-out = Move Out Permit)
  *               isActive:
  *                 type: boolean
  *                 description: Whether the template is active
@@ -432,13 +435,20 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
 
 /**
  * @swagger
- * /documents/templates/{id}:
+ * /documents/occupancytemplate/{templateType}/{id}:
  *   get:
  *     summary: Get template by ID
  *     tags: [Documents - Templates]
  *     security:
  *       - bearerAuth: []
  *     parameters:
+ *       - in: path
+ *         name: templateType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [move-in, move-out]
+ *         description: Type of template (move-in = Move In Permit, move-out = Move Out Permit)
  *       - in: path
  *         name: id
  *         required: true
@@ -475,13 +485,20 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
 
 /**
  * @swagger
- * /documents/templates/{id}/download:
+ * /documents/occupancytemplate/{templateType}/{id}/download:
  *   get:
  *     summary: Download template file
  *     tags: [Documents - Templates]
  *     security:
  *       - bearerAuth: []
  *     parameters:
+ *       - in: path
+ *         name: templateType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [move-in, move-out]
+ *         description: Type of template (move-in = Move In Permit, move-out = Move Out Permit)
  *       - in: path
  *         name: id
  *         required: true
@@ -509,13 +526,20 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
 
 /**
  * @swagger
- * /documents/templates/{id}:
+ * /documents/occupancytemplate/{templateType}/{id}:
  *   put:
  *     summary: Update template
  *     tags: [Documents - Templates]
  *     security:
  *       - bearerAuth: []
  *     parameters:
+ *       - in: path
+ *         name: templateType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [move-in, move-out]
+ *         description: Type of template (move-in = Move In Permit, move-out = Move Out Permit)
  *       - in: path
  *         name: id
  *         required: true
@@ -562,13 +586,20 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
 
 /**
  * @swagger
- * /documents/templates/{id}/history:
+ * /documents/occupancytemplate/{templateType}/{id}/history:
  *   get:
  *     summary: Get template history - tracks all changes including who added/edited the template (move-in/move-out)
  *     tags: [Documents - Templates]
  *     security:
  *       - bearerAuth: []
  *     parameters:
+ *       - in: path
+ *         name: templateType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [move-in, move-out]
+ *         description: Type of template (move-in = Move In Permit, move-out = Move Out Permit)
  *       - in: path
  *         name: id
  *         required: true
@@ -868,7 +899,7 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
  * /documents/welcome-pack/{id}/download:
  *   get:
  *     summary: Download welcome pack file
- *     tags: [Documents]
+ *     tags: [Documents - Welcome Pack]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -902,8 +933,8 @@ export default router;
 /**
  * @swagger
  * tags:
- *   - name: Documents
- *     description: Document Management organized by template types with complete history tracking
+ *   - name: Documents - Welcome Pack
+ *     description: Welcome Pack Management with complete history tracking
  *   - name: Documents - Templates
  *     description: Template Management (templateType move-in, move-out) with complete history tracking
  *   - name: Documents - Email Recipients
@@ -917,7 +948,7 @@ export default router;
  *     description: >
  *       Complete History Tracking Available for All Document Types.
  *       - Welcome Pack History: GET /documents/welcome-pack/{id}/history - Track all welcome pack changes.
- *       - Template History (Move-in/Move-out): GET /documents/templates/{id}/history - Track all template changes.
+ *       - Template History (Move-in/Move-out): GET /documents/occupancytemplate/{templateType}/{id}/history - Track all template changes.
  *       - Email Recipients History: GET /documents/email-recipients/{id}/history - Track all email recipient changes.
  *       - Unified History: GET /documents/history/{templateType}/{id} - Track history for any template type (move-in, move-out, welcome-pack, recipient-mail).
  *       All history endpoints return comprehensive audit trails including who made changes, when, and what was changed.
