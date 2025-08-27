@@ -43,7 +43,11 @@ export class DocumentsController {
     async downloadWelcomePackFile(req: Request, res: Response) {
         const { params: { id } }: Record<string, any> = req;
         const result = await documentsService.downloadWelcomePackFile(parseInt(id));
-
+        // If service returned a direct fileUrl (PDF), respond with URL for client-side download
+        if ((result as any)?.fileUrl) {
+            return successResponseWithData(res, APICodes.COMMON_SUCCESS, { fileUrl: (result as any).fileUrl });
+        }
+        // Otherwise, return binary (HTML template case)
         return successResponseWithBinaryData(res, APICodes.COMMON_SUCCESS, result.buffer, result.contentType, result.fileName);
     }
 

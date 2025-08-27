@@ -577,20 +577,20 @@ export class DocumentsService {
             let fileBuffer: Buffer;
 
             if ((welcomePack as any).fileId) {
-                // Handle PDF file via fileId
+                // For PDF files, return direct Blob URL (no streaming)
                 try {
-                    const { getFileById } = await import('../../Common/Utils/azureBlobStorage');
-                    const fileData = await getFileById((welcomePack as any).fileId);
-                    
-                    if (!fileData || !fileData.buffer) {
+                    const fileUpload = await AppDataSource.getRepository(FileUploads).findOne({
+                        where: { id: (welcomePack as any).fileId }
+                    });
+
+                    if (!fileUpload) {
                         throw new ApiError(httpStatus.NOT_FOUND, APICodes.FILE_NOT_FOUND.message, APICodes.FILE_NOT_FOUND.code);
                     }
-                    
-                    fileBuffer = fileData.buffer;
-                    contentType = 'application/pdf';
-                    fileName += '.pdf';
+
+                    const fileUrl = `https://${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/application/${fileUpload.filePath}`;
+                    return { fileUrl } as any;
                 } catch (fileError: any) {
-                    logger.error(`Error retrieving PDF file: ${JSON.stringify(fileError)}`);
+                    logger.error(`Error building file URL for welcome-pack ${id}: ${JSON.stringify(fileError)}`);
                     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.FILE_NOT_FOUND.message, APICodes.FILE_NOT_FOUND.code);
                 }
             } else if ((welcomePack as any).templateString) {

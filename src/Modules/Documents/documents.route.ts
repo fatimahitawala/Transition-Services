@@ -830,12 +830,24 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
  *         description: Welcome pack ID
  *     responses:
  *       200:
- *         description: File content
+ *         description: For PDF, returns JSON with fileUrl. For HTML, returns HTML content.
  *         content:
- *           application/pdf:
+ *           application/json:
  *             schema:
- *               type: string
- *               format: binary
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                 code:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     fileUrl:
+ *                       type: string
+ *                       description: Direct Azure Blob URL for the PDF file (when applicable)
  *           text/html:
  *             schema:
  *               type: string
