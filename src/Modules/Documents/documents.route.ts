@@ -26,13 +26,13 @@ router.post('/occupancytemplate/:templateType', authMiddleware.auth(), templateS
 router.get('/occupancytemplate/:templateType/:id', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateById));
 router.get('/occupancytemplate/:templateType/:id/download', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.downloadTemplateFile));
 router.put('/occupancytemplate/:templateType/:id', authMiddleware.auth(), templateSingleUpload, validate(documentsValidation.updateTemplate), catchAsync(documentsController.updateTemplate));
-router.get('/occupancytemplate/:templateType/:id/history', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateHistory));
+//router.get('/occupancytemplate/:templateType/:id/history', authMiddleware.auth(), validate(documentsValidation.getTemplateById), catchAsync(documentsController.getTemplateHistory));
 
 // Email Recipients Routes (templateType: recipient-mail)
 router.get('/email-recipients', authMiddleware.auth(), validate(documentsValidation.getEmailRecipientsList), catchAsync(documentsController.getEmailRecipientsList));
 router.post('/email-recipients', authMiddleware.auth(), validate(documentsValidation.createEmailRecipients), catchAsync(documentsController.createEmailRecipients));
 router.put('/email-recipients/:id', authMiddleware.auth(), validate(documentsValidation.updateEmailRecipients), catchAsync(documentsController.updateEmailRecipients));
-router.get('/email-recipients/:id/history', authMiddleware.auth(), validate(documentsValidation.getEmailRecipientsById), catchAsync(documentsController.getEmailRecipientsHistory));
+//router.get('/email-recipients/:id/history', authMiddleware.auth(), validate(documentsValidation.getEmailRecipientsById), catchAsync(documentsController.getEmailRecipientsHistory));
 
 // Unified History Route - handles all template types (move-in, move-out, welcome-pack, recipient-mail)
 router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documentsValidation.getUnifiedHistory), catchAsync(documentsController.getUnifiedHistory));
@@ -584,51 +584,7 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
  *         description: Internal server error
  */
 
-/**
- * @swagger
- * /documents/occupancytemplate/{templateType}/{id}/history:
- *   get:
- *     summary: Get template history - tracks all changes including who added/edited the template (move-in/move-out)
- *     tags: [Documents - Templates]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: templateType
- *         required: true
- *         schema:
- *           type: string
- *           enum: [move-in, move-out]
- *         description: Type of template (move-in = Move In Permit, move-out = Move Out Permit)
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Template ID
- *     responses:
- *       200:
- *         description: Template history retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/TemplateHistory'
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Template not found
- *       500:
- *         description: Internal server error
- */
+ 
 
 // Email Recipients Routes
 /**
@@ -851,44 +807,7 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
  *         description: Internal server error
  */
 
-/**
- * @swagger
- * /documents/email-recipients/{id}/history:
- *   get:
- *     summary: Get email recipients configuration history - tracks all changes including who added/edited the configuration
- *     tags: [Documents - Email Recipients]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Email Recipients ID
- *     responses:
- *       200:
- *         description: Email recipients history retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/EmailRecipientsTemplateHistory'
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Email recipients configuration not found
- *       500:
- *         description: Internal server error
- */
+/** */
 
 
 
@@ -934,9 +853,9 @@ export default router;
  * @swagger
  * tags:
  *   - name: Documents - Welcome Pack
- *     description: Welcome Pack Management with complete history tracking
+ *     description: Welcome Pack Management
  *   - name: Documents - Templates
- *     description: Template Management (templateType move-in, move-out) with complete history tracking
+ *     description: Template Management (templateType move-in, move-out)
  *   - name: Documents - Email Recipients
  *     description: Email Recipients Management (templateType recipient-mail) for Move-in and Move-out notifications with complete history tracking. Supports multiple comma-separated email addresses per community. Only one active configuration allowed per unique combination of master community/community/tower.
  *   - name: Documents - Unified History
@@ -947,9 +866,6 @@ export default router;
  *   x-history-routes:
  *     description: >
  *       Complete History Tracking Available for All Document Types.
- *       - Welcome Pack History: GET /documents/welcome-pack/{id}/history - Track all welcome pack changes.
- *       - Template History (Move-in/Move-out): GET /documents/occupancytemplate/{templateType}/{id}/history - Track all template changes.
- *       - Email Recipients History: GET /documents/email-recipients/{id}/history - Track all email recipient changes.
  *       - Unified History: GET /documents/history/{templateType}/{id} - Track history for any template type (move-in, move-out, welcome-pack, recipient-mail).
  *       All history endpoints return comprehensive audit trails including who made changes, when, and what was changed.
  */
@@ -1229,44 +1145,7 @@ export default router;
  *         description: Internal server error
  */
 
-/**
- * @swagger
- * /documents/welcome-pack/{id}/history:
- *   get:
- *     summary: Get welcome pack history by ID - tracks all changes including who added/edited the welcome pack
- *     tags: [Documents - Welcome Pack]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Welcome pack ID
- *     responses:
- *       200:
- *         description: Welcome pack history retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/WelcomePackHistory'
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Welcome pack not found
- *       500:
- *         description: Internal server error
- */
+
 
 /**
  * @swagger
