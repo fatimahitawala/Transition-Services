@@ -94,11 +94,11 @@ export class DocumentsController {
             unitNumber: body.unitNumber,
             buildingName: body.buildingName,
             communityName: body.communityName || body.buildingName,
-            masterCommunityName: body.masterCommunityName || 'Sobha Hartland',
+            masterCommunityName: body.masterCommunityName || APICodes.DEFAULT_MASTER_COMMUNITY.message,
             dateOfIssue: body.dateOfIssue || new Date().toLocaleDateString('en-GB'),
             moveInDate: body.moveInDate || new Date().toLocaleDateString('en-GB'),
             referenceNumber: body.referenceNumber || `WK-${Date.now()}`,
-            contactNumber: body.contactNumber || '800 SOBHA (76242)'
+            contactNumber: body.contactNumber || APICodes.DEFAULT_CONTACT_NUMBER.message
         };
 
         const pdfBuffer = await documentsService.generateWelcomeKitPDF(welcomeKitData);

@@ -15,9 +15,10 @@ const moveInAtLeastDaysLater = (days: number) => (value: any, helpers: any) => {
     return helpers.message(APICodes.MOVE_IN_DATE_FUTURE.message);
   }
   
-  // Check if date is within 30 days from today (not beyond 30 days)
+  // Check if date is within specified days from today (not beyond)
   if (inputDate > maxDate) {
-    return helpers.message(`Move-in date must be within ${days} days from today`);
+    const message = APICodes.MOVE_IN_DATE_WITHIN_DAYS.message.replace('{days}', days.toString());
+    return helpers.message(message);
   }
   
   return value;

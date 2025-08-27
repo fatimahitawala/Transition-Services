@@ -7,6 +7,8 @@ import { AuthMiddleware } from "../../../Common/Middlewares/AuthMiddleware";
 import { MoveInvalidation } from "./moveIn.validation";
 import { fileUploads } from "../../../Common/Utils/upload";
 import { TRANSITION_DOCUMENT_TYPES } from "../../../Entities/EntityTypes/transition";
+import { fileUploads } from "../../../Common/Utils/upload";
+import { TRANSITION_DOCUMENT_TYPES } from "../../../Entities/EntityTypes/transition";
 
 const moveInController = new MoveInController();
 const moveInValidation = new MoveInvalidation();
@@ -14,6 +16,7 @@ const auth = new AuthMiddleware();
 
 const router = Router();
 
+// GET routes for admin move-in management
 // GET routes for admin move-in management
 router.get("/request", auth.auth(), validate(moveInValidation.getAdminMoveIn), catchAsync(moveInController.getAllMoveInRequestList));
 router.get('/moveInDetails/:requestId', auth.auth(), validate(moveInValidation.getAdminMoveInDetails), catchAsync(moveInController.getAllMoveInDetailsList));

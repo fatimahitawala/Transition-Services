@@ -248,6 +248,7 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
  */
 
 // Template Routes (templateType: move-in, move-out) - All routes require authentication
+// Template Routes (templateType: move-in, move-out) - All routes require authentication
 
 /**
  * @swagger
@@ -731,6 +732,18 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
  *                 type: string
  *                 description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
  *                 example: "admin@community.com, manager@community.com, supervisor@community.com"
+ *               communityId:
+ *                 type: integer
+ *                 description: Community ID
+ *                 example: 5
+ *               towerId:
+ *                 type: integer
+ *                 description: Tower ID (optional)
+ *                 example: 10
+ *               mipRecipients:
+ *                 type: string
+ *                 description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+ *                 example: "admin@community.com, manager@community.com, supervisor@community.com"
  *               mopRecipients:
  *                 type: string
  *                 description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
@@ -787,6 +800,14 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
  *                 type: string
  *                 description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
  *                 example: "admin@community.com, manager@community.com, supervisor@community.com"
+ *               mipRecipients:
+ *                 type: string
+ *                 description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+ *                 example: "admin@community.com, manager@community.com, supervisor@community.com"
+ *               mopRecipients:
+ *                 type: string
+ *                 description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+ *                 example: "admin@community.com, manager@community.com, supervisor@community.com"
  *               isActive:
  *                 type: boolean
  *                 description: Whether the configuration is active
@@ -808,6 +829,7 @@ router.get('/history/:templateType/:id', authMiddleware.auth(), validate(documen
  */
 
 /** */
+
 
 
 
@@ -870,7 +892,9 @@ export default router;
  *     description: Template Management (templateType move-in, move-out)
  *   - name: Documents - Email Recipients
  *     description: Email Recipients Management (templateType recipient-mail) for Move-in and Move-out notifications with complete history tracking. Supports multiple comma-separated email addresses per community. Only one active configuration allowed per unique combination of master community/community/tower.
+ *     description: Email Recipients Management (templateType recipient-mail) for Move-in and Move-out notifications with complete history tracking. Supports multiple comma-separated email addresses per community. Only one active configuration allowed per unique combination of master community/community/tower.
  *   - name: Documents - Unified History
+ *     description: Unified history tracking for all template types (move-in, move-out, welcome-pack, recipient-mail)
  *     description: Unified history tracking for all template types (move-in, move-out, welcome-pack, recipient-mail)
  * 
  * @swagger
@@ -887,6 +911,7 @@ export default router;
  * /documents/welcome-pack:
  *   get:
  *     summary: Get list of welcome packs with advanced filtering, search, and pagination
+ *     tags: [Documents - Welcome Pack]
  *     tags: [Documents - Welcome Pack]
  *     security:
  *       - bearerAuth: []
@@ -914,6 +939,8 @@ export default router;
  *       - in: query
  *         name: isActive
  *         schema:
+ *           type: string
+ *           enum: ['true', 'false', true, false]
  *           type: string
  *           enum: ['true', 'false', true, false]
  *         description: Filter by active status (true/false or "true"/"false"). If not specified, shows all records (both active and inactive)
@@ -962,6 +989,9 @@ export default router;
  *           type: string
  *           enum: ['true', 'false', true, false]
  *           default: 'false'
+ *           type: string
+ *           enum: ['true', 'false', true, false]
+ *           default: 'false'
  *         description: Include file content in response (true/false or "true"/"false")
  *     responses:
  *       200:
@@ -1003,6 +1033,7 @@ export default router;
  * /documents/welcome-pack:
  *   post:
  *     summary: Create a new welcome pack
+ *     tags: [Documents - Welcome Pack]
  *     tags: [Documents - Welcome Pack]
  *     security:
  *       - bearerAuth: []
@@ -1063,6 +1094,7 @@ export default router;
  *   get:
  *     summary: Get welcome pack by ID with file content
  *     tags: [Documents - Welcome Pack]
+ *     tags: [Documents - Welcome Pack]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -1107,6 +1139,7 @@ export default router;
  * /documents/welcome-pack/{id}:
  *   put:
  *     summary: Update welcome pack status and/or replace file
+ *     tags: [Documents - Welcome Pack]
  *     tags: [Documents - Welcome Pack]
  *     security:
  *       - bearerAuth: []
@@ -1208,6 +1241,219 @@ export default router;
  *         description: Internal server error
  */
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     WelcomePack:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *         masterCommunityId:
+ *           type: integer
+ *         communityId:
+ *           type: integer
+ *         towerId:
+ *           type: integer
+ *           nullable: true
+ *         templateString:
+ *           type: string
+ *           description: Base64 encoded file content (only included when includeFile=true)
+ *         isActive:
+ *           type: boolean
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *         createdBy:
+ *           type: integer
+ *         updatedBy:
+ *           type: integer
+ *     Template:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *         masterCommunity:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: integer
+ *             name:
+ *               type: string
+ *         community:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: integer
+ *             name:
+ *               type: string
+ *         tower:
+ *           type: object
+ *           nullable: true
+ *           properties:
+ *             id:
+ *               type: integer
+ *             name:
+ *               type: string
+ *         templateType:
+ *           type: string
+ *           enum: [move-in, move-out]
+ *         templateString:
+ *           type: string
+ *           description: Base64 encoded file content (only included when includeFile=true)
+ *         isActive:
+ *           type: boolean
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *         createdBy:
+ *           type: integer
+ *         updatedBy:
+ *           type: integer
+ *     TemplateHistory:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *         templateType:
+ *           type: string
+ *           enum: [move-in, move-out, recipient-mail, welcome-pack]
+ *           description: Type of template history entry
+ *         occupancyRequestTemplates:
+ *           type: object
+ *           nullable: true
+ *           properties:
+ *             id:
+ *               type: integer
+ *             templateType:
+ *               type: string
+ *               enum: [move-in, move-out]
+ *             isActive:
+ *               type: boolean
+ *         isActive:
+ *           type: boolean
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *         createdBy:
+ *           type: integer
+ *         updatedBy:
+ *           type: integer
+ *     EmailRecipients:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *         masterCommunity:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: integer
+ *             name:
+ *               type: string
+ *         community:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: integer
+ *             name:
+ *               type: string
+ *         tower:
+ *           type: object
+ *           nullable: true
+ *           properties:
+ *             id:
+ *               type: integer
+ *             name:
+ *               type: string
+ *         mipRecipients:
+ *           type: string
+ *           description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+ *           example: "admin@community.com, manager@community.com, supervisor@community.com"
+ *         mopRecipients:
+ *           type: string
+ *           description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+ *           example: "admin@community.com, manager@community.com, supervisor@community.com"
+ *         isActive:
+ *           type: boolean
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *         createdBy:
+ *           type: integer
+ *         updatedBy:
+ *           type: integer
+ *     EmailRecipientsTemplateHistory:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *         templateType:
+ *           type: string
+ *           enum: [recipient-mail]
+ *           description: Type of template history entry
+ *         occupancyRequestEmailRecipients:
+ *           type: object
+ *           nullable: true
+ *           properties:
+ *             id:
+ *               type: integer
+ *             masterCommunity:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                 name:
+ *                   type: string
+ *             community:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                 name:
+ *                   type: string
+ *             tower:
+ *               type: object
+ *               nullable: true
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                 name:
+ *                   type: string
+ *         mipRecipients:
+ *           type: string
+ *           description: MIP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+ *           example: "admin@community.com, manager@community.com, supervisor@community.com"
+ *         mopRecipients:
+ *           type: string
+ *           description: MOP Email Recipients - Multiple email addresses separated by commas (e.g., "user1@example.com, user2@example.com"). Each email must be in valid email format.
+ *           example: "admin@community.com, manager@community.com, supervisor@community.com"
+ *         isActive:
+ *           type: boolean
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *         createdBy:
+ *           type: integer
+ *         updatedBy:
+ *           type: integer
+ */
 /**
  * @swagger
  * components:
