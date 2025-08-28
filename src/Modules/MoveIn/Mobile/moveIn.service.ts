@@ -51,6 +51,23 @@ export class MoveInService {
     return this.createMoveIn({ ...data, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
   }
 
+  // ============ UPDATE METHODS ============
+  async updateOwnerMoveIn(requestId: number, data: any, user: any) {
+    return this.updateMoveIn(requestId, { ...data, requestType: MOVE_IN_USER_TYPES.OWNER }, user);
+  }
+
+  async updateTenantMoveIn(requestId: number, data: any, user: any) {
+    return this.updateMoveIn(requestId, { ...data, requestType: MOVE_IN_USER_TYPES.TENANT }, user);
+  }
+
+  async updateHhoOwnerMoveIn(requestId: number, data: any, user: any) {
+    return this.updateMoveIn(requestId, { ...data, requestType: MOVE_IN_USER_TYPES.HHO_OWNER }, user);
+  }
+
+  async updateHhcCompanyMoveIn(requestId: number, data: any, user: any) {
+    return this.updateMoveIn(requestId, { ...data, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
+  }
+
   async uploadHhcCompanyDocuments(requestId: number, files: any, user: any) {
     try {
       if (user?.isAdmin === true || user?.isAdmin === 1) {
@@ -80,8 +97,8 @@ export class MoveInService {
       if (moveInRequest.user?.id !== user?.id) {
         throw new ApiError(
           httpStatus.FORBIDDEN,
-          APICodes.REQUEST_NOT_BELONG_TO_USER.message,
-          APICodes.REQUEST_NOT_BELONG_TO_USER.code
+          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message,
+          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code
         );
       }
 
@@ -93,17 +110,24 @@ export class MoveInService {
           const file = files.emiratesIdFront[0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/emirates-id-front/`, user?.id);
           
-          const document = qr.manager.create(MoveInRequestDocuments, {
-            moveInRequest: { id: requestId } as any,
-            user: { id: user?.id } as any,
-            file: uploadedFile,
-            documentType: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT,
-            createdBy: user?.id,
-            updatedBy: user?.id,
-            isActive: true,
-          });
+          if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
+            throw new ApiError(
+              httpStatus.INTERNAL_SERVER_ERROR,
+              APICodes.FILE_UPLOAD_ERROR.message,
+              APICodes.FILE_UPLOAD_ERROR.code
+            );
+          }
           
-          const savedDoc = await qr.manager.save(MoveInRequestDocuments, document);
+          const document = new MoveInRequestDocuments();
+          document.documentType = TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT;
+          document.user = { id: user?.id } as any;
+          document.moveInRequest = { id: requestId } as any;
+          document.file = { id: (uploadedFile as any).id } as any;
+          document.createdBy = user?.id;
+          document.updatedBy = user?.id;
+          document.isActive = true;
+          
+          const savedDoc = await document.save();
           uploadedDocuments.push({ type: 'emiratesIdFront', document: savedDoc });
         }
 
@@ -112,17 +136,24 @@ export class MoveInService {
           const file = files.emiratesIdBack[0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/emirates-id-back/`, user?.id);
           
-          const document = qr.manager.create(MoveInRequestDocuments, {
-            moveInRequest: { id: requestId } as any,
-            user: { id: user?.id } as any,
-            file: uploadedFile,
-            documentType: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK,
-            createdBy: user?.id,
-            updatedBy: user?.id,
-            isActive: true,
-          });
+          if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
+            throw new ApiError(
+              httpStatus.INTERNAL_SERVER_ERROR,
+              APICodes.FILE_UPLOAD_ERROR.message,
+              APICodes.FILE_UPLOAD_ERROR.code
+            );
+          }
           
-          const savedDoc = await qr.manager.save(MoveInRequestDocuments, document);
+          const document = new MoveInRequestDocuments();
+          document.documentType = TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK;
+          document.user = { id: user?.id } as any;
+          document.moveInRequest = { id: requestId } as any;
+          document.file = { id: (uploadedFile as any).id } as any;
+          document.createdBy = user?.id;
+          document.updatedBy = user?.id;
+          document.isActive = true;
+          
+          const savedDoc = await document.save();
           uploadedDocuments.push({ type: 'emiratesIdBack', document: savedDoc });
         }
 
@@ -131,17 +162,24 @@ export class MoveInService {
           const file = files.companyTradeLicense[0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/company-trade-license/`, user?.id);
           
-          const document = qr.manager.create(MoveInRequestDocuments, {
-            moveInRequest: { id: requestId } as any,
-            user: { id: user?.id } as any,
-            file: uploadedFile,
-            documentType: TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE,
-            createdBy: user?.id,
-            updatedBy: user?.id,
-            isActive: true,
-          });
+          if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
+            throw new ApiError(
+              httpStatus.INTERNAL_SERVER_ERROR,
+              APICodes.FILE_UPLOAD_ERROR.message,
+              APICodes.FILE_UPLOAD_ERROR.code
+            );
+          }
           
-          const savedDoc = await qr.manager.save(MoveInRequestDocuments, document);
+          const document = new MoveInRequestDocuments();
+          document.documentType = TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE;
+          document.user = { id: user?.id } as any;
+          document.moveInRequest = { id: requestId } as any;
+          document.file = { id: (uploadedFile as any).id } as any;
+          document.createdBy = user?.id;
+          document.updatedBy = user?.id;
+          document.isActive = true;
+          
+          const savedDoc = await document.save();
           uploadedDocuments.push({ type: 'companyTradeLicense', document: savedDoc });
         }
 
@@ -150,32 +188,39 @@ export class MoveInService {
           const file = files.unitPermit[0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/unit-permit/`, user?.id);
           
-          const document = qr.manager.create(MoveInRequestDocuments, {
-            moveInRequest: { id: requestId } as any,
-            user: { id: user?.id } as any,
-            file: uploadedFile,
-            documentType: TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT,
-            createdBy: user?.id,
-            updatedBy: user?.id,
-            isActive: true,
-          });
+          if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
+            throw new ApiError(
+              httpStatus.INTERNAL_SERVER_ERROR,
+              APICodes.FILE_UPLOAD_ERROR.message,
+              APICodes.FILE_UPLOAD_ERROR.code
+            );
+          }
           
-          const savedDoc = await qr.manager.save(MoveInRequestDocuments, document);
+          const document = new MoveInRequestDocuments();
+          document.documentType = TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT;
+          document.user = { id: user?.id } as any;
+          document.moveInRequest = { id: requestId } as any;
+          document.file = { id: (uploadedFile as any).id } as any;
+          document.createdBy = user?.id;
+          document.updatedBy = user?.id;
+          document.isActive = true;
+          
+          const savedDoc = await document.save();
           uploadedDocuments.push({ type: 'unitPermit', document: savedDoc });
         }
 
         // Create log entry
-        const log = qr.manager.create(MoveInRequestLogs, {
-          moveInRequest: { id: requestId } as any,
-          requestType: moveInRequest.requestType,
-          status: moveInRequest.status,
-          changes: `Documents uploaded: ${uploadedDocuments.map(d => d.type).join(', ')}`,
-          user: { id: user?.id } as any,
-          actionBy: ActionByTypes.USER,
-          details: JSON.stringify(uploadedDocuments),
-          comments: `Documents uploaded for move-in request ${requestId}`,
-        });
-        await qr.manager.save(MoveInRequestLogs, log);
+        const log = new MoveInRequestLogs();
+        log.moveInRequest = { id: requestId } as any;
+        log.requestType = moveInRequest.requestType;
+        log.status = moveInRequest.status;
+        log.changes = `Documents uploaded: ${uploadedDocuments.map(d => d.type).join(', ')}`;
+        log.user = { id: user?.id } as any;
+        log.actionBy = ActionByTypes.USER;
+        log.details = JSON.stringify(uploadedDocuments);
+        log.comments = `Documents uploaded for move-in request ${requestId}`;
+        
+        await log.save();
       });
 
       logger.info(`DOCUMENTS UPLOADED: ${uploadedDocuments.length} documents for move-in request ${requestId} by user ${user?.id}`);
@@ -226,8 +271,8 @@ export class MoveInService {
       if (moveInRequest.user?.id !== user?.id) {
         throw new ApiError(
           httpStatus.FORBIDDEN,
-          APICodes.REQUEST_NOT_BELONG_TO_USER.message,
-          APICodes.REQUEST_NOT_BELONG_TO_USER.code
+          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message,
+          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code
         );
       }
 
@@ -255,8 +300,8 @@ export class MoveInService {
         if (invalidDocumentTypes.length > 0) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
-            `For Tenant Move-In, only Emirates ID Front, Emirates ID Back, and Ejari documents are allowed. Invalid document types: ${invalidDocumentTypes.join(', ')}`,
-            'INVALID_DOCUMENT_TYPES_FOR_TENANT'
+            APICodes.INVALID_DOCUMENT_TYPES_FOR_TENANT.message,
+            APICodes.INVALID_DOCUMENT_TYPES_FOR_TENANT.code
           );
         }
         
@@ -272,8 +317,8 @@ export class MoveInService {
         if (invalidLinkedTypes.length > 0) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
-            `For Tenant Move-In, only Emirates ID Front, Emirates ID Back, and Ejari documents are allowed. Invalid linked document types: ${invalidLinkedTypes.join(', ')}`,
-            'INVALID_LINKED_DOCUMENT_TYPES_FOR_TENANT'
+            APICodes.INVALID_LINKED_DOCUMENT_TYPES_FOR_TENANT.message,
+            APICodes.INVALID_LINKED_DOCUMENT_TYPES_FOR_TENANT.code
           );
         }
       }
@@ -299,8 +344,8 @@ export class MoveInService {
         if (invalidDocumentTypes.length > 0) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
-            `For HHC Company Move-In, only Emirates ID Front, Emirates ID Back, Company Trade License, and Unit Permit documents are allowed. Invalid document types: ${invalidDocumentTypes.join(', ')}`,
-            'INVALID_DOCUMENT_TYPES_FOR_HHC_COMPANY'
+            APICodes.INVALID_DOCUMENT_TYPES_FOR_HHC_COMPANY.message,
+            APICodes.INVALID_DOCUMENT_TYPES_FOR_HHC_COMPANY.code
           );
         }
         
@@ -316,8 +361,8 @@ export class MoveInService {
         if (invalidLinkedTypes.length > 0) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
-            `For HHC Company Move-In, only Emirates ID Front, Emirates ID Back, Company Trade License, and Unit Permit documents are allowed. Invalid linked document types: ${invalidLinkedTypes.join(', ')}`,
-            'INVALID_LINKED_DOCUMENT_TYPES_FOR_HHC_COMPANY'
+            APICodes.INVALID_LINKED_DOCUMENT_TYPES_FOR_HHC_COMPANY.message,
+            APICodes.INVALID_LINKED_DOCUMENT_TYPES_FOR_HHC_COMPANY.code
           );
         }
       }
@@ -493,8 +538,8 @@ export class MoveInService {
       if (moveInRequest.user?.id !== user?.id) {
         throw new ApiError(
           httpStatus.FORBIDDEN,
-          APICodes.REQUEST_NOT_BELONG_TO_USER.message,
-          APICodes.REQUEST_NOT_BELONG_TO_USER.code
+          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message,
+          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code
         );
       }
 
@@ -507,33 +552,40 @@ export class MoveInService {
             const file = files.otherDocuments[i];
             const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/other-documents/`, user?.id);
             
-            const document = qr.manager.create(MoveInRequestDocuments, {
-              moveInRequest: { id: requestId } as any,
-              user: { id: user?.id } as any,
-              file: uploadedFile,
-              documentType: TRANSITION_DOCUMENT_TYPES.OTHER,
-              createdBy: user?.id,
-              updatedBy: user?.id,
-              isActive: true,
-            });
+            if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
+              throw new ApiError(
+                httpStatus.INTERNAL_SERVER_ERROR,
+                APICodes.FILE_UPLOAD_ERROR.message,
+                APICodes.FILE_UPLOAD_ERROR.code
+              );
+            }
             
-            const savedDoc = await qr.manager.save(MoveInRequestDocuments, document);
+            const document = new MoveInRequestDocuments();
+            document.documentType = TRANSITION_DOCUMENT_TYPES.OTHER;
+            document.user = { id: user?.id } as any;
+            document.moveInRequest = { id: requestId } as any;
+            document.file = { id: (uploadedFile as any).id } as any;
+            document.createdBy = user?.id;
+            document.updatedBy = user?.id;
+            document.isActive = true;
+            
+            const savedDoc = await document.save();
             uploadedDocuments.push({ type: `otherDocument${i + 1}`, document: savedDoc });
           }
         }
 
         // Create log entry
-        const log = qr.manager.create(MoveInRequestLogs, {
-          moveInRequest: { id: requestId } as any,
-          requestType: moveInRequest.requestType,
-          status: moveInRequest.status,
-          changes: `Other documents uploaded: ${uploadedDocuments.length} files`,
-          user: { id: user?.id } as any,
-          actionBy: ActionByTypes.USER,
-          details: JSON.stringify(uploadedDocuments),
-          comments: `Other documents uploaded for move-in request ${requestId}`,
-        });
-        await qr.manager.save(MoveInRequestLogs, log);
+        const log = new MoveInRequestLogs();
+        log.moveInRequest = { id: requestId } as any;
+        log.requestType = moveInRequest.requestType;
+        log.status = moveInRequest.status;
+        log.changes = `Other documents uploaded: ${uploadedDocuments.length} files`;
+        log.user = { id: user?.id } as any;
+        log.actionBy = ActionByTypes.USER;
+        log.details = JSON.stringify(uploadedDocuments);
+        log.comments = `Other documents uploaded for move-in request ${requestId}`;
+        
+        await log.save();
       });
 
       logger.info(`OTHER DOCUMENTS UPLOADED: ${uploadedDocuments.length} documents for move-in request ${requestId} by user ${user?.id}`);
@@ -583,8 +635,8 @@ export class MoveInService {
       if (moveInRequest.user?.id !== user?.id) {
         throw new ApiError(
           httpStatus.FORBIDDEN,
-          APICodes.REQUEST_NOT_BELONG_TO_USER.message,
-          APICodes.REQUEST_NOT_BELONG_TO_USER.code
+          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message,
+          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code
         );
       }
 
@@ -596,32 +648,39 @@ export class MoveInService {
           const file = files.titleDeed[0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/title-deed/`, user?.id);
           
-          const document = qr.manager.create(MoveInRequestDocuments, {
-            moveInRequest: { id: requestId } as any,
-            user: { id: user?.id } as any,
-            file: uploadedFile,
-            documentType: TRANSITION_DOCUMENT_TYPES.TITLE_DEED,
-            createdBy: user?.id,
-            updatedBy: user?.id,
-            isActive: true,
-          });
+          if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
+            throw new ApiError(
+              httpStatus.INTERNAL_SERVER_ERROR,
+              APICodes.FILE_UPLOAD_ERROR.message,
+              APICodes.FILE_UPLOAD_ERROR.code
+            );
+          }
           
-          const savedDoc = await qr.manager.save(MoveInRequestDocuments, document);
+          const document = new MoveInRequestDocuments();
+          document.documentType = TRANSITION_DOCUMENT_TYPES.TITLE_DEED;
+          document.user = { id: user?.id } as any;
+          document.moveInRequest = { id: requestId } as any;
+          document.file = { id: (uploadedFile as any).id } as any;
+          document.createdBy = user?.id;
+          document.updatedBy = user?.id;
+          document.isActive = true;
+          
+          const savedDoc = await document.save();
           uploadedDocuments.push({ type: 'titleDeed', document: savedDoc });
         }
 
         // Create log entry
-        const log = qr.manager.create(MoveInRequestLogs, {
-          moveInRequest: { id: requestId } as any,
-          requestType: moveInRequest.requestType,
-          status: moveInRequest.status,
-          changes: `Title deed document uploaded`,
-          user: { id: user?.id } as any,
-          actionBy: ActionByTypes.USER,
-          details: JSON.stringify(uploadedDocuments),
-          comments: `Title deed document uploaded for move-in request ${requestId}`,
-        });
-        await qr.manager.save(MoveInRequestLogs, log);
+        const log = new MoveInRequestLogs();
+        log.moveInRequest = { id: requestId } as any;
+        log.requestType = moveInRequest.requestType;
+        log.status = moveInRequest.status;
+        log.changes = `Title deed document uploaded`;
+        log.user = { id: user?.id } as any;
+        log.actionBy = ActionByTypes.USER;
+        log.details = JSON.stringify(uploadedDocuments);
+        log.comments = `Title deed document uploaded for move-in request ${requestId}`;
+        
+        await log.save();
       });
 
       logger.info(`TITLE DEED DOCUMENT UPLOADED: for move-in request ${requestId} by user ${user?.id}`);
@@ -718,24 +777,24 @@ export class MoveInService {
 
       await executeInTransaction(async (qr: any) => {
         // Create master record
-        const master = qr.manager.create(MoveInRequests, {
-          moveInRequestNo: tempRequestNumber,
-          requestType,
-          user: { id: user?.id } as any,
-          unit: { id: unitId } as any,
-          status: MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN,
-          moveInDate: moveInDate ? new Date(moveInDate) : null,
-          comments: comments || null,
-          additionalInfo: additionalInfo || null,
-          createdBy: user?.id,
-          updatedBy: user?.id,
-          isActive: true,
-        });
-        const savedMaster = await qr.manager.save(MoveInRequests, master);
+        const master = new MoveInRequests();
+        master.moveInRequestNo = tempRequestNumber;
+        master.requestType = requestType;
+        master.user = { id: user?.id } as any;
+        master.unit = { id: unitId } as any;
+        master.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
+        master.moveInDate = moveInDate ? new Date(moveInDate) : null as any;
+        master.comments = comments || null as any;
+        master.additionalInfo = additionalInfo || null as any;
+        master.createdBy = user?.id;
+        master.updatedBy = user?.id;
+        master.isActive = true;
+        
+        const savedMaster = await master.save();
 
         // Update request number to final format MIN-<unitNumber>-<id>
         const finalRequestNumber = `MIN-${unit?.unitNumber}-${savedMaster.id}`;
-        await qr.manager.update(MoveInRequests, { id: savedMaster.id }, { moveInRequestNo: finalRequestNumber });
+        await MoveInRequests.update({ id: savedMaster.id }, { moveInRequestNo: finalRequestNumber });
         savedMaster.moveInRequestNo = finalRequestNumber as any;
         createdMaster = savedMaster;
 
@@ -775,17 +834,17 @@ export class MoveInService {
         createdDetails = await this.createDetailsRecord(qr, requestType, createdMaster as MoveInRequests, detailsData, user?.id);
 
         // Create initial log
-        const log = qr.manager.create(MoveInRequestLogs, {
-          moveInRequest: createdMaster as MoveInRequests,
-          requestType,
-          status: MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN,
-          changes: null,
-          user: { id: user?.id } as any,
-          actionBy: ActionByTypes.USER,
-          details: details ? JSON.stringify(details) : null,
-          comments: comments || null,
-        });
-        await qr.manager.save(MoveInRequestLogs, log);
+        const log = new MoveInRequestLogs();
+        log.moveInRequest = createdMaster as MoveInRequests;
+        log.requestType = requestType;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
+        log.changes = null as any;
+        log.user = { id: user?.id } as any;
+        log.actionBy = ActionByTypes.USER;
+        log.details = details ? JSON.stringify(details) : null as any;
+        log.comments = comments || null as any;
+        
+        await log.save();
       });
 
       logger.info(`MOVE-IN CREATED: ${createdMaster?.moveInRequestNo} for unit ${unitId} by user ${user?.id}`);
@@ -802,6 +861,183 @@ export class MoveInService {
       };
     } catch (error: any) {
       logger.error(`Error in createMoveIn: ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+    }
+  }
+
+  private async ensureEditableByOwner(requestId: number, user: any) {
+    const mir = await MoveInRequests.getRepository()
+      .createQueryBuilder('mir')
+      .leftJoinAndSelect('mir.user', 'user')
+      .where('mir.id = :requestId AND mir.isActive = true', { requestId })
+      .getOne();
+    if (!mir) {
+      throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
+    }
+    if (mir.user?.id !== user?.id) {
+      throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
+    }
+    if (mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN) {
+      throw new ApiError(httpStatus.BAD_REQUEST, APICodes.ONLY_OPEN_REQUEST_EDITABLE.message, APICodes.ONLY_OPEN_REQUEST_EDITABLE.code);
+    }
+    return mir;
+  }
+
+  private async updateMoveIn(requestId: number, data: any, user: any) {
+    try {
+      const existing = await this.ensureEditableByOwner(requestId, user);
+
+      const {
+        unitId,
+        requestType,
+        moveInDate,
+        comments,
+        additionalInfo,
+        details,
+        firstName,
+        lastName,
+        email,
+        dialCode,
+        phoneNumber,
+        emiratesIdNumber,
+        emiratesIdExpiryDate,
+        tenancyContractStartDate,
+        tenancyContractEndDate,
+        name,
+        company,
+        companyEmail,
+        countryCode,
+        operatorOfficeNumber,
+        tradeLicenseNumber,
+        unitPermitStartDate,
+        unitPermitExpiryDate,
+        unitPermitNumber,
+        leaseStartDate,
+        leaseEndDate,
+        nationality,
+      } = data;
+
+      await executeInTransaction(async (qr: any) => {
+        // Update master
+        await MoveInRequests.update({ id: requestId }, {
+          unit: unitId ? ({ id: unitId } as any) : (undefined as any),
+          moveInDate: moveInDate ? new Date(moveInDate) : (undefined as any),
+          comments: comments ?? (undefined as any),
+          additionalInfo: additionalInfo ?? (undefined as any),
+          updatedBy: user?.id,
+        } as any);
+
+        // Update details by type
+        switch (requestType) {
+          case MOVE_IN_USER_TYPES.TENANT: {
+            await MoveInRequestDetailsTenant.getRepository()
+              .createQueryBuilder()
+              .update()
+              .set({
+                firstName,
+                lastName,
+                email,
+                dialCode,
+                phoneNumber,
+                nationality,
+                adults: details?.adults,
+                children: details?.children,
+                householdStaffs: details?.householdStaffs,
+                pets: details?.pets,
+                peopleOfDetermination: details?.peopleOfDetermination,
+                emiratesIdNumber,
+                emiratesIdExpiryDate,
+                tenancyContractStartDate,
+                tenancyContractEndDate,
+                updatedBy: user?.id,
+              })
+              .where('moveInRequestId = :requestId', { requestId })
+              .execute();
+            break;
+          }
+          case MOVE_IN_USER_TYPES.OWNER: {
+            await MoveInRequestDetailsOwner.getRepository()
+              .createQueryBuilder()
+              .update()
+              .set({
+                adults: details?.adults,
+                children: details?.children,
+                householdStaffs: details?.householdStaffs,
+                pets: details?.pets,
+                comments: details?.detailsText ?? comments ?? null,
+                updatedBy: user?.id,
+              })
+              .where('moveInRequestId = :requestId', { requestId })
+              .execute();
+            break;
+          }
+          case MOVE_IN_USER_TYPES.HHO_OWNER: {
+            await MoveInRequestDetailsHhoOwner.getRepository()
+              .createQueryBuilder()
+              .update()
+              .set({
+                unitPermitNumber: details?.unitPermitNumber,
+                unitPermitStartDate: details?.unitPermitStartDate,
+                unitPermitExpiryDate: details?.unitPermitExpiryDate,
+                comments: comments ?? null,
+                updatedBy: user?.id,
+              })
+              .where('moveInRequestId = :requestId', { requestId })
+              .execute();
+            break;
+          }
+          case MOVE_IN_USER_TYPES.HHO_COMPANY: {
+            await MoveInRequestDetailsHhcCompany.getRepository()
+              .createQueryBuilder()
+              .update()
+              .set({
+                name,
+                companyName: company,
+                companyEmail,
+                countryCode,
+                operatorOfficeNumber,
+                tradeLicenseNumber,
+                tenancyContractStartDate,
+                unitPermitStartDate,
+                unitPermitExpiryDate,
+                unitPermitNumber,
+                leaseStartDate,
+                leaseEndDate,
+                nationality,
+                emiratesIdNumber,
+                emiratesIdExpiryDate,
+                updatedBy: user?.id,
+              })
+              .where('moveInRequestId = :requestId', { requestId })
+              .execute();
+            break;
+          }
+        }
+
+        // Log update
+        const log = new MoveInRequestLogs();
+        log.moveInRequest = { id: requestId } as any;
+        log.requestType = existing.requestType;
+        log.status = existing.status;
+        log.changes = 'Request updated';
+        log.user = { id: user?.id } as any;
+        log.actionBy = ActionByTypes.USER;
+        log.details = JSON.stringify({ data });
+        log.comments = comments || null as any;
+        await log.save();
+      });
+
+      const updated = await MoveInRequests.findOne({ where: { id: requestId } });
+      return {
+        id: updated?.id,
+        moveInRequestNo: updated?.moveInRequestNo,
+        status: updated?.status,
+        requestType: updated?.requestType,
+        moveInDate: updated?.moveInDate,
+      };
+    } catch (error: any) {
+      logger.error(`Error in updateMoveIn: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
       throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
     }
@@ -967,73 +1203,73 @@ export class MoveInService {
   private async createDetailsRecord(qr: any, requestType: MOVE_IN_USER_TYPES, master: MoveInRequests, details: any, userId: number) {
     switch (requestType) {
       case MOVE_IN_USER_TYPES.TENANT: {
-        const entity = qr.manager.create(MoveInRequestDetailsTenant, {
-          moveInRequest: master,
-          firstName: details.firstName,
-          lastName: details.lastName,
-          email: details.email,
-          dialCode: details.dialCode,
-          phoneNumber: details.phoneNumber,
-          nationality: details.nationality,
-          adults: details.adults,
-          children: details.children,
-          householdStaffs: details.householdStaffs,
-          pets: details.pets,
-          // peopleOfDetermination is persisted as column exists; termsAccepted not stored in tenant table
-          peopleOfDetermination: details.peopleOfDetermination,
-          emiratesIdNumber: details.emiratesIdNumber,
-          emiratesIdExpiryDate: details.emiratesIdExpiryDate,
-          tenancyContractStartDate: details.tenancyContractStartDate,
-          tenancyContractEndDate: details.tenancyContractEndDate,
-          createdBy: userId,
-          updatedBy: userId,
-          isActive: true,
-        });
-        return await qr.manager.save(MoveInRequestDetailsTenant, entity);
+        const entity = new MoveInRequestDetailsTenant();
+        entity.moveInRequest = master;
+        entity.firstName = details.firstName;
+        entity.lastName = details.lastName;
+        entity.email = details.email;
+        entity.dialCode = details.dialCode;
+        entity.phoneNumber = details.phoneNumber;
+        entity.nationality = details.nationality;
+        entity.adults = details.adults;
+        entity.children = details.children;
+        entity.householdStaffs = details.householdStaffs;
+        entity.pets = details.pets;
+        // peopleOfDetermination is persisted as column exists; termsAccepted not stored in tenant table
+        entity.peopleOfDetermination = details.peopleOfDetermination;
+        entity.emiratesIdNumber = details.emiratesIdNumber;
+        entity.emiratesIdExpiryDate = details.emiratesIdExpiryDate;
+        entity.tenancyContractStartDate = details.tenancyContractStartDate;
+        entity.tenancyContractEndDate = details.tenancyContractEndDate;
+        entity.createdBy = userId;
+        entity.updatedBy = userId;
+        entity.isActive = true;
+        
+        return await entity.save();
       }
       case MOVE_IN_USER_TYPES.OWNER: {
-        const entity = qr.manager.create(MoveInRequestDetailsOwner, {
-          ...details,
-          moveInRequest: master,
-          createdBy: userId,
-          updatedBy: userId,
-          isActive: true,
-        });
-        return await qr.manager.save(MoveInRequestDetailsOwner, entity);
+        const entity = new MoveInRequestDetailsOwner();
+        Object.assign(entity, details);
+        entity.moveInRequest = master;
+        entity.createdBy = userId;
+        entity.updatedBy = userId;
+        entity.isActive = true;
+        
+        return await entity.save();
       }
       case MOVE_IN_USER_TYPES.HHO_OWNER: {
-        const entity = qr.manager.create(MoveInRequestDetailsHhoOwner, {
-          ...details,
-          moveInRequest: master,
-          createdBy: userId,
-          updatedBy: userId,
-          isActive: true,
-        });
-        return await qr.manager.save(MoveInRequestDetailsHhoOwner, entity);
+        const entity = new MoveInRequestDetailsHhoOwner();
+        Object.assign(entity, details);
+        entity.moveInRequest = master;
+        entity.createdBy = userId;
+        entity.updatedBy = userId;
+        entity.isActive = true;
+        
+        return await entity.save();
       }
       case MOVE_IN_USER_TYPES.HHO_COMPANY: {
-        const entity = qr.manager.create(MoveInRequestDetailsHhcCompany, {
-          moveInRequest: master,
-          name: details.name, // Now map directly to the name field
-          companyName: details.company,
-          companyEmail: details.companyEmail,
-          countryCode: details.countryCode,
-          operatorOfficeNumber: details.operatorOfficeNumber,
-          tradeLicenseNumber: details.tradeLicenseNumber,
-          tenancyContractStartDate: details.tenancyContractStartDate,
-          unitPermitStartDate: details.unitPermitStartDate,
-          unitPermitExpiryDate: details.unitPermitExpiryDate,
-          unitPermitNumber: details.unitPermitNumber,
-          leaseStartDate: details.leaseStartDate,
-          leaseEndDate: details.leaseEndDate,
-          nationality: details.nationality,
-          emiratesIdNumber: details.emiratesIdNumber,
-          emiratesIdExpiryDate: details.emiratesIdExpiryDate,
-          createdBy: userId,
-          updatedBy: userId,
-          isActive: true,
-        });
-        return await qr.manager.save(MoveInRequestDetailsHhcCompany, entity);
+        const entity = new MoveInRequestDetailsHhcCompany();
+        entity.moveInRequest = master;
+        entity.name = details.name; // Now map directly to the name field
+        entity.companyName = details.company;
+        entity.companyEmail = details.companyEmail;
+        entity.countryCode = details.countryCode;
+        entity.operatorOfficeNumber = details.operatorOfficeNumber;
+        entity.tradeLicenseNumber = details.tradeLicenseNumber;
+        entity.tenancyContractStartDate = details.tenancyContractStartDate;
+        entity.unitPermitStartDate = details.unitPermitStartDate;
+        entity.unitPermitExpiryDate = details.unitPermitExpiryDate;
+        entity.unitPermitNumber = details.unitPermitNumber;
+        entity.leaseStartDate = details.leaseStartDate;
+        entity.leaseEndDate = details.leaseEndDate;
+        entity.nationality = details.nationality;
+        entity.emiratesIdNumber = details.emiratesIdNumber;
+        entity.emiratesIdExpiryDate = details.emiratesIdExpiryDate;
+        entity.createdBy = userId;
+        entity.updatedBy = userId;
+        entity.isActive = true;
+        
+        return await entity.save();
       }
       default:
         throw new ApiError(

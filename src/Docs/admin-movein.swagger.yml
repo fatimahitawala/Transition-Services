@@ -1,0 +1,1232 @@
+paths:
+  /admin/move-in/request:
+    get:
+      summary: Get all move-in requests (Admin)
+      description: Retrieves a paginated list of all move-in requests for admin management
+      tags: [Admin MoveIn Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          required: false
+          description: Page number for pagination (optional)
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          required: false
+          description: Number of items per page (optional)
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [submitted, rfi-pending, rfi-submitted, approved, closed, cancelled]
+          required: false
+          description: Filter by request status (optional)
+        - in: query
+          name: userType
+          schema:
+            type: string
+            enum: [owner, tenant, hho-unit, hhc-company]
+          required: false
+          description: Filter by user type (optional)
+        - in: query
+          name: search
+          schema:
+            type: string
+          required: false
+          description: Search term for filtering (optional)
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [id, createdAt, updatedAt, moveInDate, status, masterCommunityId, communityId, towerId, unitNumber, ownerName, tenantName, createdBy, updatedBy]
+            default: createdAt
+          required: false
+          description: Field to sort by (optional) - id, createdAt, updatedAt, moveInDate, status, masterCommunityId, communityId, towerId, unitNumber, ownerName, tenantName, createdBy, updatedBy
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+          required: false
+          description: Sort order (optional)
+      responses:
+        '200':
+          description: Move-in requests retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Operation completed successfully"
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MoveInRequest'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /admin/move-in/moveInDetails/{requestId}:
+    get:
+      summary: Get move-in request details by ID
+      description: Retrieves detailed information about a specific move-in request
+      tags: [Admin MoveIn Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: requestId
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Move-in request ID
+      responses:
+        '200':
+          description: Move-in request details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Operation completed successfully"
+                  data:
+                    $ref: '#/components/schemas/MoveInRequestDetails'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Request not found
+        '500':
+          description: Internal server error
+
+  /admin/move-in/owner:
+    post:
+      summary: Create owner move-in request (Admin)
+      description: Create a move-in request on behalf of an owner
+      tags: [Admin MoveIn Management]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [unitId, moveInDate, details]
+              properties:
+                unitId:
+                  type: integer
+                  description: ID of the unit for move-in
+                  example: 123
+                moveInDate:
+                  type: string
+                  format: date
+                  description: Move-in date (at least 30 days in the future)
+                  example: "2025-08-28"
+                comments:
+                  type: string
+                  nullable: true
+                  description: Additional comments
+                  example: "Owner moving in after renovation"
+                additionalInfo:
+                  type: string
+                  nullable: true
+                  description: Additional information
+                  example: "Renovation completed"
+                details:
+                  type: object
+                  required: [titleDeedNumber, titleDeedDate, termsAccepted]
+                  properties:
+                    titleDeedNumber:
+                      type: string
+                      description: Title deed number
+                      example: "TD123456"
+                    titleDeedDate:
+                      type: string
+                      format: date
+                      description: Title deed date
+                      example: "2020-01-15"
+                    termsAccepted:
+                      type: boolean
+                      enum: [true]
+                      description: Terms and conditions acceptance
+                      example: true
+      responses:
+        '201':
+          description: Owner move-in request created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Owner move-in request created successfully"
+                  data:
+                    $ref: '#/components/schemas/MoveInRequest'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - admin access required
+        '500':
+          description: Internal server error
+
+  /admin/move-in/tenant:
+    post:
+      summary: Create tenant move-in request (Admin)
+      description: Create a move-in request on behalf of a tenant
+      tags: [Admin MoveIn Management]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [unitId, moveInDate, details]
+              properties:
+                unitId:
+                  type: integer
+                  description: ID of the unit for move-in
+                  example: 123
+                moveInDate:
+                  type: string
+                  format: date
+                  description: Move-in date (at least 30 days in the future)
+                  example: "2025-08-28"
+                comments:
+                  type: string
+                  nullable: true
+                  description: Additional comments
+                  example: "Tenant moving in after lease agreement"
+                additionalInfo:
+                  type: string
+                  nullable: true
+                  description: Additional information
+                  example: "Lease agreement signed"
+                details:
+                  type: object
+                  required: [ejariNumber, ejariDate, leaseStartDate, leaseEndDate, termsAccepted]
+                  properties:
+                    ejariNumber:
+                      type: string
+                      description: Ejari contract number
+                      example: "EJ123456"
+                    ejariDate:
+                      type: string
+                      format: date
+                      description: Ejari contract date
+                      example: "2025-01-15"
+                    leaseStartDate:
+                      type: string
+                      format: date
+                      description: Lease start date
+                      example: "2025-02-01"
+                    leaseEndDate:
+                      type: string
+                      format: date
+                      description: Lease end date
+                      example: "2027-01-31"
+                    termsAccepted:
+                      type: boolean
+                      enum: [true]
+                      description: Terms and conditions acceptance
+                      example: true
+      responses:
+        '201':
+          description: Tenant move-in request created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Tenant move-in request created successfully"
+                  data:
+                    $ref: '#/components/schemas/MoveInRequest'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - admin access required
+        '500':
+          description: Internal server error
+
+  /admin/move-in/hho-unit:
+    post:
+      summary: Create HHO Unit move-in request (Admin)
+      description: Create a move-in request on behalf of a Holiday Home Unit Owner
+      tags: [Admin MoveIn Management]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [unitId, moveInDate, ownerFirstName, ownerLastName, email, dialCode, phoneNumber, nationality, details]
+              properties:
+                unitId:
+                  type: integer
+                  description: ID of the unit for move-in
+                  example: 123
+                moveInDate:
+                  type: string
+                  format: date
+                  description: Move-in date (at least 30 days in the future)
+                  example: "2025-08-28"
+                ownerFirstName:
+                  type: string
+                  maxLength: 100
+                  description: Owner first name
+                  example: "John"
+                ownerLastName:
+                  type: string
+                  maxLength: 100
+                  description: Owner last name
+                  example: "Doe"
+                email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  description: Owner email address
+                  example: "john.doe@example.com"
+                dialCode:
+                  type: string
+                  maxLength: 10
+                  description: Phone country dial code (e.g., +971)
+                  example: "+971"
+                phoneNumber:
+                  type: string
+                  maxLength: 20
+                  description: Owner phone number
+                  example: "501234567"
+                nationality:
+                  type: string
+                  maxLength: 100
+                  description: Owner nationality
+                  example: "UAE"
+                comments:
+                  type: string
+                  nullable: true
+                  description: Additional comments
+                  example: "HHO unit owner moving in"
+                additionalInfo:
+                  type: string
+                  nullable: true
+                  description: Additional information
+                  example: "Unit permit verified"
+                details:
+                  type: object
+                  required: [unitPermitNumber, unitPermitStartDate, unitPermitExpiryDate, termsAccepted]
+                  properties:
+                    unitPermitNumber:
+                      type: string
+                      description: Unit permit number
+                      example: "42388"
+                    unitPermitStartDate:
+                      type: string
+                      format: date
+                      description: Unit permit start date
+                      example: "2027-08-27"
+                    unitPermitExpiryDate:
+                      type: string
+                      format: date
+                      description: Unit permit expiry date
+                      example: "2028-08-27"
+                    termsAccepted:
+                      type: boolean
+                      enum: [true]
+                      description: Terms and conditions acceptance
+                      example: true
+      responses:
+        '201':
+          description: HHO Unit move-in request created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "HHO Unit move-in request created successfully"
+                  data:
+                    $ref: '#/components/schemas/MoveInRequest'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - admin access required
+        '500':
+          description: Internal server error
+
+  /admin/move-in/hhc-company:
+    post:
+      summary: Create HHO Company move-in request (Admin)
+      description: Create a move-in request on behalf of an HHO Company
+      tags: [Admin MoveIn Management]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [unitId, userEmail, moveInDate, representativeName, companyName, companyEmail, officeContactNumber, tradeLicenseNumber, tradeLicenseExpiryDate, leaseStartDate, leaseEndDate, nationality, emiratesIdNumber, emiratesIdExpiryDate, dtcmStartDate, dtcmEndDate]
+              properties:
+                unitId:
+                  type: integer
+                  description: ID of the unit for move-in
+                  example: 123
+                userEmail:
+                  type: string
+                  format: email
+                  description: Email of the HHO Company user
+                  example: "company@example.com"
+                moveInDate:
+                  type: string
+                  format: date
+                  description: Requested move-in date
+                  example: "2025-02-15"
+                representativeName:
+                  type: string
+                  maxLength: 100
+                  description: Name of the company representative
+                  example: "John Smith"
+                companyName:
+                  type: string
+                  maxLength: 200
+                  description: Name of the company
+                  example: "ABC Trading Company LLC"
+                companyEmail:
+                  type: string
+                  format: email
+                  description: Company email address
+                  example: "info@abctrading.com"
+                officeContactNumber:
+                  type: string
+                  maxLength: 20
+                  description: Office contact number with country code
+                  example: "+971501234567"
+                tradeLicenseNumber:
+                  type: string
+                  maxLength: 50
+                  description: Company trade license number
+                  example: "TL123456"
+                tradeLicenseExpiryDate:
+                  type: string
+                  format: date
+                  description: Trade license expiry date
+                  example: "2026-12-31"
+                leaseStartDate:
+                  type: string
+                  format: date
+                  description: Lease start date
+                  example: "2025-01-01"
+                leaseEndDate:
+                  type: string
+                  format: date
+                  description: Lease end date
+                  example: "2027-12-31"
+                nationality:
+                  type: string
+                  maxLength: 50
+                  description: Nationality of the representative
+                  example: "UAE"
+                emiratesIdNumber:
+                  type: string
+                  maxLength: 20
+                  description: Emirates ID number
+                  example: "784-1985-1234567-8"
+                emiratesIdExpiryDate:
+                  type: string
+                  format: date
+                  description: Emirates ID expiry date
+                  example: "2030-05-15"
+                dtcmStartDate:
+                  type: string
+                  format: date
+                  description: DTCM start date
+                  example: "2025-01-01"
+                dtcmEndDate:
+                  type: string
+                  format: date
+                  description: DTCM end date
+                  example: "2027-12-31"
+      responses:
+        '201':
+          description: HHO Company move-in request created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "HHO Company move-in request created successfully"
+                  data:
+                    $ref: '#/components/schemas/MoveInRequest'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - admin access required
+        '500':
+          description: Internal server error
+
+  /admin/move-in/request/{requestId}/documents:
+    post:
+      summary: Upload documents for move-in request
+      description: Upload required documents for a move-in request
+      tags: [Admin MoveIn Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: requestId
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Move-in request ID
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                emiratesIdFront:
+                  type: string
+                  format: binary
+                  description: Emirates ID front side
+                emiratesIdBack:
+                  type: string
+                  format: binary
+                  description: Emirates ID back side
+                ejari:
+                  type: string
+                  format: binary
+                  description: Ejari contract document
+                unitPermit:
+                  type: string
+                  format: binary
+                  description: Unit permit document
+                companyTradeLicense:
+                  type: string
+                  format: binary
+                  description: Company trade license
+                titleDeed:
+                  type: string
+                  format: binary
+                  description: Title deed document
+                other:
+                  type: string
+                  format: binary
+                  description: Other supporting documents (max 4)
+      responses:
+        '200':
+          description: Documents uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Documents uploaded successfully"
+                  data:
+                    type: object
+                    properties:
+                      requestId:
+                        type: integer
+                        example: 123
+                      uploadedDocuments:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            documentType:
+                              type: string
+                              example: "emiratesIdFront"
+                            fileName:
+                              type: string
+                              example: "emirates_id_front.pdf"
+                            fileUrl:
+                              type: string
+                              example: "https://storage.blob.core.windows.net/documents/emirates_id_front.pdf"
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Request not found
+        '500':
+          description: Internal server error
+
+  /admin/move-in/request/{requestId}/approve:
+    put:
+      summary: Approve move-in request
+      description: Approve a move-in request that has been submitted or resubmitted after RFI
+      tags: [Admin MoveIn Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: requestId
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: The ID of the move-in request to approve
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comments]
+              properties:
+                comments:
+                  type: string
+                  maxLength: 35
+                  description: Approval comments/remarks
+                  example: "All documents verified and requirements met. Approved for move-in."
+      responses:
+        '200':
+          description: Move-in request approved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Move-in request approved successfully"
+                  data:
+                    type: object
+                    properties:
+                      requestId:
+                        type: integer
+                        example: 123
+                      status:
+                        type: string
+                        example: "approved"
+                      moveInPermitUrl:
+                        type: string
+                        example: "move-in-permit-123.pdf"
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Request not found
+        '500':
+          description: Internal server error
+
+  /admin/move-in/request/{requestId}/rfi:
+    put:
+      summary: Mark move-in request as RFI
+      description: Mark a move-in request as Request for Information when additional details are needed
+      tags: [Admin MoveIn Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: requestId
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: The ID of the move-in request to mark as RFI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comments]
+              properties:
+                comments:
+                  type: string
+                  maxLength: 35
+                  description: RFI comments/remarks explaining what additional information is needed
+                  example: "Please provide updated Emirates ID with extended validity period."
+      responses:
+        '200':
+          description: Request marked as RFI successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Request marked as RFI successfully"
+                  data:
+                    type: object
+                    properties:
+                      requestId:
+                        type: integer
+                        example: 123
+                      status:
+                        type: string
+                        example: "rfi-pending"
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Request not found
+        '500':
+          description: Internal server error
+
+  /admin/move-in/request/{requestId}/cancel:
+    put:
+      summary: Cancel/Reject move-in request
+      description: Cancel or reject a move-in request that is invalid, duplicated, or unqualified
+      tags: [Admin MoveIn Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: requestId
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: The ID of the move-in request to cancel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cancellationRemarks]
+              properties:
+                cancellationRemarks:
+                  type: string
+                  maxLength: 100
+                  description: Detailed explanation for cancellation/rejection
+                  example: "Request cancelled due to duplicate submission for the same unit and date range."
+      responses:
+        '200':
+          description: Request cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Request cancelled successfully"
+                  data:
+                    type: object
+                    properties:
+                      requestId:
+                        type: integer
+                        example: 123
+                      status:
+                        type: string
+                        example: "cancelled"
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Request not found
+        '500':
+          description: Internal server error
+
+  /admin/move-in/request/{requestId}/close:
+    put:
+      summary: Close move-in request by security
+      description: Close an approved move-in request when the customer arrives at the site
+      tags: [Admin MoveIn Management]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: requestId
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: The ID of the approved move-in request to close
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [closureRemarks, actualMoveInDate]
+              properties:
+                closureRemarks:
+                  type: string
+                  maxLength: 100
+                  description: Security remarks about the closure
+                  example: "Customer arrived with valid MIP. Unit access granted and keys handed over."
+                actualMoveInDate:
+                  type: string
+                  format: date
+                  description: Actual date when the customer moved in
+                  example: "2025-01-15"
+      responses:
+        '200':
+          description: Request closed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Request closed successfully"
+                  data:
+                    type: object
+                    properties:
+                      requestId:
+                        type: integer
+                        example: 123
+                      status:
+                        type: string
+                        example: "closed"
+                      actualMoveInDate:
+                        type: string
+                        format: date
+                        example: "2025-01-15"
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Request not found
+        '500':
+          description: Internal server error
+
+  /admin/move-in/status-flow:
+    get:
+      summary: Get status transition flow
+      description: Retrieve the status transition flow and business rules for move-in request management
+      tags: [Admin MoveIn Management]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Status transition flow retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusFlow:
+                    $ref: '#/components/schemas/StatusTransitionFlow'
+                  businessRules:
+                    $ref: '#/components/schemas/BusinessRules'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+components:
+  schemas:
+    MoveInRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the move-in request
+          example: 123
+        requestNumber:
+          type: string
+          description: Auto-generated request number
+          example: "MIN-UNIT123-123"
+        unitId:
+          type: integer
+          description: ID of the unit for move-in
+          example: 123
+        userId:
+          type: integer
+          description: ID of the user making the request
+          example: 456
+        userType:
+          type: string
+          enum: [owner, tenant, hho-unit, hhc-company]
+          description: Type of user making the request
+          example: "owner"
+        moveInDate:
+          type: string
+          format: date
+          description: Requested move-in date
+          example: "2025-08-28"
+        status:
+          type: string
+          enum: [submitted, rfi-pending, rfi-submitted, approved, closed, cancelled]
+          description: Current status of the request
+          example: "submitted"
+        comments:
+          type: string
+          nullable: true
+          description: Additional comments
+          example: "Owner moving in after renovation"
+        additionalInfo:
+          type: string
+          nullable: true
+          description: Additional information
+          example: "Renovation completed"
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2025-01-15T10:30:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2025-01-15T10:30:00.000Z"
+        createdBy:
+          type: integer
+          description: ID of the user who created the request
+          example: 789
+        updatedBy:
+          type: integer
+          description: ID of the user who last updated the request
+          example: 789
+
+    MoveInRequestDetails:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the move-in request
+          example: 123
+        requestNumber:
+          type: string
+          description: Auto-generated request number
+          example: "MIN-UNIT123-123"
+        unitId:
+          type: integer
+          description: ID of the unit for move-in
+          example: 123
+        userId:
+          type: integer
+          description: ID of the user making the request
+          example: 456
+        userType:
+          type: string
+          enum: [owner, tenant, hho-unit, hhc-company]
+          description: Type of user making the request
+          example: "owner"
+        moveInDate:
+          type: string
+          format: date
+          description: Requested move-in date
+          example: "2025-08-28"
+        status:
+          type: string
+          enum: [submitted, rfi-pending, rfi-submitted, approved, closed, cancelled]
+          description: Current status of the request
+          example: "submitted"
+        comments:
+          type: string
+          nullable: true
+          description: Additional comments
+          example: "Owner moving in after renovation"
+        additionalInfo:
+          type: string
+          nullable: true
+          description: Additional information
+          example: "Renovation completed"
+        details:
+          type: object
+          description: Type-specific details based on userType
+          properties:
+            titleDeedNumber:
+              type: string
+              description: Title deed number (for owner)
+              example: "TD123456"
+            titleDeedDate:
+              type: string
+              format: date
+              description: Title deed date (for owner)
+              example: "2020-01-15"
+            ejariNumber:
+              type: string
+              description: Ejari contract number (for tenant)
+              example: "EJ123456"
+            ejariDate:
+              type: string
+              format: date
+              description: Ejari contract date (for tenant)
+              example: "2025-01-15"
+            leaseStartDate:
+              type: string
+              format: date
+              description: Lease start date (for tenant/hhc-company)
+              example: "2025-02-01"
+            leaseEndDate:
+              type: string
+              format: date
+              description: Lease end date (for tenant/hhc-company)
+              example: "2027-01-31"
+            unitPermitNumber:
+              type: string
+              description: Unit permit number (for hho-unit)
+              example: "42388"
+            unitPermitStartDate:
+              type: string
+              format: date
+              description: Unit permit start date (for hho-unit)
+              example: "2027-08-27"
+            unitPermitExpiryDate:
+              type: string
+              format: date
+              description: Unit permit expiry date (for hho-unit)
+              example: "2028-08-27"
+            representativeName:
+              type: string
+              description: Company representative name (for hhc-company)
+              example: "John Smith"
+            companyName:
+              type: string
+              description: Company name (for hhc-company)
+              example: "ABC Trading Company LLC"
+            companyEmail:
+              type: string
+              format: email
+              description: Company email (for hhc-company)
+              example: "info@abctrading.com"
+            officeContactNumber:
+              type: string
+              description: Office contact number (for hhc-company)
+              example: "+971501234567"
+            tradeLicenseNumber:
+              type: string
+              description: Trade license number (for hhc-company)
+              example: "TL123456"
+            tradeLicenseExpiryDate:
+              type: string
+              format: date
+              description: Trade license expiry date (for hhc-company)
+              example: "2026-12-31"
+            nationality:
+              type: string
+              description: Nationality (for hhc-company)
+              example: "UAE"
+            emiratesIdNumber:
+              type: string
+              description: Emirates ID number (for hhc-company)
+              example: "784-1985-1234567-8"
+            emiratesIdExpiryDate:
+              type: string
+              format: date
+              description: Emirates ID expiry date (for hhc-company)
+              example: "2030-05-15"
+            dtcmStartDate:
+              type: string
+              format: date
+              description: DTCM start date (for hhc-company)
+              example: "2025-01-01"
+            dtcmEndDate:
+              type: string
+              format: date
+              description: DTCM end date (for hhc-company)
+              example: "2027-12-31"
+            termsAccepted:
+              type: boolean
+              description: Terms and conditions acceptance
+              example: true
+        documents:
+          type: array
+          description: List of uploaded documents
+          items:
+            type: object
+            properties:
+              documentType:
+                type: string
+                description: Type of document
+                example: "emiratesIdFront"
+              fileName:
+                type: string
+                description: Name of the uploaded file
+                example: "emirates_id_front.pdf"
+              fileUrl:
+                type: string
+                description: URL to access the document
+                example: "https://storage.blob.core.windows.net/documents/emirates_id_front.pdf"
+              uploadedAt:
+                type: string
+                format: date-time
+                description: When the document was uploaded
+                example: "2025-01-15T10:30:00.000Z"
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2025-01-15T10:30:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2025-01-15T10:30:00.000Z"
+        createdBy:
+          type: integer
+          description: ID of the user who created the request
+          example: 789
+        updatedBy:
+          type: integer
+          description: ID of the user who last updated the request
+          example: 789
+
+    StatusTransitionFlow:
+      type: object
+      description: Status transition flow for move-in requests
+      properties:
+        submitted:
+          type: string
+          example: "OPEN (new request submitted)"
+        rfiPending:
+          type: string
+          example: "RFI_PENDING (admin marked as RFI)"
+        rfiSubmitted:
+          type: string
+          example: "RFI_SUBMITTED (customer resubmitted after RFI)"
+        approved:
+          type: string
+          example: "APPROVED (admin approved request)"
+        closed:
+          type: string
+          example: "CLOSED (security closed after physical move-in)"
+        cancelled:
+          type: string
+          example: "CANCELLED (admin cancelled request)"
+      required:
+        - submitted
+        - rfiPending
+        - rfiSubmitted
+        - approved
+        - closed
+        - cancelled
+
+    BusinessRules:
+      type: object
+      description: Business rules for status management
+      properties:
+        approvalRules:
+          type: array
+          items:
+            type: string
+          example: [
+            "Only requests in Submitted or RFI Submitted status can be approved",
+            "No active overlapping move-in request exists for the same unit",
+            "MIP template must be active for the unit",
+            "SLA: Move-in request max 30 days validity"
+          ]
+        rfiRules:
+          type: array
+          items:
+            type: string
+          example: [
+            "Only requests in Submitted status can be marked as RFI",
+            "Admin must provide remarks",
+            "Status transition: Submitted → RFI Pending"
+          ]
+        cancellationRules:
+          type: array
+          items:
+            type: string
+          example: [
+            "Only requests in Submitted, RFI Submitted, or Approved status can be cancelled",
+            "Cancellation remarks are mandatory",
+            "Status changes to Cancelled"
+          ]
+        closureRules:
+          type: array
+          items:
+            type: string
+          example: [
+            "Only requests in Approved status can be closed",
+            "Security team can close requests",
+            "Unit is linked to user and marked as occupied",
+            "Previous user access is invalidated"
+          ]
+
+    Pagination:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+          example: 1
+        totalPages:
+          type: integer
+          example: 5
+        totalItems:
+          type: integer
+          example: 100
+        itemsPerPage:
+          type: integer
+          example: 20
