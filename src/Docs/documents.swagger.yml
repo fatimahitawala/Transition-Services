@@ -1,0 +1,1195 @@
+paths:
+  /documents/welcome-pack:
+    get:
+      summary: Get list of welcome packs
+      description: Retrieves a paginated list of welcome packs. All query parameters are optional.
+      tags: [Documents - Welcome Pack]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          required: false
+          description: Page number for pagination (optional)
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          required: false
+          description: Number of items per page (optional)
+        - in: query
+          name: search
+          schema:
+            type: string
+          required: false
+          description: Search term for filtering (optional)
+        - in: query
+          name: isActive
+          schema:
+            oneOf:
+              - type: boolean
+              - type: string
+                enum: ["true", "false"]
+          required: false
+          description: Filter by active status (optional)
+        - in: query
+          name: includeFile
+          schema:
+            oneOf:
+              - type: boolean
+              - type: string
+                enum: ["true", "false"]
+          required: false
+          description: Whether to include template file content (optional)
+        - in: query
+          name: masterCommunityIds
+          schema:
+            type: string
+          required: false
+          description: Filter by master community IDs - comma-separated list (e.g., "1,2,3") (optional)
+        - in: query
+          name: communityIds
+          schema:
+            type: string
+          required: false
+          description: Filter by community IDs - comma-separated list (e.g., "1,2,3") (optional)
+        - in: query
+          name: towerIds
+          schema:
+            type: string
+          required: false
+          description: Filter by tower IDs - comma-separated list (e.g., "1,2,3") (optional)
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [id, createdAt, updatedAt, isActive, createdBy, updatedBy]
+            default: createdAt
+          required: false
+          description: Field to sort by (optional) - id, createdAt, updatedAt, isActive, createdBy, updatedBy
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+          required: false
+          description: Sort order (optional)
+      responses:
+        '200':
+          description: List of welcome packs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Operation completed successfully"
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WelcomePack'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+    post:
+      summary: Create new welcome pack
+      description: Creates a new welcome pack with file upload
+      tags: [Documents - Welcome Pack]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - masterCommunityId
+                - communityId
+                - welcomePackFile
+              properties:
+                masterCommunityId:
+                  type: string
+                  description: Master community ID
+                communityId:
+                  type: string
+                  description: Community ID
+                towerId:
+                  type: string
+                  description: Tower ID (optional)
+                welcomePackFile:
+                  type: string
+                  format: binary
+                  description: Welcome pack file (PDF or HTML)
+                isActive:
+                  type: string
+                  enum: ['true', 'false']
+                  default: 'true'
+                  description: Active status of the welcome pack
+      responses:
+        '201':
+          description: Welcome pack created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Welcome pack created successfully"
+                  data:
+                    $ref: '#/components/schemas/WelcomePack'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /documents/welcome-pack/{id}:
+    get:
+      summary: Get welcome pack by ID
+      description: Retrieves a specific welcome pack by ID with optional file content
+      tags: [Documents - Welcome Pack]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Welcome pack ID
+        - in: query
+          name: includeFile
+          schema:
+            oneOf:
+              - type: boolean
+              - type: string
+                enum: ["true", "false"]
+          required: false
+          default: false
+          description: Whether to include template file content
+      responses:
+        '200':
+          description: Welcome pack retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Operation completed successfully"
+                  data:
+                    $ref: '#/components/schemas/WelcomePack'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Welcome pack not found
+        '500':
+          description: Internal server error
+    put:
+      summary: Update welcome pack
+      description: Updates an existing welcome pack. File upload is optional for updates.
+      tags: [Documents - Welcome Pack]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Welcome pack ID to update
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                masterCommunityId:
+                  type: string
+                  description: Master community ID (optional)
+                communityId:
+                  type: string
+                  description: Community ID (optional)
+                towerId:
+                  type: string
+                  description: Tower ID (optional, can be null)
+                isActive:
+                  type: string
+                  enum: ['true', 'false']
+                  description: Active status of the welcome pack (optional)
+                welcomePackFile:
+                  type: string
+                  format: binary
+                  description: Welcome pack file (PDF or HTML) - optional for updates
+      responses:
+        '200':
+          description: Welcome pack updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Welcome pack updated successfully"
+                  data:
+                    $ref: '#/components/schemas/WelcomePack'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Welcome pack not found
+        '500':
+          description: Internal server error
+
+  /documents/welcome-pack/{id}/download:
+    get:
+      summary: Download welcome pack file
+      description: Downloads the file content of a specific welcome pack
+      tags: [Documents - Welcome Pack]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Welcome pack ID
+      responses:
+        '200':
+          description: Welcome pack file downloaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "File downloaded successfully"
+                  data:
+                    type: object
+                    properties:
+                      fileName:
+                        type: string
+                        example: "welcome-pack.html"
+                      fileContent:
+                        type: string
+                        description: Base64 encoded file content
+                      fileType:
+                        type: string
+                        example: "text/html"
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Welcome pack not found
+        '500':
+          description: Internal server error
+
+  /documents/occupancytemplate/{templateType}:
+    get:
+      summary: Get list of occupancy templates
+      description: Retrieves a paginated list of occupancy templates (move-in or move-out)
+      tags: [Documents - Occupancy Templates]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: templateType
+          required: true
+          schema:
+            type: string
+            enum: [move-in, move-out]
+          description: Type of occupancy template (move-in or move-out)
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          required: false
+          description: Page number for pagination (optional)
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          required: false
+          description: Number of items per page (optional)
+        - in: query
+          name: isActive
+          schema:
+            oneOf:
+              - type: boolean
+              - type: string
+                enum: ["true", "false"]
+          required: false
+          description: Filter by active status (optional)
+        - in: query
+          name: includeFile
+          schema:
+            oneOf:
+              - type: boolean
+              - type: string
+                enum: ["true", "false"]
+          required: false
+          description: Whether to include template file content (optional)
+        - in: query
+          name: masterCommunityIds
+          schema:
+            type: string
+          required: false
+          description: Filter by master community IDs - comma-separated list (e.g., "1,2,3") (optional)
+        - in: query
+          name: communityIds
+          schema:
+            type: string
+          required: false
+          description: Filter by community IDs - comma-separated list (e.g., "1,2,3") (optional)
+        - in: query
+          name: towerIds
+          schema:
+            type: string
+          required: false
+          description: Filter by tower IDs - comma-separated list (e.g., "1,2,3") (optional)
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [id, createdAt, updatedAt, isActive, templateType, createdBy, updatedBy]
+            default: createdAt
+          required: false
+          description: Field to sort by (optional) - id, createdAt, updatedAt, isActive, templateType, createdBy, updatedBy
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+          required: false
+          description: Sort order (optional)
+      responses:
+        '200':
+          description: List of occupancy templates retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Operation completed successfully"
+                  data:
+                    type: object
+                    properties:
+                      templates:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Template'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+    post:
+      summary: Create new occupancy template
+      description: Creates a new occupancy template (move-in or move-out) with file upload
+      tags: [Documents - Occupancy Templates]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: templateType
+          required: true
+          schema:
+            type: string
+            enum: [move-in, move-out]
+          description: Type of occupancy template (move-in or move-out)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - masterCommunityId
+                - communityId
+                - templateFile
+              properties:
+                masterCommunityId:
+                  type: string
+                  description: Master community ID
+                communityId:
+                  type: string
+                  description: Community ID
+                towerId:
+                  type: string
+                  description: Tower ID (optional)
+                templateFile:
+                  type: string
+                  format: binary
+                  description: Template file (PDF or HTML)
+                isActive:
+                  type: string
+                  enum: ['true', 'false']
+                  default: 'true'
+                  description: Active status of the template
+      responses:
+        '201':
+          description: Occupancy template created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Occupancy template created successfully"
+                  data:
+                    $ref: '#/components/schemas/Template'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /documents/occupancytemplate/{templateType}/{id}:
+    get:
+      summary: Get occupancy template by ID
+      description: Retrieves a specific occupancy template by ID
+      tags: [Documents - Occupancy Templates]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: templateType
+          required: true
+          schema:
+            type: string
+            enum: [move-in, move-out]
+          description: Type of occupancy template (move-in or move-out)
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Template ID
+        - in: query
+          name: includeFile
+          schema:
+            oneOf:
+              - type: boolean
+              - type: string
+                enum: ["true", "false"]
+          required: false
+          default: false
+          description: Whether to include template file content
+      responses:
+        '200':
+          description: Occupancy template retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Operation completed successfully"
+                  data:
+                    $ref: '#/components/schemas/Template'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Template not found
+        '500':
+          description: Internal server error
+    put:
+      summary: Update occupancy template
+      description: Updates an existing occupancy template. File upload is optional for updates.
+      tags: [Documents - Occupancy Templates]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: templateType
+          required: true
+          schema:
+            type: string
+            enum: [move-in, move-out]
+          description: Type of occupancy template (move-in or move-out)
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Template ID to update
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                masterCommunityId:
+                  type: string
+                  description: Master community ID (optional)
+                communityId:
+                  type: string
+                  description: Community ID (optional)
+                towerId:
+                  type: string
+                  description: Tower ID (optional, can be null)
+                isActive:
+                  type: string
+                  enum: ['true', 'false']
+                  description: Active status of the template (optional)
+                templateFile:
+                  type: string
+                  format: binary
+                  description: Template file (PDF or HTML) - optional for updates
+      responses:
+        '200':
+          description: Occupancy template updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Occupancy template updated successfully"
+                  data:
+                    $ref: '#/components/schemas/Template'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Template not found
+        '500':
+          description: Internal server error
+
+  /documents/occupancytemplate/{templateType}/{id}/download:
+    get:
+      summary: Download occupancy template file
+      description: Downloads the file content of a specific occupancy template
+      tags: [Documents - Occupancy Templates]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: templateType
+          required: true
+          schema:
+            type: string
+            enum: [move-in, move-out]
+          description: Type of occupancy template (move-in or move-out)
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Template ID
+      responses:
+        '200':
+          description: Template file downloaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "File downloaded successfully"
+                  data:
+                    type: object
+                    properties:
+                      fileName:
+                        type: string
+                        example: "template.html"
+                      fileContent:
+                        type: string
+                        description: Base64 encoded file content
+                      fileType:
+                        type: string
+                        example: "text/html"
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Template not found
+        '500':
+          description: Internal server error
+
+  /documents/email-recipients:
+    get:
+      summary: Get list of email recipients
+      description: Retrieves a paginated list of email recipients. All query parameters are optional.
+      tags: [Documents - Email Recipients]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          required: false
+          description: Page number for pagination (optional)
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          required: false
+          description: Number of items per page (optional)
+        - in: query
+          name: masterCommunityIds
+          schema:
+            type: string
+          required: false
+          description: Filter by master community IDs - comma-separated list (e.g., "1,2,3") (optional)
+        - in: query
+          name: communityIds
+          schema:
+            type: string
+          required: false
+          description: Filter by community IDs - comma-separated list (e.g., "1,2,3") (optional)
+        - in: query
+          name: towerIds
+          schema:
+            type: string
+          required: false
+          description: Filter by tower IDs - comma-separated list (e.g., "1,2,3") (optional)
+        - in: query
+          name: isActive
+          schema:
+            oneOf:
+              - type: boolean
+              - type: string
+                enum: ["true", "false"]
+          required: false
+          description: Filter by active status (optional)
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [id, createdAt, updatedAt, isActive, mipRecipients, mopRecipients, createdBy, updatedBy]
+            default: createdAt
+          required: false
+          description: Field to sort by (optional) - id, createdAt, updatedAt, isActive, mipRecipients, mopRecipients, createdBy, updatedBy
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+          required: false
+          description: Sort order (optional)
+      responses:
+        '200':
+          description: List of email recipients retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Operation completed successfully"
+                  data:
+                    type: object
+                    properties:
+                      officialRecipients:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EmailRecipients'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+    post:
+      summary: Create new email recipients
+      description: Creates a new email recipients configuration
+      tags: [Documents - Email Recipients]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - masterCommunityId
+                - communityId
+                - mipRecipients
+                - mopRecipients
+              properties:
+                masterCommunityId:
+                  type: string
+                  description: Master community ID
+                communityId:
+                  type: string
+                  description: Community ID
+                towerId:
+                  type: string
+                  description: Tower ID (optional)
+                mipRecipients:
+                  type: string
+                  description: MIP Email Recipients - Multiple email addresses separated by commas
+                  example: "admin@community.com, manager@community.com"
+                mopRecipients:
+                  type: string
+                  description: MOP Email Recipients - Multiple email addresses separated by commas
+                  example: "admin@community.com, manager@community.com"
+                isActive:
+                  type: string
+                  enum: ['true', 'false']
+                  default: 'true'
+                  description: Active status of the recipients
+      responses:
+        '201':
+          description: Email recipients created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Email recipients created successfully"
+                  data:
+                    $ref: '#/components/schemas/EmailRecipients'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /documents/email-recipients/{id}:
+    put:
+      summary: Update email recipients
+      description: Updates an existing email recipients configuration
+      tags: [Documents - Email Recipients]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Email recipients ID to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                masterCommunityId:
+                  type: string
+                  description: Master community ID (optional)
+                communityId:
+                  type: string
+                  description: Community ID (optional)
+                towerId:
+                  type: string
+                  description: Tower ID (optional, can be null)
+                mipRecipients:
+                  type: string
+                  description: MIP Email Recipients - Multiple email addresses separated by commas (optional)
+                  example: "admin@community.com, manager@community.com"
+                mopRecipients:
+                  type: string
+                  description: MOP Email Recipients - Multiple email addresses separated by commas (optional)
+                  example: "admin@community.com, manager@community.com"
+                isActive:
+                  type: string
+                  enum: ['true', 'false']
+                  description: Active status of the recipients (optional)
+      responses:
+        '200':
+          description: Email recipients updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Email recipients updated successfully"
+                  data:
+                    $ref: '#/components/schemas/EmailRecipients'
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Email recipients not found
+        '500':
+          description: Internal server error
+
+  /documents/history/{templateType}/{id}:
+    get:
+      summary: Get unified template history
+      description: Retrieves history for any template type (move-in, move-out, welcome-pack, recipient-mail)
+      tags: [Documents - History]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: templateType
+          required: true
+          schema:
+            type: string
+            enum: [move-in, move-out, welcome-pack, recipient-mail]
+          description: Type of template for which to retrieve history
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Template ID for which to retrieve history
+      responses:
+        '200':
+          description: Template history retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Operation completed successfully"
+                  data:
+                    type: array
+                    description: Chronological history entries for the selected master data (template)
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          description: Action type
+                          example: Creation
+                          enum: [Creation, Update, Deactivation]
+                        createdModifiedDate:
+                          type: string
+                          format: date-time
+                          description: Timestamp of the action
+                          example: "2023-09-14T16:28:00.000Z"
+                        createdModifiedBy:
+                          type: string
+                          description: Display name of the user who performed the action
+                          example: "Ammu Admin UAT TC"
+                        # Optional raw fields if consumers need them
+                        createdAt:
+                          type: string
+                          format: date-time
+                          description: Raw createdAt of the history row
+                        updatedAt:
+                          type: string
+                          format: date-time
+                          description: Raw updatedAt of the history row
+                        createdBy:
+                          type: integer
+                          description: User ID of creator
+                        updatedBy:
+                          type: integer
+                          description: User ID of last updater
+                      required: [type, createdModifiedDate, createdModifiedBy]
+              examples:
+                sample:
+                  value:
+                    success: true
+                    message: "Operation completed successfully"
+                    data:
+                      - type: Creation
+                        createdModifiedDate: "2023-09-14T16:28:00.000Z"
+                        createdModifiedBy: "Ammu Admin UAT TC"
+                      - type: Creation
+                        createdModifiedDate: "2023-09-14T16:29:00.000Z"
+                        createdModifiedBy: "Ammu Admin UAT TC"
+                      - type: Creation
+                        createdModifiedDate: "2024-03-08T12:13:00.000Z"
+                        createdModifiedBy: "Admin UAT TC"
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Template not found
+        '500':
+          description: Internal server error
+
+  /documents/welcome-kit/generate:
+    post:
+      summary: Generate welcome kit PDF
+      description: Generates a welcome kit PDF with custom data
+      tags: [Documents - Welcome Kit]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - residentName
+                - unitNumber
+                - buildingName
+              properties:
+                residentName:
+                  type: string
+                  description: Name of the resident
+                unitNumber:
+                  type: string
+                  description: Unit number
+                buildingName:
+                  type: string
+                  description: Building name
+                communityName:
+                  type: string
+                  description: Community name (optional)
+                masterCommunityName:
+                  type: string
+                  description: Master community name (optional)
+                dateOfIssue:
+                  type: string
+                  description: Date of issue (optional)
+                moveInDate:
+                  type: string
+                  description: Move-in date (optional)
+                referenceNumber:
+                  type: string
+                  description: Reference number (optional)
+                contactNumber:
+                  type: string
+                  description: Contact number (optional)
+                moveInTimingsWeekdays:
+                  type: string
+                  description: Move-in timings for weekdays (optional)
+                moveInTimingsSundays:
+                  type: string
+                  description: Move-in timings for Sundays (optional)
+      responses:
+        '200':
+          description: Welcome kit PDF generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Welcome kit PDF generated successfully"
+                  data:
+                    type: object
+                    properties:
+                      pdfUrl:
+                        type: string
+                        description: URL to download the generated PDF
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /documents/welcome-kit/template/{id}/generate:
+    post:
+      summary: Generate welcome kit PDF from template
+      description: Generates a welcome kit PDF using an existing template with custom data
+      tags: [Documents - Welcome Kit]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: Welcome pack template ID to use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                residentName:
+                  type: string
+                  description: Name of the resident (optional)
+                unitNumber:
+                  type: string
+                  description: Unit number (optional)
+                buildingName:
+                  type: string
+                  description: Building name (optional)
+                communityName:
+                  type: string
+                  description: Community name (optional)
+                masterCommunityName:
+                  type: string
+                  description: Master community name (optional)
+                dateOfIssue:
+                  type: string
+                  description: Date of issue (optional)
+                moveInDate:
+                  type: string
+                  description: Move-in date (optional)
+                referenceNumber:
+                  type: string
+                  description: Reference number (optional)
+                contactNumber:
+                  type: string
+                  description: Contact number (optional)
+                moveInTimingsWeekdays:
+                  type: string
+                  description: Move-in timings for weekdays (optional)
+                moveInTimingsSundays:
+                  type: string
+                  description: Move-in timings for Sundays (optional)
+      responses:
+        '200':
+          description: Welcome kit PDF generated successfully from template
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Welcome kit PDF generated successfully from template"
+                  data:
+                    type: object
+                    properties:
+                      pdfUrl:
+                        type: string
+                        description: URL to download the generated PDF
+        '400':
+          description: Bad request - validation error
+        '401':
+          description: Unauthorized
+        '404':
+          description: Template not found
+        '500':
+          description: Internal server error
+
+components:
+  schemas:
+    Pagination:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+          example: 1
+        totalPages:
+          type: integer
+          example: 5
+        totalItems:
+          type: integer
+          example: 100
+        itemsPerPage:
+          type: integer
+          example: 20

@@ -228,166 +228,6 @@ components:
             message: Success Message
             code: SC001
 
-    Template:
-      type: object
-      properties:
-        id:
-          type: integer
-        masterCommunity:
-          type: object
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
-        community:
-          type: object
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
-        tower:
-          type: object
-          nullable: true
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
-        templateType:
-          type: string
-          enum: [move-in, move-out, welcome-pack]
-        templateString:
-          type: string
-          description: Base64 encoded file content (only included when includeFile=true)
-        isActive:
-          type: boolean
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        createdBy:
-          type: integer
-        updatedBy:
-          type: integer
-    
-    MipTemplate:
-      type: object
-      properties:
-        id:
-          type: integer
-        masterCommunity:
-          type: object
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
-        community:
-          type: object
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
-        tower:
-          type: object
-          nullable: true
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
-        templateType:
-          type: string
-          enum: [move-in]
-        templateString:
-          type: string
-          description: Base64 encoded file content (only included when includeFile=true)
-        isActive:
-          type: boolean
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        createdBy:
-          type: integer
-        updatedBy:
-          type: integer
-    
-    MopTemplate:
-      type: object
-      properties:
-        id:
-          type: integer
-        masterCommunity:
-          type: object
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
-        community:
-          type: object
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
-        tower:
-          type: object
-          nullable: true
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
-        templateType:
-          type: string
-          enum: [move-out]
-        templateString:
-          type: string
-          description: Base64 encoded file content (only included when includeFile=true)
-        isActive:
-          type: boolean
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        createdBy:
-          type: integer
-        updatedBy:
-          type: integer
-    
-    TemplateHistory:
-      type: object
-      properties:
-        id:
-          type: integer
-        template:
-          type: object
-          $ref: "#/components/schemas/Template"
-        action:
-          type: string
-          enum: [create, update, delete]
-        user:
-          type: object
-          properties:
-            id:
-              type: integer
-            username:
-              type: string
-        createdAt:
-          type: string
-          format: date-time
-
     WelcomePack:
       type: object
       properties:
@@ -412,6 +252,12 @@ components:
           type: string
           description: Base64 encoded file content (only included when includeFile=true)
           nullable: true
+          example: "PGh0bWw+PGJvZHk+SGVsbG8gV29ybGQ8L2JvZHk+PC9odG1sPg=="
+        fileId:
+          type: integer
+          nullable: true
+          description: File ID reference
+          example: 123
         isActive:
           type: boolean
           description: Active status of the welcome pack
@@ -471,43 +317,303 @@ components:
               description: Tower name
               example: "The Horizon"
 
-    WelcomePackHistory:
+    EmailRecipients:
       type: object
       properties:
         id:
           type: integer
-          description: Unique identifier for the history entry
-        templateType:
+          description: Unique identifier for the email recipients
+          example: 1
+        masterCommunityId:
+          type: integer
+          description: Master community ID
+          example: 28
+        communityId:
+          type: integer
+          description: Community ID
+          example: 70
+        towerId:
+          type: integer
+          nullable: true
+          description: Tower ID (optional)
+          example: 142
+        mipRecipients:
           type: string
-          enum: [welcome-pack]
-          description: Type of template history entry
-        welcomePack:
+          description: MIP Email Recipients - Multiple email addresses separated by commas
+          example: "admin@community.com, manager@community.com, supervisor@community.com"
+        mopRecipients:
+          type: string
+          description: MOP Email Recipients - Multiple email addresses separated by commas
+          example: "admin@community.com, manager@community.com, supervisor@community.com"
+        isActive:
+          type: boolean
+          description: Active status of the recipients
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2025-08-13T10:44:46.291Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2025-08-13T10:44:46.291Z"
+        createdBy:
+          type: integer
+          description: ID of the user who created the recipients
+          example: 4
+        updatedBy:
+          type: integer
+          description: ID of the user who last updated the recipients
+          example: 4
+        masterCommunity:
           type: object
           nullable: true
           properties:
             id:
               type: integer
-            masterCommunityId:
+              description: Master community ID
+              example: 28
+            name:
+              type: string
+              description: Master community name
+              example: "Sobha Central"
+        community:
+          type: object
+          nullable: true
+          properties:
+            id:
               type: integer
-            communityId:
+              description: Community ID
+              example: 70
+            name:
+              type: string
+              description: Community name
+              example: "The Horizon"
+        tower:
+          type: object
+          nullable: true
+          properties:
+            id:
               type: integer
-            towerId:
-              type: integer
-              nullable: true
-            isActive:
-              type: boolean
+              description: Tower ID
+              example: 142
+            name:
+              type: string
+              description: Tower name
+              example: "The Horizon"
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the template
+          example: 1
+        masterCommunityId:
+          type: integer
+          description: Master community ID
+          example: 28
+        communityId:
+          type: integer
+          description: Community ID
+          example: 70
+        towerId:
+          type: integer
+          nullable: true
+          description: Tower ID (optional)
+          example: 142
+        templateType:
+          type: string
+          enum: [move-in, move-out]
+          description: Type of occupancy template
+          example: "move-in"
+        templateString:
+          type: string
+          description: Base64 encoded file content (only included when includeFile=true)
+          example: "PGh0bWw+PGJvZHk+SGVsbG8gV29ybGQ8L2JvZHk+PC9odG1sPg=="
         isActive:
           type: boolean
+          description: Active status of the template
+          example: true
         createdAt:
           type: string
           format: date-time
+          description: Creation timestamp
+          example: "2025-08-13T10:44:46.291Z"
         updatedAt:
           type: string
           format: date-time
+          description: Last update timestamp
+          example: "2025-08-13T10:44:46.291Z"
         createdBy:
           type: integer
+          description: ID of the user who created the template
+          example: 4
         updatedBy:
           type: integer
+          description: ID of the user who last updated the template
+          example: 4
+        masterCommunity:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              description: Master community ID
+              example: 28
+            name:
+              type: string
+              description: Master community name
+              example: "Sobha Central"
+        community:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              description: Community ID
+              example: 70
+            name:
+              type: string
+              description: Community name
+              example: "The Horizon"
+        tower:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              description: Tower ID
+              example: 142
+            name:
+              type: string
+              description: Tower name
+              example: "The Horizon"
+
+    TemplateHistory:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the history entry
+          example: 1
+        templateType:
+          type: string
+          enum: [move-in, move-out, recipient-mail, welcome-pack]
+          description: Type of template history entry
+          example: "move-in"
+        occupancyRequestTemplates:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              description: Template ID
+              example: 1
+            templateType:
+              type: string
+              enum: [move-in, move-out]
+              description: Type of occupancy template
+              example: "move-in"
+            masterCommunityId:
+              type: integer
+              description: Master community ID
+              example: 28
+            communityId:
+              type: integer
+              description: Community ID
+              example: 70
+            towerId:
+              type: integer
+              nullable: true
+              description: Tower ID (optional)
+              example: 142
+            isActive:
+              type: boolean
+              description: Active status of the template
+              example: true
+        occupancyRequestWelcomePack:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              description: Welcome pack ID
+              example: 1
+            masterCommunityId:
+              type: integer
+              description: Master community ID
+              example: 28
+            communityId:
+              type: integer
+              description: Community ID
+              example: 70
+            towerId:
+              type: integer
+              nullable: true
+              description: Tower ID (optional)
+              example: 142
+            isActive:
+              type: boolean
+              description: Active status of the welcome pack
+              example: true
+        occupancyRequestEmailRecipients:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              description: Email recipients ID
+              example: 1
+            masterCommunityId:
+              type: integer
+              description: Master community ID
+              example: 28
+            communityId:
+              type: integer
+              description: Community ID
+              example: 70
+            towerId:
+              type: integer
+              nullable: true
+              description: Tower ID (optional)
+              example: 142
+            mipRecipients:
+              type: string
+              description: MIP Email Recipients
+              example: "admin@community.com, manager@community.com"
+            mopRecipients:
+              type: string
+              description: MOP Email Recipients
+              example: "admin@community.com, manager@community.com"
+            isActive:
+              type: boolean
+              description: Active status of the recipients
+              example: true
+        isActive:
+          type: boolean
+          description: Active status at the time of history entry
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp of the history entry
+          example: "2025-08-13T10:44:46.291Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp of the history entry
+          example: "2025-08-13T10:44:46.291Z"
+        createdBy:
+          type: integer
+          description: ID of the user who created the history entry
+          example: 4
+        updatedBy:
+          type: integer
+          description: ID of the user who last updated the history entry
+          example: 4
 
   securitySchemes:
     bearerAuth:

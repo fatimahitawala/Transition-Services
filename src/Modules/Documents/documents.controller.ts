@@ -60,7 +60,9 @@ export class DocumentsController {
     // Consolidated template controller methods
     async getTemplateList(req: Request, res: Response) {
         const { user: { id: userId = '' } }: Record<string, any> = req;
-        const result = await documentsService.getTemplateList(req.query, userId);
+        const { templateType } = req.params;
+        const queryWithTemplateType = { ...req.query, templateType };
+        const result = await documentsService.getTemplateList(queryWithTemplateType, userId);
         return successResponseWithPaginationData(res, APICodes.COMMON_SUCCESS, result.templates, result.pagination);
     }
 
