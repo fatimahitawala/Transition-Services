@@ -14,7 +14,7 @@ const auth = new AuthMiddleware();
 const router = Router();
 
 // GET routes for admin move-in management
-router.get("/request", auth.auth(), validate(moveInValidation.getAdminMoveIn), catchAsync(moveInController.getAllMoveInRequestList));
+router.get("/request-list", auth.auth(), validate(moveInValidation.getAdminMoveIn), catchAsync(moveInController.getAllMoveInRequestList));
 router.get('/details/:requestId', auth.auth(), validate(moveInValidation.getAdminMoveInDetails), catchAsync(moveInController.getAllMoveInDetailsList));
 
 // POST routes for creating different types of move-in requests (Admin)
@@ -25,18 +25,18 @@ router.post('/hhc-company', auth.auth(), validate(moveInValidation.createHhcComp
 
 // Document upload route for Admin
 router.post('/request/:requestId/documents',
-    auth.auth(),
-    validate(moveInValidation.uploadDocuments),
-    fileUploads.fields([
-        { name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT, maxCount: 1 },
-        { name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK, maxCount: 1 },
-        { name: TRANSITION_DOCUMENT_TYPES.EJARI, maxCount: 1 },
-        { name: TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, maxCount: 1 },
-        { name: TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE, maxCount: 1 },
-        { name: TRANSITION_DOCUMENT_TYPES.TITLE_DEED, maxCount: 1 },
-        { name: TRANSITION_DOCUMENT_TYPES.OTHER, maxCount: 4 }
-    ]),
-    catchAsync(moveInController.uploadDocuments)
+	auth.auth(),
+	validate(moveInValidation.uploadDocuments),
+	fileUploads.fields([
+		{ name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT, maxCount: 1 },
+		{ name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK, maxCount: 1 },
+		{ name: TRANSITION_DOCUMENT_TYPES.EJARI, maxCount: 1 },
+		{ name: TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, maxCount: 1 },
+		{ name: TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE, maxCount: 1 },
+		{ name: TRANSITION_DOCUMENT_TYPES.TITLE_DEED, maxCount: 1 },
+		{ name: TRANSITION_DOCUMENT_TYPES.OTHER, maxCount: 4 }
+	]),
+	catchAsync(moveInController.uploadDocuments)
 );
 
 // Status management routes

@@ -13,7 +13,7 @@ const auth = new AuthMiddleware();
 
 const router = Router();
 // GET routes
-router.get("/request", auth.auth(), catchAsync(moveInController.getAllMoveInRequestList));
+router.get("/request-list", auth.auth(), catchAsync(moveInController.getAllMoveInRequestList));
 router.get("/request/:unitId", auth.auth(), catchAsync(moveInController.getAllMoveInRequestList));
 
 // POST routes for different move-in request types
