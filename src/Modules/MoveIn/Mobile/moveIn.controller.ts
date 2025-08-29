@@ -57,6 +57,38 @@ export class MoveInController {
     return successResponseWithData(res, APICodes.CREATE_SUCCESS, result);
   }
 
+  async updateOwnerMoveInRequest(req: Request, res: Response) {
+    const { user }: Record<string, any> = req;
+    const { requestId } = req.params as any;
+    logger.debug(`MOVE-IN | UPDATE OWNER | MOBILE REQUEST | USER: ${user?.id} | REQUEST: ${requestId} | BODY: ${JSON.stringify(req.body)}`);
+    const result = await moveInService.updateOwnerMoveIn(Number(requestId), req.body, user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
+
+  async updateTenantMoveInRequest(req: Request, res: Response) {
+    const { user }: Record<string, any> = req;
+    const { requestId } = req.params as any;
+    logger.debug(`MOVE-IN | UPDATE TENANT | MOBILE REQUEST | USER: ${user?.id} | REQUEST: ${requestId} | BODY: ${JSON.stringify(req.body)}`);
+    const result = await moveInService.updateTenantMoveIn(Number(requestId), req.body, user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
+
+  async updateHhoOwnerMoveInRequest(req: Request, res: Response) {
+    const { user }: Record<string, any> = req;
+    const { requestId } = req.params as any;
+    logger.debug(`MOVE-IN | UPDATE HHO OWNER | MOBILE REQUEST | USER: ${user?.id} | REQUEST: ${requestId} | BODY: ${JSON.stringify(req.body)}`);
+    const result = await moveInService.updateHhoOwnerMoveIn(Number(requestId), req.body, user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
+
+  async updateHhcCompanyMoveInRequest(req: Request, res: Response) {
+    const { user }: Record<string, any> = req;
+    const { requestId } = req.params as any;
+    logger.debug(`MOVE-IN | UPDATE HHC COMPANY | MOBILE REQUEST | USER: ${user?.id} | REQUEST: ${requestId} | BODY: ${JSON.stringify(req.body)}`);
+    const result = await moveInService.updateHhcCompanyMoveIn(Number(requestId), req.body, user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
+
   // Single comprehensive document upload method (following AmenityRegistration pattern)
   async uploadDocuments(req: Request, res: Response) {
     const { user }: Record<string, any> = req;

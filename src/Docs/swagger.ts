@@ -12,15 +12,6 @@ const swaggerDef = {
             url: `${config.server}/api/v1/`,
         },
     ],
-    components: {
-        securitySchemes: {
-            bearerAuth: {
-                type: 'http',
-                scheme: 'bearer',
-                bearerFormat: 'JWT'
-            }
-        }
-    },
     security: [
         {
             bearerAuth: []
