@@ -13,7 +13,7 @@ const auth = new AuthMiddleware();
 const router = Router();
 
 router.get("/request", auth.auth(), validate(moveInValidation.getAdminMoveIn), catchAsync(moveInController.getAllMoveInRequestList));
-router.get('/moveInDetails/:requestId', auth.auth(), validate(moveInValidation.getAdminMoveInDetails), catchAsync(moveInController.getAllMoveInDetailsList));
+router.get('/details/:requestId', auth.auth(), validate(moveInValidation.getAdminMoveInDetails), catchAsync(moveInController.getAllMoveInDetailsList));
 
 export default router;
 
@@ -29,11 +29,60 @@ export default router;
 * @swagger
 * /admin/move-in/request:
 *   get:
-*     summary: Close a move in request
+*     summary: move in request
 *     tags: [MoveIn]
+*     parameters:
+*       - in: query
+*         name: page
+*         schema:
+*           type: integer
+*           default: 1
+*       - in: query
+*         name: per_page
+*         schema:
+*           type: integer
+*           default: 20
+*       - in: query
+*         name: requestId
+*         schema:
+*           type: string
+*       - in: query
+*         name: moveOutType
+*         schema:
+*           type: string
+*       - in: query
+*         name: masterCommunity
+*         schema:
+*           type: string
+*       - in: query
+*         name: community
+*         schema:
+*           type: string
+*       - in: query
+*         name: tower
+*         schema:
+*           type: string
+*       - in: query
+*         name: unit
+*         schema:
+*           type: string
+*       - in: query
+*         name: createdDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: moveOutDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: requestStatus
+*         schema:
+*           type: string
 *     responses:
 *       200:
-*         description: Move in request
+*         description: A list of move out requests
 */
 
 // Swagger documentation
@@ -46,18 +95,61 @@ export default router;
 
 /**
 * @swagger
-* /admin/movein/moveInDetails/{requestId}:
+* /admin/movein/details/{requestId}:
 *   get:
-*     summary: Close a move in request
-*     tags: [MoveOut]
+*     summary: move in Details request
+*     tags: [MoveIn]
 *     parameters:
-*       - in: path
+*       - in: query
+*         name: page
+*         schema:
+*           type: integer
+*           default: 1
+*       - in: query
+*         name: per_page
+*         schema:
+*           type: integer
+*           default: 20
+*       - in: query
 *         name: requestId
-*         required: true
-*         description: The ID of the move out request
-*    
+*         schema:
+*           type: string
+*       - in: query
+*         name: moveOutType
+*         schema:
+*           type: string
+*       - in: query
+*         name: masterCommunity
+*         schema:
+*           type: string
+*       - in: query
+*         name: community
+*         schema:
+*           type: string
+*       - in: query
+*         name: tower
+*         schema:
+*           type: string
+*       - in: query
+*         name: unit
+*         schema:
+*           type: string
+*       - in: query
+*         name: createdDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: moveOutDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: requestStatus
+*         schema:
+*           type: string
 *     responses:
 *       200:
-*         description: Move out request closed
+*         description: A list of move in requests
 */
 

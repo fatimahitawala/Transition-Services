@@ -30,9 +30,58 @@ export default router;
 *   get:
 *     summary: Close a move in request
 *     tags: [MoveIn]
+*     parameters:
+*       - in: query
+*         name: page
+*         schema:
+*           type: integer
+*           default: 1
+*       - in: query
+*         name: per_page
+*         schema:
+*           type: integer
+*           default: 20
+*       - in: query
+*         name: requestId
+*         schema:
+*           type: string
+*       - in: query
+*         name: moveOutType
+*         schema:
+*           type: string
+*       - in: query
+*         name: masterCommunity
+*         schema:
+*           type: string
+*       - in: query
+*         name: community
+*         schema:
+*           type: string
+*       - in: query
+*         name: tower
+*         schema:
+*           type: string
+*       - in: query
+*         name: unit
+*         schema:
+*           type: string
+*       - in: query
+*         name: createdDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: moveOutDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: requestStatus
+*         schema:
+*           type: string
 *     responses:
 *       200:
-*         description: Move in request 
+*         description: A list of move in requests
 */
 
 /**
@@ -42,14 +91,57 @@ export default router;
 *     summary: get a move in request List
 *     tags: [MoveOut]
 *     parameters:
-*       - in: path
-*         name: unitId
-*         required: true
-*         description: The ID of the move out request
-*    
+*       - in: query
+*         name: page
+*         schema:
+*           type: integer
+*           default: 1
+*       - in: query
+*         name: per_page
+*         schema:
+*           type: integer
+*           default: 20
+*       - in: query
+*         name: requestId
+*         schema:
+*           type: string
+*       - in: query
+*         name: moveOutType
+*         schema:
+*           type: string
+*       - in: query
+*         name: masterCommunity
+*         schema:
+*           type: string
+*       - in: query
+*         name: community
+*         schema:
+*           type: string
+*       - in: query
+*         name: tower
+*         schema:
+*           type: string
+*       - in: query
+*         name: unit
+*         schema:
+*           type: string
+*       - in: query
+*         name: createdDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: moveOutDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: requestStatus
+*         schema:
+*           type: string
 *     responses:
 *       200:
-*         description: Move out request closed
+*         description: A list of move out requests
 */
 
 
