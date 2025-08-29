@@ -29,19 +29,19 @@ router.put('/request/hho-unit/:requestId', auth.auth(), validate(moveInValidatio
 router.put('/request/hhc-company/:requestId', auth.auth(), validate(moveInValidation.updateHhcCompanyMoveIn), catchAsync(moveInController.updateHhcCompanyMoveInRequest));
 
 // Single comprehensive document upload route (following AmenityRegistration pattern)
-router.post('/request/:requestId/documents', 
-	auth.auth(), 
-	validate(moveInValidation.uploadDocuments),
-	fileUploads.fields([
-		{ name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.EJARI, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.TITLE_DEED, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.OTHER, maxCount: 4 }
-	]), 
-	catchAsync(moveInController.uploadDocuments)
+router.post('/request/:requestId/documents',
+    auth.auth(),
+    validate(moveInValidation.uploadDocuments),
+    fileUploads.fields([
+        { name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.EJARI, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.TITLE_DEED, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.OTHER, maxCount: 4 }
+    ]),
+    catchAsync(moveInController.uploadDocuments)
 );
 
 /**
@@ -765,9 +765,58 @@ export default router;
 *   get:
 *     summary: Close a move in request
 *     tags: [MoveIn]
+*     parameters:
+*       - in: query
+*         name: page
+*         schema:
+*           type: integer
+*           default: 1
+*       - in: query
+*         name: per_page
+*         schema:
+*           type: integer
+*           default: 20
+*       - in: query
+*         name: requestId
+*         schema:
+*           type: string
+*       - in: query
+*         name: moveOutType
+*         schema:
+*           type: string
+*       - in: query
+*         name: masterCommunity
+*         schema:
+*           type: string
+*       - in: query
+*         name: community
+*         schema:
+*           type: string
+*       - in: query
+*         name: tower
+*         schema:
+*           type: string
+*       - in: query
+*         name: unit
+*         schema:
+*           type: string
+*       - in: query
+*         name: createdDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: moveOutDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: requestStatus
+*         schema:
+*           type: string
 *     responses:
 *       200:
-*         description: Move in request 
+*         description: A list of move in requests
 */
 
 /**
@@ -777,14 +826,57 @@ export default router;
 *     summary: get a move in request List
 *     tags: [MoveOut]
 *     parameters:
-*       - in: path
-*         name: unitId
-*         required: true
-*         description: The ID of the move out request
-*    
+*       - in: query
+*         name: page
+*         schema:
+*           type: integer
+*           default: 1
+*       - in: query
+*         name: per_page
+*         schema:
+*           type: integer
+*           default: 20
+*       - in: query
+*         name: requestId
+*         schema:
+*           type: string
+*       - in: query
+*         name: moveOutType
+*         schema:
+*           type: string
+*       - in: query
+*         name: masterCommunity
+*         schema:
+*           type: string
+*       - in: query
+*         name: community
+*         schema:
+*           type: string
+*       - in: query
+*         name: tower
+*         schema:
+*           type: string
+*       - in: query
+*         name: unit
+*         schema:
+*           type: string
+*       - in: query
+*         name: createdDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: moveOutDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: requestStatus
+*         schema:
+*           type: string
 *     responses:
 *       200:
-*         description: Move out request closed
+*         description: A list of move out requests
 */
 
 
