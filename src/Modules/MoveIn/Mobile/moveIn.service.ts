@@ -71,11 +71,7 @@ export class MoveInService {
   async uploadHhcCompanyDocuments(requestId: number, files: any, user: any) {
     try {
       if (user?.isAdmin === true || user?.isAdmin === 1) {
-        throw new ApiError(
-          httpStatus.FORBIDDEN,
-          APICodes.INVALID_USER_ROLE.message,
-          APICodes.INVALID_USER_ROLE.code
-        );
+        throw new ApiError(httpStatus.FORBIDDEN, APICodes.INVALID_USER_ROLE.message, APICodes.INVALID_USER_ROLE.code);
       }
 
       // Get the move-in request with user relationship
@@ -86,20 +82,12 @@ export class MoveInService {
         .getOne();
 
       if (!moveInRequest) {
-        throw new ApiError(
-          httpStatus.NOT_FOUND,
-          APICodes.NOT_FOUND.message,
-          APICodes.NOT_FOUND.code
-        );
+        throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
       }
 
       // Verify the request belongs to the user
       if (moveInRequest.user?.id !== user?.id) {
-        throw new ApiError(
-          httpStatus.FORBIDDEN,
-          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message,
-          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code
-        );
+        throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
       }
 
       const uploadedDocuments: Array<{ type: string; document: any }> = [];
@@ -137,11 +125,7 @@ export class MoveInService {
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/emirates-id-back/`, user?.id);
 
           if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
-            throw new ApiError(
-              httpStatus.INTERNAL_SERVER_ERROR,
-              APICodes.FILE_UPLOAD_ERROR.message,
-              APICodes.FILE_UPLOAD_ERROR.code
-            );
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
           }
 
           const document = new MoveInRequestDocuments();
@@ -163,11 +147,7 @@ export class MoveInService {
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/company-trade-license/`, user?.id);
 
           if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
-            throw new ApiError(
-              httpStatus.INTERNAL_SERVER_ERROR,
-              APICodes.FILE_UPLOAD_ERROR.message,
-              APICodes.FILE_UPLOAD_ERROR.code
-            );
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
           }
 
           const document = new MoveInRequestDocuments();
@@ -245,11 +225,7 @@ export class MoveInService {
   async uploadDocuments(requestId: number, files: any, body: any, user: any) {
     try {
       if (user?.isAdmin === true || user?.isAdmin === 1) {
-        throw new ApiError(
-          httpStatus.FORBIDDEN,
-          APICodes.INVALID_USER_ROLE.message,
-          APICodes.INVALID_USER_ROLE.code
-        );
+        throw new ApiError(httpStatus.FORBIDDEN, APICodes.INVALID_USER_ROLE.message, APICodes.INVALID_USER_ROLE.code);
       }
 
       // Get the move-in request with user relationship
@@ -260,20 +236,12 @@ export class MoveInService {
         .getOne();
 
       if (!moveInRequest) {
-        throw new ApiError(
-          httpStatus.NOT_FOUND,
-          APICodes.NOT_FOUND.message,
-          APICodes.NOT_FOUND.code
-        );
+        throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
       }
 
       // Verify the request belongs to the user
       if (moveInRequest.user?.id !== user?.id) {
-        throw new ApiError(
-          httpStatus.FORBIDDEN,
-          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message,
-          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code
-        );
+        throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
       }
 
       // Check if this is a Tenant Move-In request and enforce document restrictions
@@ -342,11 +310,7 @@ export class MoveInService {
         );
 
         if (invalidDocumentTypes.length > 0) {
-          throw new ApiError(
-            httpStatus.BAD_REQUEST,
-            APICodes.INVALID_DOCUMENT_TYPES_FOR_HHC_COMPANY.message,
-            APICodes.INVALID_DOCUMENT_TYPES_FOR_HHC_COMPANY.code
-          );
+          throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DOCUMENT_TYPES_FOR_HHC_COMPANY.message, APICodes.INVALID_DOCUMENT_TYPES_FOR_HHC_COMPANY.code);
         }
 
         // Check if any non-allowed document IDs are being linked
@@ -359,11 +323,7 @@ export class MoveInService {
         );
 
         if (invalidLinkedTypes.length > 0) {
-          throw new ApiError(
-            httpStatus.BAD_REQUEST,
-            APICodes.INVALID_LINKED_DOCUMENT_TYPES_FOR_HHC_COMPANY.message,
-            APICodes.INVALID_LINKED_DOCUMENT_TYPES_FOR_HHC_COMPANY.code
-          );
+          throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_LINKED_DOCUMENT_TYPES_FOR_HHC_COMPANY.message, APICodes.INVALID_LINKED_DOCUMENT_TYPES_FOR_HHC_COMPANY.code);
         }
       }
 
@@ -512,11 +472,7 @@ export class MoveInService {
   async uploadOtherDocuments(requestId: number, files: any, user: any) {
     try {
       if (user?.isAdmin === true || user?.isAdmin === 1) {
-        throw new ApiError(
-          httpStatus.FORBIDDEN,
-          APICodes.INVALID_USER_ROLE.message,
-          APICodes.INVALID_USER_ROLE.code
-        );
+        throw new ApiError(httpStatus.FORBIDDEN, APICodes.INVALID_USER_ROLE.message, APICodes.INVALID_USER_ROLE.code);
       }
 
       // Get the move-in request with user relationship
@@ -527,20 +483,12 @@ export class MoveInService {
         .getOne();
 
       if (!moveInRequest) {
-        throw new ApiError(
-          httpStatus.NOT_FOUND,
-          APICodes.NOT_FOUND.message,
-          APICodes.NOT_FOUND.code
-        );
+        throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
       }
 
       // Verify the request belongs to the user
       if (moveInRequest.user?.id !== user?.id) {
-        throw new ApiError(
-          httpStatus.FORBIDDEN,
-          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message,
-          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code
-        );
+        throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
       }
 
       const uploadedDocuments: Array<{ type: string; document: any }> = [];
@@ -609,11 +557,7 @@ export class MoveInService {
   async uploadTitleDeedDocuments(requestId: number, files: any, user: any) {
     try {
       if (user?.isAdmin === true || user?.isAdmin === 1) {
-        throw new ApiError(
-          httpStatus.FORBIDDEN,
-          APICodes.INVALID_USER_ROLE.message,
-          APICodes.INVALID_USER_ROLE.code
-        );
+        throw new ApiError(httpStatus.FORBIDDEN, APICodes.INVALID_USER_ROLE.message, APICodes.INVALID_USER_ROLE.code);
       }
 
       // Get the move-in request with user relationship
@@ -624,20 +568,12 @@ export class MoveInService {
         .getOne();
 
       if (!moveInRequest) {
-        throw new ApiError(
-          httpStatus.NOT_FOUND,
-          APICodes.NOT_FOUND.message,
-          APICodes.NOT_FOUND.code
-        );
+        throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
       }
 
       // Verify the request belongs to the user
       if (moveInRequest.user?.id !== user?.id) {
-        throw new ApiError(
-          httpStatus.FORBIDDEN,
-          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message,
-          APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code
-        );
+        throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
       }
 
       const uploadedDocuments: Array<{ type: string; document: any }> = [];
@@ -738,36 +674,20 @@ export class MoveInService {
       } = data;
 
       if (user?.isAdmin === true || user?.isAdmin === 1) {
-        throw new ApiError(
-          httpStatus.FORBIDDEN,
-          APICodes.INVALID_USER_ROLE.message,
-          APICodes.INVALID_USER_ROLE.code
-        );
+        throw new ApiError(httpStatus.FORBIDDEN, APICodes.INVALID_USER_ROLE.message, APICodes.INVALID_USER_ROLE.code);
       }
 
       if (!unitId) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          APICodes.INVALID_DATA.message,
-          APICodes.INVALID_DATA.code
-        );
+        throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
       }
 
       if (!Object.values(MOVE_IN_USER_TYPES).includes(requestType)) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          APICodes.INVALID_DATA.message,
-          APICodes.INVALID_DATA.code
-        );
+        throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
       }
 
       const unit = await this.getUnitById(Number(unitId));
       if (!unit) {
-        throw new ApiError(
-          httpStatus.NOT_FOUND,
-          APICodes.UNIT_NOT_FOUND.message,
-          APICodes.UNIT_NOT_FOUND.code
-        );
+        throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
       }
 
       const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
@@ -1065,15 +985,11 @@ export class MoveInService {
   }
 
   async getMobileMoveIn(query: any, unitId: number) {
-    const unit = await this.getUnitById(unitId);
 
-    if (!unit) {
-      throw new ApiError(
-        httpStatus.NOT_FOUND,
-        APICodes.UNIT_NOT_FOUND.message,
-        APICodes.UNIT_NOT_FOUND.code
-      );
-    }
+    if (!unitId) throw new ApiError(httpStatus.BAD_REQUEST, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
+    const unit = await this.getUnitById(unitId);
+    if (!unit) throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
+
     try {
       let {
         page = 1,
@@ -1094,23 +1010,12 @@ export class MoveInService {
       unitIds = unitIds.split(",").filter((e: any) => e);
       let whereClause = "am.isActive = true";
 
-      if (masterCommunityIds && masterCommunityIds.length)
-        whereClause += ` AND am.masterCommunity IN (:...masterCommunityIds)`;
-
-      if (communityIds && communityIds.length)
-        whereClause += ` AND am.community IN (:...communityIds)`;
-
-      if (towerIds && towerIds.length)
-        whereClause += ` AND am.tower IN (:...towerIds)`;
-
-      if (createdStartDate)
-        whereClause += ` AND am.createdAt >= :createdStartDate`;
-
+      if (masterCommunityIds && masterCommunityIds.length) whereClause += ` AND am.masterCommunity IN (:...masterCommunityIds)`;
+      if (communityIds && communityIds.length) whereClause += ` AND am.community IN (:...communityIds)`;
+      if (towerIds && towerIds.length) whereClause += ` AND am.tower IN (:...towerIds)`;
+      if (createdStartDate) whereClause += ` AND am.createdAt >= :createdStartDate`;
       if (createdEndDate) whereClause += ` AND am.createdAt <= :createdEndDate`;
-
-      if (moveInStartDate)
-        whereClause += ` AND am.moveInDate >= :moveInStartDate`;
-
+      if (moveInStartDate) whereClause += ` AND am.moveInDate >= :moveInStartDate`;
       if (moveInEndDate) whereClause += ` AND am.moveInDate <= :moveInEndDate`;
       if (unitFilter) whereClause += ` AND am.unit = :unitId`;
       if (unitIds && unitIds.length)
@@ -1136,11 +1041,7 @@ export class MoveInService {
         });
 
       getMoveInList.innerJoinAndSelect("am.unit", "u", "u.isActive=1");
-      getMoveInList.innerJoinAndSelect(
-        "u.masterCommunity",
-        "mc",
-        "mc.isActive=1"
-      );
+      getMoveInList.innerJoinAndSelect("u.masterCommunity", "mc", "mc.isActive=1");
       getMoveInList.innerJoinAndSelect("u.community", "c", "c.isActive=1");
       getMoveInList.innerJoinAndSelect("u.tower", "t", "t.isActive=1");
       getMoveInList.where(whereClause, {
@@ -1151,8 +1052,9 @@ export class MoveInService {
         units: unitIds.map((x: any) => Number(x)).filter((n: any) => !isNaN(n)),
       });
 
-      // getMoveInList = checkAdminPermission(getMoveInList, { towerId: 't.id', communityId: 'c.id', masterCommunityId: 'mc.id' }, query.user);
-      getMoveInList.offset((page - 1) * per_page).limit(per_page);
+      getMoveInList.orderBy("am.createdAt", "DESC")
+        .offset((page - 1) * per_page)
+        .limit(per_page);
 
       const list = await getMoveInList.getMany();
       const count = await getMoveInList.getCount();
@@ -1171,27 +1073,11 @@ export class MoveInService {
         .createQueryBuilder("u")
         .leftJoinAndMapOne("u.tower", "u.tower", "t", "t.isActive = 1")
         .leftJoinAndMapOne("u.community", "u.community", "c", "c.isActive = 1")
-        .leftJoinAndMapOne(
-          "u.masterCommunity",
-          "u.masterCommunity",
-          "mc",
-          "mc.isActive = 1"
-        )
-        .leftJoinAndMapOne(
-          "u.unitRestriction",
-          "u.unitRestriction",
-          "ut",
-          "ut.isActive = 1"
-        )
-        .where({ id })
-        .getOne();
+        .leftJoinAndMapOne("u.masterCommunity", "u.masterCommunity", "mc", "mc.isActive = 1")
+        .leftJoinAndMapOne("u.unitRestriction", "u.unitRestriction", "ut", "ut.isActive = 1")
+        .where({ id }).getOne();
     } catch (error) {
-      throw new ApiError(
-        httpStatus.INTERNAL_SERVER_ERROR,
-        APICodes.UNKNOWN_ERROR.message,
-        APICodes.UNKNOWN_ERROR.code,
-        error
-      );
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
     }
   }
 
@@ -1272,11 +1158,7 @@ export class MoveInService {
         return await entity.save();
       }
       default:
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          APICodes.INVALID_DATA.message,
-          APICodes.INVALID_DATA.code
-        );
+        throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
     }
   }
 }

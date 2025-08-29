@@ -19,12 +19,8 @@ import { Units } from "../../../Entities/Units.entity";
 import { get } from "http";
 
 export class MoveInService {
-  createMoveInRequest(body: any) {
-    throw new Error("Method not implemented.");
-  }
 
-  // Implement the proper createMoveIn method based on Mobile service
-  async createMoveIn(data: any, user: any) {
+  async createMoveInRequest(data: any, user: any) {
     try {
       const {
         unitId,
@@ -244,7 +240,7 @@ export class MoveInService {
         moveInPermitUrl: (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) ? await this.generateMoveInPermit(response.id) : null,
       };
     } catch (error: any) {
-      logger.error(`Error in createMoveIn Admin: ${JSON.stringify(error)}`);
+      logger.error(`Error in createMoveInRequest Admin: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
       throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
     }
@@ -444,7 +440,7 @@ export class MoveInService {
       };
 
       logger.debug(`Owner Details mapped: ${JSON.stringify(ownerDetails)}`);
-      return this.createMoveIn({ ...rest, details: ownerDetails, requestType: MOVE_IN_USER_TYPES.OWNER }, user);
+      return this.createMoveInRequest({ ...rest, details: ownerDetails, requestType: MOVE_IN_USER_TYPES.OWNER }, user);
     } catch (error) {
       logger.error(`Error in createOwnerMoveIn Admin: ${JSON.stringify(error)}`);
       throw error;
@@ -453,7 +449,7 @@ export class MoveInService {
 
   async createTenantMoveIn(data: any, user: any) {
     try {
-      return this.createMoveIn({ ...data, requestType: MOVE_IN_USER_TYPES.TENANT }, user);
+      return this.createMoveInRequest({ ...data, requestType: MOVE_IN_USER_TYPES.TENANT }, user);
     } catch (error) {
       logger.error(`Error in createTenantMoveIn Admin: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
@@ -508,7 +504,7 @@ export class MoveInService {
       };
 
       logger.debug(`HHO Owner Details mapped: ${JSON.stringify(hhoOwnerDetails)}`);
-      return this.createMoveIn({ ...rest, details: hhoOwnerDetails, requestType: MOVE_IN_USER_TYPES.HHO_OWNER }, user);
+      return this.createMoveInRequest({ ...rest, details: hhoOwnerDetails, requestType: MOVE_IN_USER_TYPES.HHO_OWNER }, user);
     } catch (error) {
       logger.error(`Error in createHhoOwnerMoveIn Admin: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
@@ -518,7 +514,7 @@ export class MoveInService {
 
   async createHhcCompanyMoveIn(data: any, user: any) {
     try {
-      return this.createMoveIn({ ...data, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
+      return this.createMoveInRequest({ ...data, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
     } catch (error) {
       logger.error(`Error in createHhcCompanyMoveIn Admin: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
@@ -697,25 +693,7 @@ export class MoveInService {
     }
   }
 
-  async getAllMoveInRequestList(query: any) {
-    try {
-      const { page = 1, per_page = 20 } = query;
-      const skip = (page - 1) * per_page;
-      const getMoveInRequestList = await MoveInRequests.getRepository()
-        .createQueryBuilder("mv")
-        .where("mv.isActive= true", {});
-      const count = await getMoveInRequestList.getCount();
-      const data = await getMoveInRequestList.offset(skip).limit(per_page).getMany();
-      const pagination = getPaginationInfo(page, per_page, count);
-      return { data, pagination };
-    } catch (error) {
-      logger.error(`Error in MoveInRequestList : ${JSON.stringify(error)}`);
-      const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
-    }
-  }
-
-  async getAdminMoveIn(query: any, user: any) {
+  async getAllMoveInRequestList(query: any, user: any) {
     try {
       const isSecurity = await checkIsSecurity(user);
       let { page = 1, per_page = 20, masterCommunityIds = "", communityIds = "", towerIds = "", createdStartDate = "", createdEndDate = "", moveInStartDate = "", moveInEndDate = "" } = query;
@@ -729,14 +707,13 @@ export class MoveInService {
           "am.id", "am.status", "am.createdAt", "am.moveInDate",
           "am.moveInRequestNo", "am.requestType",
         ])
-        .innerJoinAndSelect("am.unit", "u", "u.isActive=1")
-        .innerJoinAndSelect("u.masterCommunity", "mc", "mc.isActive=1")
-        .innerJoinAndSelect("u.community", "c", "c.isActive=1")
-        .innerJoinAndSelect("u.tower", "t", "t.isActive=1")
+        .innerJoin("am.unit", "u", "u.isActive=1")
+        .innerJoin("u.masterCommunity", "mc", "mc.isActive=1")
+        .innerJoin("u.community", "c", "c.isActive=1")
+        .innerJoin("u.tower", "t", "t.isActive=1")
         .where("am.isActive=1");
 
-      console.log("Query:", getMoveInList.getQuery());
-      getMoveInList = checkAdminPermission(getMoveInList, { towerId: 't.id', communityId: 'c.id', masterCommunityId: 'mc.id' }, query.user);
+      getMoveInList = checkAdminPermission(getMoveInList, { towerId: 't.id', communityId: 'c.id', masterCommunityId: 'mc.id' }, user);
 
       if (masterCommunityIds && masterCommunityIds.length) getMoveInList.andWhere(`am.masterCommunity IN (:...masterCommunityIds)`, { masterCommunityIds });
       if (communityIds && communityIds.length) getMoveInList.andWhere(`am.community IN (:...communityIds)`, { communityIds });
@@ -767,7 +744,7 @@ export class MoveInService {
     }
   }
 
-  async getMoveInRequestById(requestId: number, user: any) {
+  async getMoveInRequestDetailsWithId(requestId: number, user: any) {
     try {
       let query = MoveInRequests.getRepository()
         .createQueryBuilder("mv")
