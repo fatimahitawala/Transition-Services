@@ -5,14 +5,14 @@ import { MoveInRequests } from "../../../Entities/MoveInRequests.entity";
 import { getPaginationInfo } from "../../../Common/Utils/paginationUtils";
 import { checkAdminPermission, checkIsSecurity } from "../../../Common/Utils/adminAccess";
 import { logger } from "../../../Common/Utils/logger";
-import { MOVE_IN_USER_TYPES, MOVE_IN_AND_OUT_REQUEST_STATUS, ActionByTypes } from "../../../Entities/EntityTypes";
+import { MOVE_IN_USER_TYPES, MOVE_IN_AND_OUT_REQUEST_STATUS } from "../../../Entities/EntityTypes";
 import { MoveInRequestDetailsHhcCompany } from "../../../Entities/MoveInRequestDetailsHhcCompany.entity";
 import { MoveInRequestDetailsHhoOwner } from "../../../Entities/MoveInRequestDetailsHhoOwner.entity";
 import { MoveInRequestDetailsTenant } from "../../../Entities/MoveInRequestDetailsTenant.entity";
 import { MoveInRequestDetailsOwner } from "../../../Entities/MoveInRequestDetailsOwner.entity";
 import { MoveInRequestLogs } from "../../../Entities/MoveInRequestLogs.entity";
 import { MoveInRequestDocuments } from "../../../Entities/MoveInRequestDocuments.entity";
-import { TRANSITION_DOCUMENT_TYPES } from "../../../Entities/EntityTypes/transition";
+import { TRANSITION_DOCUMENT_TYPES, TransitionRequestActionByTypes } from "../../../Entities/EntityTypes/transition";
 import { uploadFile } from "../../../Common/Utils/azureBlobStorage";
 import { executeInTransaction } from "../../../Common/Utils/transactionUtil";
 import { Units } from "../../../Entities/Units.entity";
@@ -215,7 +215,7 @@ export class MoveInService {
          log.status = (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) ? MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED : MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
          log.changes = "";
          log.user = { id: user?.id } as any;
-         log.actionBy = ActionByTypes.COMMUNITY_ADMIN;
+         log.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
          log.details = details ? JSON.stringify(details) : "";
          log.comments = comments || null;
          
@@ -678,7 +678,7 @@ export class MoveInService {
          const log = new MoveInRequestLogs();
          log.moveInRequest = { id: requestId } as any;
          log.user = { id: user?.id } as any;
-         log.actionBy = ActionByTypes.COMMUNITY_ADMIN;
+         log.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
          log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
          log.changes = 'DOCUMENTS_UPLOADED'; 
          log.comments = `Documents uploaded by admin: ${uploadedDocuments.map(d => d.type).join(', ')}`;
@@ -979,7 +979,7 @@ export class MoveInService {
          approvalLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
          approvalLog.changes = "Request auto-approved by system";
          approvalLog.user = { id: userId } as any;
-         approvalLog.actionBy = ActionByTypes.SYSTEM;
+         approvalLog.actionBy = TransitionRequestActionByTypes.SYSTEM;
          approvalLog.details = "Move-in request auto-approved for owner/tenant";
          approvalLog.comments = "Auto-approved as per business rules";
          
@@ -1121,7 +1121,7 @@ export class MoveInService {
          approvalLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
          approvalLog.changes = `Request approved by ${user?.firstName || 'Admin'}`;
          approvalLog.user = { id: user?.id } as any;
-         approvalLog.actionBy = ActionByTypes.COMMUNITY_ADMIN;
+         approvalLog.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
          approvalLog.details = JSON.stringify({ comments, action: 'APPROVED' });
          approvalLog.comments = comments || '';
          
@@ -1219,7 +1219,7 @@ export class MoveInService {
          rfiLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING;
          rfiLog.changes = `Request marked as RFI by ${user?.firstName || 'Admin'}`;
          rfiLog.user = { id: user?.id } as any;
-         rfiLog.actionBy = ActionByTypes.COMMUNITY_ADMIN;
+         rfiLog.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
          rfiLog.details = JSON.stringify({ comments, action: 'RFI_PENDING' });
          rfiLog.comments = comments;
          
@@ -1314,7 +1314,7 @@ export class MoveInService {
          cancellationLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED;
          cancellationLog.changes = `Request cancelled by ${user?.firstName || 'Admin'}`;
          cancellationLog.user = { id: user?.id } as any;
-         cancellationLog.actionBy = ActionByTypes.COMMUNITY_ADMIN;
+         cancellationLog.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
          cancellationLog.details = JSON.stringify({ cancellationRemarks, action: 'CANCELLED' });
          cancellationLog.comments = cancellationRemarks;
          
@@ -1427,7 +1427,7 @@ export class MoveInService {
          closureLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED;
          closureLog.changes = `Request closed by ${isSecurity ? 'Security' : 'Admin'}`;
          closureLog.user = { id: user?.id } as any;
-         closureLog.actionBy = isSecurity ? ActionByTypes.SECURITY : ActionByTypes.COMMUNITY_ADMIN;
+         closureLog.actionBy = isSecurity ? TransitionRequestActionByTypes.SECURITY : TransitionRequestActionByTypes.COMMUNITY_ADMIN;
          closureLog.details = JSON.stringify({ closureRemarks, actualMoveInDate, action: 'CLOSED' });
          closureLog.comments = closureRemarks;
          
