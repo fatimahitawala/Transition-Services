@@ -47,6 +47,18 @@ export class DocumentsValidation {
     });
 
     updateWelcomePack = Joi.object({
+        masterCommunityId: Joi.number().integer().optional().messages({
+            'number.base': APICodes.MASTER_COMMUNITY_ID_MUST_BE_NUMBER.message,
+            'number.integer': APICodes.MASTER_COMMUNITY_ID_MUST_BE_NUMBER.message
+        }),
+        communityId: Joi.number().integer().optional().messages({
+            'number.base': APICodes.COMMUNITY_ID_MUST_BE_NUMBER.message,
+            'number.integer': APICodes.COMMUNITY_ID_MUST_BE_NUMBER.message
+        }),
+        towerId: Joi.number().integer().allow(null).optional().messages({
+            'number.base': APICodes.TOWER_ID_MUST_BE_NUMBER.message,
+            'number.integer': APICodes.TOWER_ID_MUST_BE_NUMBER.message
+        }),
         isActive: Joi.alternatives().try(
             Joi.boolean(),
             Joi.string().valid('true', 'false')
@@ -100,18 +112,18 @@ export class DocumentsValidation {
             'string.empty': APICodes.TEMPLATE_TYPE_CANNOT_BE_EMPTY.message,
             'any.only': APICodes.TEMPLATE_TYPE_INVALID.message
         }),
-        page: Joi.number().integer().min(1).default(1),
-        per_page: Joi.number().integer().min(1).max(100).default(20),
-        masterCommunityIds: Joi.string().optional(),
-        communityIds: Joi.string().optional(),
-        towerIds: Joi.string().optional(),
-        search: Joi.string().optional(),
-        isActive: Joi.boolean().optional(),
+        page: Joi.number().integer().min(1).default(1).optional(),
+        per_page: Joi.number().integer().min(1).max(100).default(20).optional(),
+        masterCommunityIds: Joi.string().optional().allow(''),
+        communityIds: Joi.string().optional().allow(''),
+        towerIds: Joi.string().optional().allow(''),
+        search: Joi.string().optional().allow(''),
+        isActive: Joi.alternatives().try(Joi.boolean(), Joi.string().valid('true', 'false')).optional(),
         startDate: Joi.date().iso().optional(),
         endDate: Joi.date().iso().optional(),
-        sortBy: Joi.string().valid('id', 'createdAt', 'updatedAt', 'templateType').default('createdAt'),
-        sortOrder: Joi.string().valid('ASC', 'DESC').default('DESC'),
-        includeFile: Joi.boolean().default(false)
+        sortBy: Joi.string().valid('id', 'createdAt', 'updatedAt', 'templateType').default('createdAt').optional(),
+        sortOrder: Joi.string().valid('ASC', 'DESC').default('DESC').optional(),
+        includeFile: Joi.alternatives().try(Joi.boolean(), Joi.string().valid('true', 'false')).default(false).optional()
     });
 
     createTemplate = Joi.object({
@@ -159,17 +171,17 @@ export class DocumentsValidation {
 
     // Email Recipients Validation Methods
     getEmailRecipientsList = Joi.object({
-        search: Joi.string().optional().description(APICodes.SEARCH_EMAIL_DESCRIPTION.message),
-        masterCommunityIds: Joi.string().optional().description(APICodes.MASTER_COMMUNITY_IDS_DESCRIPTION.message),
-        communityIds: Joi.string().optional().description(APICodes.COMMUNITY_IDS_DESCRIPTION.message),
-        towerIds: Joi.string().optional().description(APICodes.TOWER_IDS_DESCRIPTION.message),
-        isActive: Joi.boolean().optional().description(APICodes.IS_ACTIVE_FILTER_DESCRIPTION.message),
+        search: Joi.string().optional().allow('').default('').description(APICodes.SEARCH_EMAIL_DESCRIPTION.message),
+        masterCommunityIds: Joi.string().optional().allow('').default('').description(APICodes.MASTER_COMMUNITY_IDS_DESCRIPTION.message),
+        communityIds: Joi.string().optional().allow('').default('').description(APICodes.COMMUNITY_IDS_DESCRIPTION.message),
+        towerIds: Joi.string().optional().allow('').default('').description(APICodes.TOWER_IDS_DESCRIPTION.message),
+        isActive: Joi.alternatives().try(Joi.boolean(), Joi.string().valid('true', 'false')).optional().description(APICodes.IS_ACTIVE_FILTER_DESCRIPTION.message),
         startDate: Joi.date().iso().optional().description(APICodes.START_DATE_DESCRIPTION.message),
         endDate: Joi.date().iso().optional().description(APICodes.END_DATE_DESCRIPTION.message),
-        sortBy: Joi.string().valid('id', 'masterCommunityId', 'communityId', 'towerId', 'isActive', 'createdAt', 'updatedAt').optional().description(APICodes.SORT_FIELD_DESCRIPTION.message),
-        sortOrder: Joi.string().valid('ASC', 'DESC').optional().description(APICodes.SORT_ORDER_FILTER_DESCRIPTION.message),
-        page: Joi.number().min(1).optional().description(APICodes.PAGE_FILTER_DESCRIPTION.message),
-        per_page: Joi.number().min(1).max(100).optional().description(APICodes.PER_PAGE_FILTER_DESCRIPTION.message)
+        sortBy: Joi.string().valid('id', 'masterCommunityId', 'communityId', 'towerId', 'isActive', 'createdAt', 'updatedAt').default('createdAt').optional().description(APICodes.SORT_FIELD_DESCRIPTION.message),
+        sortOrder: Joi.string().valid('ASC', 'DESC').default('DESC').optional().description(APICodes.SORT_ORDER_FILTER_DESCRIPTION.message),
+        page: Joi.number().min(1).default(1).optional().description(APICodes.PAGE_FILTER_DESCRIPTION.message),
+        per_page: Joi.number().min(1).max(100).default(20).optional().description(APICodes.PER_PAGE_FILTER_DESCRIPTION.message)
     });
 
     createEmailRecipients = Joi.object({

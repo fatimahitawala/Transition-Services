@@ -10,7 +10,10 @@ const router = express.Router();
 const specs = swaggerJsdoc({
     swaggerDefinition,
     apis: [
-        path.join(__dirname, '../Modules/**/*.route.{ts,js}')
+        path.join(__dirname, '../Modules/**/*.route.{ts,js}'),
+        path.join(__dirname, './components.yml'),
+        path.join(__dirname, './documents.swagger.yml'),
+        path.join(__dirname, './admin-movein.swagger.yml')
     ],
 });
 
