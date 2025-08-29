@@ -8,7 +8,7 @@ import { executeInTransaction } from "../../../Common/Utils/transactionUtil";
 import {
   MOVE_IN_AND_OUT_REQUEST_STATUS,
   MOVE_IN_USER_TYPES,
-  ActionByTypes,
+  TransitionRequestActionByTypes,
 } from "../../../Entities/EntityTypes";
 import { MoveInRequestDetailsTenant } from "../../../Entities/MoveInRequestDetailsTenant.entity";
 import { MoveInRequestDetailsOwner } from "../../../Entities/MoveInRequestDetailsOwner.entity";
@@ -109,7 +109,7 @@ export class MoveInService {
         if (files?.emiratesIdFront?.[0]) {
           const file = files.emiratesIdFront[0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/emirates-id-front/`, user?.id);
-          
+
           if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
             throw new ApiError(
               httpStatus.INTERNAL_SERVER_ERROR,
@@ -117,7 +117,7 @@ export class MoveInService {
               APICodes.FILE_UPLOAD_ERROR.code
             );
           }
-          
+
           const document = new MoveInRequestDocuments();
           document.documentType = TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT;
           document.user = { id: user?.id } as any;
@@ -126,7 +126,7 @@ export class MoveInService {
           document.createdBy = user?.id;
           document.updatedBy = user?.id;
           document.isActive = true;
-          
+
           const savedDoc = await document.save();
           uploadedDocuments.push({ type: 'emiratesIdFront', document: savedDoc });
         }
@@ -135,7 +135,7 @@ export class MoveInService {
         if (files?.emiratesIdBack?.[0]) {
           const file = files.emiratesIdBack[0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/emirates-id-back/`, user?.id);
-          
+
           if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
             throw new ApiError(
               httpStatus.INTERNAL_SERVER_ERROR,
@@ -143,7 +143,7 @@ export class MoveInService {
               APICodes.FILE_UPLOAD_ERROR.code
             );
           }
-          
+
           const document = new MoveInRequestDocuments();
           document.documentType = TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK;
           document.user = { id: user?.id } as any;
@@ -152,7 +152,7 @@ export class MoveInService {
           document.createdBy = user?.id;
           document.updatedBy = user?.id;
           document.isActive = true;
-          
+
           const savedDoc = await document.save();
           uploadedDocuments.push({ type: 'emiratesIdBack', document: savedDoc });
         }
@@ -161,7 +161,7 @@ export class MoveInService {
         if (files?.companyTradeLicense?.[0]) {
           const file = files.companyTradeLicense[0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/company-trade-license/`, user?.id);
-          
+
           if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
             throw new ApiError(
               httpStatus.INTERNAL_SERVER_ERROR,
@@ -169,7 +169,7 @@ export class MoveInService {
               APICodes.FILE_UPLOAD_ERROR.code
             );
           }
-          
+
           const document = new MoveInRequestDocuments();
           document.documentType = TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE;
           document.user = { id: user?.id } as any;
@@ -178,7 +178,7 @@ export class MoveInService {
           document.createdBy = user?.id;
           document.updatedBy = user?.id;
           document.isActive = true;
-          
+
           const savedDoc = await document.save();
           uploadedDocuments.push({ type: 'companyTradeLicense', document: savedDoc });
         }
@@ -187,7 +187,7 @@ export class MoveInService {
         if (files?.unitPermit?.[0]) {
           const file = files.unitPermit[0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/unit-permit/`, user?.id);
-          
+
           if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
             throw new ApiError(
               httpStatus.INTERNAL_SERVER_ERROR,
@@ -195,7 +195,7 @@ export class MoveInService {
               APICodes.FILE_UPLOAD_ERROR.code
             );
           }
-          
+
           const document = new MoveInRequestDocuments();
           document.documentType = TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT;
           document.user = { id: user?.id } as any;
@@ -204,7 +204,7 @@ export class MoveInService {
           document.createdBy = user?.id;
           document.updatedBy = user?.id;
           document.isActive = true;
-          
+
           const savedDoc = await document.save();
           uploadedDocuments.push({ type: 'unitPermit', document: savedDoc });
         }
@@ -216,10 +216,10 @@ export class MoveInService {
         log.status = moveInRequest.status;
         log.changes = `Documents uploaded: ${uploadedDocuments.map(d => d.type).join(', ')}`;
         log.user = { id: user?.id } as any;
-        log.actionBy = ActionByTypes.USER;
+        log.actionBy = TransitionRequestActionByTypes.USER;
         log.details = JSON.stringify(uploadedDocuments);
         log.comments = `Documents uploaded for move-in request ${requestId}`;
-        
+
         await log.save();
       });
 
@@ -279,7 +279,7 @@ export class MoveInService {
       // Check if this is a Tenant Move-In request and enforce document restrictions
       const isTenantMoveIn = moveInRequest.requestType === 'tenant';
       const isHhcCompanyMoveIn = moveInRequest.requestType === 'hho_company';
-      
+
       if (isTenantMoveIn) {
         // For Tenant Move-In, only allow the 3 required documents
         const allowedDocumentTypes = [
@@ -287,16 +287,16 @@ export class MoveInService {
           TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK,
           TRANSITION_DOCUMENT_TYPES.EJARI
         ];
-        
+
         // Check if any non-allowed documents are being uploaded
-        const uploadedDocumentTypes = Object.keys(files || {}).filter(key => 
+        const uploadedDocumentTypes = Object.keys(files || {}).filter(key =>
           files[key] && files[key].length > 0
         );
-        
-        const invalidDocumentTypes = uploadedDocumentTypes.filter(docType => 
+
+        const invalidDocumentTypes = uploadedDocumentTypes.filter(docType =>
           !allowedDocumentTypes.includes(docType as TRANSITION_DOCUMENT_TYPES)
         );
-        
+
         if (invalidDocumentTypes.length > 0) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
@@ -304,16 +304,16 @@ export class MoveInService {
             APICodes.INVALID_DOCUMENT_TYPES_FOR_TENANT.code
           );
         }
-        
+
         // Check if any non-allowed document IDs are being linked
-        const linkedDocumentTypes = Object.keys(body || {}).filter(key => 
+        const linkedDocumentTypes = Object.keys(body || {}).filter(key =>
           key.endsWith('-file') && body[key] !== undefined && body[key] !== '' && body[key] !== '0'
         ).map(key => key.replace('-file', ''));
-        
-        const invalidLinkedTypes = linkedDocumentTypes.filter(docType => 
+
+        const invalidLinkedTypes = linkedDocumentTypes.filter(docType =>
           !allowedDocumentTypes.includes(docType as TRANSITION_DOCUMENT_TYPES)
         );
-        
+
         if (invalidLinkedTypes.length > 0) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
@@ -322,7 +322,7 @@ export class MoveInService {
           );
         }
       }
-      
+
       if (isHhcCompanyMoveIn) {
         // For HHC Company Move-In, only allow the 4 required documents
         const allowedDocumentTypes = [
@@ -331,16 +331,16 @@ export class MoveInService {
           TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE,
           TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT
         ];
-        
+
         // Check if any non-allowed documents are being uploaded
-        const uploadedDocumentTypes = Object.keys(files || {}).filter(key => 
+        const uploadedDocumentTypes = Object.keys(files || {}).filter(key =>
           files[key] && files[key].length > 0
         );
-        
-        const invalidDocumentTypes = uploadedDocumentTypes.filter(docType => 
+
+        const invalidDocumentTypes = uploadedDocumentTypes.filter(docType =>
           !allowedDocumentTypes.includes(docType as TRANSITION_DOCUMENT_TYPES)
         );
-        
+
         if (invalidDocumentTypes.length > 0) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
@@ -348,16 +348,16 @@ export class MoveInService {
             APICodes.INVALID_DOCUMENT_TYPES_FOR_HHC_COMPANY.code
           );
         }
-        
+
         // Check if any non-allowed document IDs are being linked
-        const linkedDocumentTypes = Object.keys(body || {}).filter(key => 
+        const linkedDocumentTypes = Object.keys(body || {}).filter(key =>
           key.endsWith('-file') && body[key] !== undefined && body[key] !== '' && body[key] !== '0'
         ).map(key => key.replace('-file', ''));
-        
-        const invalidLinkedTypes = linkedDocumentTypes.filter(docType => 
+
+        const invalidLinkedTypes = linkedDocumentTypes.filter(docType =>
           !allowedDocumentTypes.includes(docType as TRANSITION_DOCUMENT_TYPES)
         );
-        
+
         if (invalidLinkedTypes.length > 0) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
@@ -439,10 +439,10 @@ export class MoveInService {
       // Handle Other Documents (Optional for Owner/HHO Owner, not for Tenant or HHC Company)
       if (!isTenantMoveIn && !isHhcCompanyMoveIn && (body?.[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] || files?.[TRANSITION_DOCUMENT_TYPES.OTHER]?.length)) {
         if (body?.[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] && body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] !== '0' && body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] !== 0 && body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] !== '') {
-          const otherIds = Array.isArray(body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`]) ? 
-            body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] : 
+          const otherIds = Array.isArray(body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`]) ?
+            body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`] :
             [body[`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`]];
-          
+
           for (const id of otherIds) {
             await this.updateMoveInRequestDocuments(id, TRANSITION_DOCUMENT_TYPES.OTHER, requestId, user?.id);
             uploadedDocuments.push({ type: 'other', documentType: TRANSITION_DOCUMENT_TYPES.OTHER });
@@ -464,10 +464,10 @@ export class MoveInService {
         log.status = moveInRequest.status;
         log.changes = `Documents uploaded: ${uploadedDocuments.map(d => d.type).join(', ')}`;
         log.user = { id: user?.id } as any;
-        log.actionBy = ActionByTypes.USER;
+        log.actionBy = TransitionRequestActionByTypes.USER;
         log.details = JSON.stringify(uploadedDocuments);
         log.comments = `Documents uploaded for move-in request ${requestId}`;
-        
+
         await log.save();
       }
 
@@ -481,12 +481,12 @@ export class MoveInService {
       };
     } catch (error: any) {
       logger.error(`Error in uploadDocuments: ${JSON.stringify(error)}`);
-      
+
       // If it's already an ApiError, re-throw it directly
       if (error instanceof ApiError) {
         throw error;
       }
-      
+
       // For other errors, convert to generic error
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
       throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
@@ -503,7 +503,7 @@ export class MoveInService {
     document.createdBy = userId;
     document.updatedBy = userId;
     document.isActive = true;
-    
+
     return await MoveInRequestDocuments.save(document);
   }
 
@@ -551,7 +551,7 @@ export class MoveInService {
           for (let i = 0; i < files.otherDocuments.length; i++) {
             const file = files.otherDocuments[i];
             const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/other-documents/`, user?.id);
-            
+
             if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
               throw new ApiError(
                 httpStatus.INTERNAL_SERVER_ERROR,
@@ -559,7 +559,7 @@ export class MoveInService {
                 APICodes.FILE_UPLOAD_ERROR.code
               );
             }
-            
+
             const document = new MoveInRequestDocuments();
             document.documentType = TRANSITION_DOCUMENT_TYPES.OTHER;
             document.user = { id: user?.id } as any;
@@ -568,7 +568,7 @@ export class MoveInService {
             document.createdBy = user?.id;
             document.updatedBy = user?.id;
             document.isActive = true;
-            
+
             const savedDoc = await document.save();
             uploadedDocuments.push({ type: `otherDocument${i + 1}`, document: savedDoc });
           }
@@ -581,10 +581,10 @@ export class MoveInService {
         log.status = moveInRequest.status;
         log.changes = `Other documents uploaded: ${uploadedDocuments.length} files`;
         log.user = { id: user?.id } as any;
-        log.actionBy = ActionByTypes.USER;
+        log.actionBy = TransitionRequestActionByTypes.USER;
         log.details = JSON.stringify(uploadedDocuments);
         log.comments = `Other documents uploaded for move-in request ${requestId}`;
-        
+
         await log.save();
       });
 
@@ -647,7 +647,7 @@ export class MoveInService {
         if (files?.titleDeed?.[0]) {
           const file = files.titleDeed[0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/title-deed/`, user?.id);
-          
+
           if (!uploadedFile || typeof uploadedFile === 'object' && 'status' in uploadedFile && !uploadedFile.status) {
             throw new ApiError(
               httpStatus.INTERNAL_SERVER_ERROR,
@@ -655,7 +655,7 @@ export class MoveInService {
               APICodes.FILE_UPLOAD_ERROR.code
             );
           }
-          
+
           const document = new MoveInRequestDocuments();
           document.documentType = TRANSITION_DOCUMENT_TYPES.TITLE_DEED;
           document.user = { id: user?.id } as any;
@@ -664,7 +664,7 @@ export class MoveInService {
           document.createdBy = user?.id;
           document.updatedBy = user?.id;
           document.isActive = true;
-          
+
           const savedDoc = await document.save();
           uploadedDocuments.push({ type: 'titleDeed', document: savedDoc });
         }
@@ -676,10 +676,10 @@ export class MoveInService {
         log.status = moveInRequest.status;
         log.changes = `Title deed document uploaded`;
         log.user = { id: user?.id } as any;
-        log.actionBy = ActionByTypes.USER;
+        log.actionBy = TransitionRequestActionByTypes.USER;
         log.details = JSON.stringify(uploadedDocuments);
         log.comments = `Title deed document uploaded for move-in request ${requestId}`;
-        
+
         await log.save();
       });
 
@@ -789,7 +789,7 @@ export class MoveInService {
         master.createdBy = user?.id;
         master.updatedBy = user?.id;
         master.isActive = true;
-        
+
         const savedMaster = await master.save();
 
         // Update request number to final format MIN-<unitNumber>-<id>
@@ -840,10 +840,10 @@ export class MoveInService {
         log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
         log.changes = null as any;
         log.user = { id: user?.id } as any;
-        log.actionBy = ActionByTypes.USER;
+        log.actionBy = TransitionRequestActionByTypes.USER;
         log.details = details ? JSON.stringify(details) : null as any;
         log.comments = comments || null as any;
-        
+
         await log.save();
       });
 
@@ -1022,7 +1022,7 @@ export class MoveInService {
         log.status = existing.status;
         log.changes = 'Request updated';
         log.user = { id: user?.id } as any;
-        log.actionBy = ActionByTypes.USER;
+        log.actionBy = TransitionRequestActionByTypes.USER;
         log.details = JSON.stringify({ data });
         log.comments = comments || null as any;
         await log.save();
@@ -1224,7 +1224,7 @@ export class MoveInService {
         entity.createdBy = userId;
         entity.updatedBy = userId;
         entity.isActive = true;
-        
+
         return await entity.save();
       }
       case MOVE_IN_USER_TYPES.OWNER: {
@@ -1234,7 +1234,7 @@ export class MoveInService {
         entity.createdBy = userId;
         entity.updatedBy = userId;
         entity.isActive = true;
-        
+
         return await entity.save();
       }
       case MOVE_IN_USER_TYPES.HHO_OWNER: {
@@ -1244,7 +1244,7 @@ export class MoveInService {
         entity.createdBy = userId;
         entity.updatedBy = userId;
         entity.isActive = true;
-        
+
         return await entity.save();
       }
       case MOVE_IN_USER_TYPES.HHO_COMPANY: {
@@ -1268,7 +1268,7 @@ export class MoveInService {
         entity.createdBy = userId;
         entity.updatedBy = userId;
         entity.isActive = true;
-        
+
         return await entity.save();
       }
       default:
@@ -1276,7 +1276,7 @@ export class MoveInService {
           httpStatus.BAD_REQUEST,
           APICodes.INVALID_DATA.message,
           APICodes.INVALID_DATA.code
-      );
+        );
     }
   }
 }

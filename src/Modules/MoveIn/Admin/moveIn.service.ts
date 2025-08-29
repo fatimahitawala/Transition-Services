@@ -5,7 +5,7 @@ import { MoveInRequests } from "../../../Entities/MoveInRequests.entity";
 import { getPaginationInfo } from "../../../Common/Utils/paginationUtils";
 import { checkAdminPermission, checkIsSecurity } from "../../../Common/Utils/adminAccess";
 import { logger } from "../../../Common/Utils/logger";
-import { MOVE_IN_USER_TYPES, MOVE_IN_AND_OUT_REQUEST_STATUS, ActionByTypes } from "../../../Entities/EntityTypes";
+import { MOVE_IN_USER_TYPES, MOVE_IN_AND_OUT_REQUEST_STATUS, TransitionRequestActionByTypes } from "../../../Entities/EntityTypes";
 import { MoveInRequestDetailsHhcCompany } from "../../../Entities/MoveInRequestDetailsHhcCompany.entity";
 import { MoveInRequestDetailsHhoOwner } from "../../../Entities/MoveInRequestDetailsHhoOwner.entity";
 import { MoveInRequestDetailsTenant } from "../../../Entities/MoveInRequestDetailsTenant.entity";
@@ -136,32 +136,32 @@ export class MoveInService {
       let createdMaster: MoveInRequests | undefined;
       let createdDetails: any = null;
 
-             await executeInTransaction(async (qr: any) => {
-         // Create master record
-         const master = new MoveInRequests();
-         master.moveInRequestNo = tempRequestNumber;
-         master.requestType = requestType;
-         master.user = { id: user?.id } as any;
-         master.unit = { id: unitId } as any;
-         master.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
-         master.moveInDate = moveInDate ? new Date(moveInDate) : new Date();
-         master.comments = comments || null;
-         master.additionalInfo = additionalInfo || null;
-         master.createdBy = user?.id;
-         master.updatedBy = user?.id;
-         master.isActive = true;
-         
-         const savedMaster = await MoveInRequests.save(master);
+      await executeInTransaction(async (qr: any) => {
+        // Create master record
+        const master = new MoveInRequests();
+        master.moveInRequestNo = tempRequestNumber;
+        master.requestType = requestType;
+        master.user = { id: user?.id } as any;
+        master.unit = { id: unitId } as any;
+        master.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
+        master.moveInDate = moveInDate ? new Date(moveInDate) : new Date();
+        master.comments = comments || null;
+        master.additionalInfo = additionalInfo || null;
+        master.createdBy = user?.id;
+        master.updatedBy = user?.id;
+        master.isActive = true;
 
-                 // Update request number to final format MIN-<unitNumber>-<id>
-         const finalRequestNumber = `MIN-${unit?.unitNumber}-${savedMaster.id}`;
-         await MoveInRequests.update({ id: savedMaster.id }, { moveInRequestNo: finalRequestNumber });
+        const savedMaster = await MoveInRequests.save(master);
+
+        // Update request number to final format MIN-<unitNumber>-<id>
+        const finalRequestNumber = `MIN-${unit?.unitNumber}-${savedMaster.id}`;
+        await MoveInRequests.update({ id: savedMaster.id }, { moveInRequestNo: finalRequestNumber });
         savedMaster.moveInRequestNo = finalRequestNumber as any;
         createdMaster = savedMaster;
 
         // Create detail record based on request type
         let detailsData;
-        
+
         if (requestType === MOVE_IN_USER_TYPES.HHO_OWNER) {
           // For HHO Owner, use the mapped details directly
           detailsData = details;
@@ -200,7 +200,7 @@ export class MoveInService {
             leaseEndDate: details.leaseEndDate,
           };
         }
-        
+
         createdDetails = await this.createDetailsRecord(qr, requestType, createdMaster as MoveInRequests, detailsData, user?.id);
 
         // Auto-approve owner, tenant, HHO-Unit, and HHO-Company move-in requests
@@ -208,18 +208,18 @@ export class MoveInService {
           await this.autoApproveRequest(qr, savedMaster.id, user?.id);
         }
 
-                 // Create initial log
-         const log = new MoveInRequestLogs();
-         log.moveInRequest = createdMaster as MoveInRequests;
-         log.requestType = requestType;
-         log.status = (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) ? MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED : MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
-         log.changes = "";
-         log.user = { id: user?.id } as any;
-         log.actionBy = ActionByTypes.COMMUNITY_ADMIN;
-         log.details = details ? JSON.stringify(details) : "";
-         log.comments = comments || null;
-         
-         await MoveInRequestLogs.save(log);
+        // Create initial log
+        const log = new MoveInRequestLogs();
+        log.moveInRequest = createdMaster as MoveInRequests;
+        log.requestType = requestType;
+        log.status = (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) ? MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED : MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
+        log.changes = "";
+        log.user = { id: user?.id } as any;
+        log.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        log.details = details ? JSON.stringify(details) : "";
+        log.comments = comments || null;
+
+        await MoveInRequestLogs.save(log);
       });
 
       // Send notifications after successful creation
@@ -300,20 +300,20 @@ export class MoveInService {
         entity.createdBy = userId;
         entity.updatedBy = userId;
         entity.isActive = true;
-        
+
         return await MoveInRequestDetailsTenant.save(entity);
       }
       case MOVE_IN_USER_TYPES.OWNER: {
         const entity = new MoveInRequestDetailsOwner();
         entity.moveInRequest = master;
-        
+
         // Occupancy details
         entity.adults = details.adults;
         entity.children = details.children;
         entity.householdStaffs = details.householdStaffs;
         entity.pets = details.pets;
         entity.comments = details.comments;
-        
+
         // Optional fields with defaults (user personal info comes from Users table)
         entity.emergencyContactDialCode = "";
         entity.emergencyContactNumber = "";
@@ -336,11 +336,11 @@ export class MoveInService {
         entity.securityDeposit = 0;
         entity.maintenanceFee = 0;
         entity.currency = "";
-        
+
         entity.createdBy = userId;
         entity.updatedBy = userId;
         entity.isActive = true;
-        
+
         return await MoveInRequestDetailsOwner.save(entity);
       }
       case MOVE_IN_USER_TYPES.HHO_OWNER: {
@@ -353,18 +353,18 @@ export class MoveInService {
         entity.dialCode = details.dialCode;
         entity.phoneNumber = details.phoneNumber;
         entity.nationality = details.nationality;
-        
+
         // Details from request
         entity.adults = details.adults;
         entity.children = details.children;
         entity.householdStaffs = details.householdStaffs;
         entity.pets = details.pets;
         entity.comments = details.comments;
-        
+
         // Optional fields
         // entity.peopleOfDetermination = details.peopleOfDetermination;
         // entity.termsAccepted = details.termsAccepted;
-        
+
         // Additional fields with defaults
         entity.attorneyFirstName = details.attorneyFirstName || null;
         entity.attorneyLastName = details.attorneyLastName || null;
@@ -385,11 +385,11 @@ export class MoveInService {
         entity.securityDeposit = details.securityDeposit || "";
         entity.maintenanceFee = details.maintenanceFee || null;
         entity.currency = details.currency || null;
-        
+
         entity.createdBy = userId;
         entity.updatedBy = userId;
         entity.isActive = true;
-        
+
         return await MoveInRequestDetailsHhoOwner.save(entity);
       }
       case MOVE_IN_USER_TYPES.HHO_COMPANY: {
@@ -413,7 +413,7 @@ export class MoveInService {
         entity.createdBy = userId;
         entity.updatedBy = userId;
         entity.isActive = true;
-        
+
         return await MoveInRequestDetailsHhcCompany.save(entity);
       }
       default:
@@ -421,7 +421,7 @@ export class MoveInService {
           httpStatus.BAD_REQUEST,
           APICodes.INVALID_DATA.message,
           APICodes.INVALID_DATA.code
-      );
+        );
     }
   }
 
@@ -437,11 +437,11 @@ export class MoveInService {
         householdStaffs: details.householdStaffs,
         pets: details.pets,
         comments: details.detailsText || rest.comments || null,
-        
+
         // Optional toggles
         peopleOfDetermination: details.peopleOfDetermination,
       };
-      
+
       logger.debug(`Owner Details mapped: ${JSON.stringify(ownerDetails)}`);
       return this.createMoveIn({ ...rest, details: ownerDetails, requestType: MOVE_IN_USER_TYPES.OWNER }, user);
     } catch (error) {
@@ -472,18 +472,18 @@ export class MoveInService {
         dialCode: user?.dialCode?.dialCode || user?.dialCode || '+971',
         phoneNumber: user?.mobile || user?.phoneNumber || user?.phone || '000000000',
         nationality: user?.nationality || 'UAE',
-        
+
         // Details from request
         adults: details.adults || 1,
         children: details.children || 0,
         householdStaffs: details.householdStaffs || 0,
         pets: details.pets || 0,
         comments: rest.comments || null,
-        
+
         // Optional fields with defaults
         peopleOfDetermination: details.peopleOfDetermination || false,
         termsAccepted: details.termsAccepted || false,
-        
+
         // Additional required fields with defaults
         attorneyFirstName: null,
         attorneyLastName: null,
@@ -505,7 +505,7 @@ export class MoveInService {
         maintenanceFee: null,
         currency: null
       };
-      
+
       logger.debug(`HHO Owner Details mapped: ${JSON.stringify(hhoOwnerDetails)}`);
       return this.createMoveIn({ ...rest, details: hhoOwnerDetails, requestType: MOVE_IN_USER_TYPES.HHO_OWNER }, user);
     } catch (error) {
@@ -558,16 +558,16 @@ export class MoveInService {
         if (files?.[TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT]?.length) {
           const file = files[TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT][0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/emirates-id-front/`, user?.id);
-          
-                     const document = new MoveInRequestDocuments();
-           document.moveInRequest = { id: requestId } as any;
-           document.user = { id: user?.id } as any;
-           document.file = uploadedFile as any;
-           document.documentType = TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT;
-           document.createdBy = user?.id;
-           document.updatedBy = user?.id;
-           
-           await MoveInRequestDocuments.save(document);
+
+          const document = new MoveInRequestDocuments();
+          document.moveInRequest = { id: requestId } as any;
+          document.user = { id: user?.id } as any;
+          document.file = uploadedFile as any;
+          document.documentType = TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT;
+          document.createdBy = user?.id;
+          document.updatedBy = user?.id;
+
+          await MoveInRequestDocuments.save(document);
           uploadedDocuments.push({ type: 'emiratesIdFront', document: document });
         }
 
@@ -575,16 +575,16 @@ export class MoveInService {
         if (files?.[TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK]?.length) {
           const file = files[TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK][0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/emirates-id-back/`, user?.id);
-          
-                     const document = new MoveInRequestDocuments();
-           document.moveInRequest = { id: requestId } as any;
-           document.user = { id: user?.id } as any;
-           document.file = uploadedFile as any;
-           document.documentType = TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK;
-           document.createdBy = user?.id;
-           document.updatedBy = user?.id;
-           
-           await MoveInRequestDocuments.save(document);
+
+          const document = new MoveInRequestDocuments();
+          document.moveInRequest = { id: requestId } as any;
+          document.user = { id: user?.id } as any;
+          document.file = uploadedFile as any;
+          document.documentType = TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK;
+          document.createdBy = user?.id;
+          document.updatedBy = user?.id;
+
+          await MoveInRequestDocuments.save(document);
           uploadedDocuments.push({ type: 'emiratesIdBack', document: document });
         }
 
@@ -592,16 +592,16 @@ export class MoveInService {
         if (files?.[TRANSITION_DOCUMENT_TYPES.EJARI]?.length) {
           const file = files[TRANSITION_DOCUMENT_TYPES.EJARI][0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/ejari/`, user?.id);
-          
-                     const document = new MoveInRequestDocuments();
-           document.moveInRequest = { id: requestId } as any;
-           document.user = { id: user?.id } as any;
-           document.file = uploadedFile as any;
-           document.documentType = TRANSITION_DOCUMENT_TYPES.EJARI;
-           document.createdBy = user?.id;
-           document.updatedBy = user?.id;
-           
-           await MoveInRequestDocuments.save(document);
+
+          const document = new MoveInRequestDocuments();
+          document.moveInRequest = { id: requestId } as any;
+          document.user = { id: user?.id } as any;
+          document.file = uploadedFile as any;
+          document.documentType = TRANSITION_DOCUMENT_TYPES.EJARI;
+          document.createdBy = user?.id;
+          document.updatedBy = user?.id;
+
+          await MoveInRequestDocuments.save(document);
           uploadedDocuments.push({ type: 'ejari', document: document });
         }
 
@@ -609,16 +609,16 @@ export class MoveInService {
         if (files?.[TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT]?.length) {
           const file = files[TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT][0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/unit-permit/`, user?.id);
-          
-                     const document = new MoveInRequestDocuments();
-           document.moveInRequest = { id: requestId } as any;
-           document.user = { id: user?.id } as any;
-           document.file = uploadedFile as any;
-           document.documentType = TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT;
-           document.createdBy = user?.id;
-           document.updatedBy = user?.id;
-           
-           await MoveInRequestDocuments.save(document);
+
+          const document = new MoveInRequestDocuments();
+          document.moveInRequest = { id: requestId } as any;
+          document.user = { id: user?.id } as any;
+          document.file = uploadedFile as any;
+          document.documentType = TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT;
+          document.createdBy = user?.id;
+          document.updatedBy = user?.id;
+
+          await MoveInRequestDocuments.save(document);
           uploadedDocuments.push({ type: 'unitPermit', document: document });
         }
 
@@ -626,16 +626,16 @@ export class MoveInService {
         if (files?.[TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE]?.length) {
           const file = files[TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE][0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/company-trade-license/`, user?.id);
-          
-                     const document = new MoveInRequestDocuments();
-           document.moveInRequest = { id: requestId } as any;
-           document.user = { id: user?.id } as any;
-           document.file = uploadedFile as any;
-           document.documentType = TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE;
-           document.createdBy = user?.id;
-           document.updatedBy = user?.id;
-           
-           await MoveInRequestDocuments.save(document);
+
+          const document = new MoveInRequestDocuments();
+          document.moveInRequest = { id: requestId } as any;
+          document.user = { id: user?.id } as any;
+          document.file = uploadedFile as any;
+          document.documentType = TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE;
+          document.createdBy = user?.id;
+          document.updatedBy = user?.id;
+
+          await MoveInRequestDocuments.save(document);
           uploadedDocuments.push({ type: 'companyTradeLicense', document: document });
         }
 
@@ -643,16 +643,16 @@ export class MoveInService {
         if (files?.[TRANSITION_DOCUMENT_TYPES.TITLE_DEED]?.length) {
           const file = files[TRANSITION_DOCUMENT_TYPES.TITLE_DEED][0];
           const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/title-deed/`, user?.id);
-          
-                     const document = new MoveInRequestDocuments();
-           document.moveInRequest = { id: requestId } as any;
-           document.user = { id: user?.id } as any;
-           document.file = uploadedFile as any;
-           document.documentType = TRANSITION_DOCUMENT_TYPES.TITLE_DEED;
-           document.createdBy = user?.id;
-           document.updatedBy = user?.id;
-           
-           await MoveInRequestDocuments.save(document);
+
+          const document = new MoveInRequestDocuments();
+          document.moveInRequest = { id: requestId } as any;
+          document.user = { id: user?.id } as any;
+          document.file = uploadedFile as any;
+          document.documentType = TRANSITION_DOCUMENT_TYPES.TITLE_DEED;
+          document.createdBy = user?.id;
+          document.updatedBy = user?.id;
+
+          await MoveInRequestDocuments.save(document);
           uploadedDocuments.push({ type: 'titleDeed', document: document });
         }
 
@@ -660,30 +660,30 @@ export class MoveInService {
         if (files?.[TRANSITION_DOCUMENT_TYPES.OTHER]?.length) {
           for (const file of files[TRANSITION_DOCUMENT_TYPES.OTHER]) {
             const uploadedFile = await uploadFile(file.originalname, file, `move-in/${requestId}/other/`, user?.id);
-            
-                         const document = new MoveInRequestDocuments();
-             document.moveInRequest = { id: requestId } as any;
-             document.user = { id: user?.id } as any;
-             document.file = uploadedFile as any;
-             document.documentType = TRANSITION_DOCUMENT_TYPES.OTHER;
-             document.createdBy = user?.id;
-             document.updatedBy = user?.id;
-             
-             await MoveInRequestDocuments.save(document);
+
+            const document = new MoveInRequestDocuments();
+            document.moveInRequest = { id: requestId } as any;
+            document.user = { id: user?.id } as any;
+            document.file = uploadedFile as any;
+            document.documentType = TRANSITION_DOCUMENT_TYPES.OTHER;
+            document.createdBy = user?.id;
+            document.updatedBy = user?.id;
+
+            await MoveInRequestDocuments.save(document);
             uploadedDocuments.push({ type: 'other', document: document });
           }
         }
 
-                 // Log the document upload action
-         const log = new MoveInRequestLogs();
-         log.moveInRequest = { id: requestId } as any;
-         log.user = { id: user?.id } as any;
-         log.actionBy = ActionByTypes.COMMUNITY_ADMIN;
-         log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
-         log.changes = 'DOCUMENTS_UPLOADED'; 
-         log.comments = `Documents uploaded by admin: ${uploadedDocuments.map(d => d.type).join(', ')}`;
-         
-         await MoveInRequestLogs.save(log);
+        // Log the document upload action
+        const log = new MoveInRequestLogs();
+        log.moveInRequest = { id: requestId } as any;
+        log.user = { id: user?.id } as any;
+        log.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
+        log.changes = 'DOCUMENTS_UPLOADED';
+        log.comments = `Documents uploaded by admin: ${uploadedDocuments.map(d => d.type).join(', ')}`;
+
+        await MoveInRequestLogs.save(log);
       });
 
       return {
@@ -892,7 +892,7 @@ export class MoveInService {
       const existingRequest = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
-        .andWhere("mir.status IN (:...statuses)", { 
+        .andWhere("mir.status IN (:...statuses)", {
           statuses: [
             MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN,
             MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
@@ -919,7 +919,7 @@ export class MoveInService {
       const overlappingRequests = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
-        .andWhere("mir.status NOT IN (:...excludedStatuses)", { 
+        .andWhere("mir.status NOT IN (:...excludedStatuses)", {
           excludedStatuses: [
             MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED,
             MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED
@@ -929,7 +929,7 @@ export class MoveInService {
         .getMany();
 
       const hasOverlap = overlappingRequests.length > 0;
-      
+
       return {
         hasOverlap,
         count: overlappingRequests.length,
@@ -972,18 +972,18 @@ export class MoveInService {
         updatedAt: new Date()
       });
 
-               // Create approval log
-         const approvalLog = new MoveInRequestLogs();
-         approvalLog.moveInRequest = { id: requestId } as any;
-         approvalLog.requestType = MOVE_IN_USER_TYPES.OWNER; // This will be updated based on actual request type
-         approvalLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
-         approvalLog.changes = "Request auto-approved by system";
-         approvalLog.user = { id: userId } as any;
-         approvalLog.actionBy = ActionByTypes.SYSTEM;
-         approvalLog.details = "Move-in request auto-approved for owner/tenant";
-         approvalLog.comments = "Auto-approved as per business rules";
-         
-         await MoveInRequestLogs.save(approvalLog);
+      // Create approval log
+      const approvalLog = new MoveInRequestLogs();
+      approvalLog.moveInRequest = { id: requestId } as any;
+      approvalLog.requestType = MOVE_IN_USER_TYPES.OWNER; // This will be updated based on actual request type
+      approvalLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
+      approvalLog.changes = "Request auto-approved by system";
+      approvalLog.user = { id: userId } as any;
+      approvalLog.actionBy = TransitionRequestActionByTypes.SYSTEM;
+      approvalLog.details = "Move-in request auto-approved for owner/tenant";
+      approvalLog.comments = "Auto-approved as per business rules";
+
+      await MoveInRequestLogs.save(approvalLog);
 
       logger.info(`Move-in request ${requestId} auto-approved`);
     } catch (error) {
@@ -1016,10 +1016,10 @@ export class MoveInService {
       // TODO: Implement push notification to owner/tenant
       // For Owner: "A new move-in request (<Reference ID>) has been created and approved by Community Admin. Tap here to view your request."
       // For Tenant: "A new move-in request (<Reference ID>) has been created and approved by Community Admin. Tap here to view your request."
-      
+
       // TODO: Implement email notification to community recipients (as per Email Recipients configuration)
       // TODO: Send notifications to both owner/tenant and relevant community team members
-      
+
       logger.info(`Notifications sent for move-in request ${requestId}`);
     } catch (error) {
       logger.error(`Error sending notifications: ${error}`);
@@ -1097,7 +1097,7 @@ export class MoveInService {
       const moveInDate = new Date(moveInRequest.moveInDate);
       const today = new Date();
       const daysDifference = Math.ceil((moveInDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       if (daysDifference > 30) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -1114,22 +1114,22 @@ export class MoveInService {
           updatedAt: new Date()
         });
 
-                 // Create approval log
-         const approvalLog = new MoveInRequestLogs();
-         approvalLog.moveInRequest = { id: requestId } as any;
-         approvalLog.requestType = moveInRequest.requestType;
-         approvalLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
-         approvalLog.changes = `Request approved by ${user?.firstName || 'Admin'}`;
-         approvalLog.user = { id: user?.id } as any;
-         approvalLog.actionBy = ActionByTypes.COMMUNITY_ADMIN;
-         approvalLog.details = JSON.stringify({ comments, action: 'APPROVED' });
-         approvalLog.comments = comments || '';
-         
-         await MoveInRequestLogs.save(approvalLog);
+        // Create approval log
+        const approvalLog = new MoveInRequestLogs();
+        approvalLog.moveInRequest = { id: requestId } as any;
+        approvalLog.requestType = moveInRequest.requestType;
+        approvalLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
+        approvalLog.changes = `Request approved by ${user?.firstName || 'Admin'}`;
+        approvalLog.user = { id: user?.id } as any;
+        approvalLog.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        approvalLog.details = JSON.stringify({ comments, action: 'APPROVED' });
+        approvalLog.comments = comments || '';
+
+        await MoveInRequestLogs.save(approvalLog);
 
         // Generate move-in permit
         const permitUrl = await this.generateMoveInPermit(requestId);
-        
+
         // Update request with permit URL
         //await MoveInRequests.update({ id: requestId }, {
         //  moveInPermitUrl: permitUrl
@@ -1212,18 +1212,18 @@ export class MoveInService {
           updatedAt: new Date()
         });
 
-                 // Create RFI log
-         const rfiLog = new MoveInRequestLogs();
-         rfiLog.moveInRequest = { id: requestId } as any;
-         rfiLog.requestType = moveInRequest.requestType;
-         rfiLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING;
-         rfiLog.changes = `Request marked as RFI by ${user?.firstName || 'Admin'}`;
-         rfiLog.user = { id: user?.id } as any;
-         rfiLog.actionBy = ActionByTypes.COMMUNITY_ADMIN;
-         rfiLog.details = JSON.stringify({ comments, action: 'RFI_PENDING' });
-         rfiLog.comments = comments;
-         
-         await MoveInRequestLogs.save(rfiLog);
+        // Create RFI log
+        const rfiLog = new MoveInRequestLogs();
+        rfiLog.moveInRequest = { id: requestId } as any;
+        rfiLog.requestType = moveInRequest.requestType;
+        rfiLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING;
+        rfiLog.changes = `Request marked as RFI by ${user?.firstName || 'Admin'}`;
+        rfiLog.user = { id: user?.id } as any;
+        rfiLog.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        rfiLog.details = JSON.stringify({ comments, action: 'RFI_PENDING' });
+        rfiLog.comments = comments;
+
+        await MoveInRequestLogs.save(rfiLog);
       });
 
       // Send RFI notifications
@@ -1290,7 +1290,7 @@ export class MoveInService {
         MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED,
         MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED
       ];
-      
+
       if (!allowedStatuses.includes(moveInRequest.status)) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -1307,18 +1307,18 @@ export class MoveInService {
           updatedAt: new Date()
         });
 
-                 // Create cancellation log
-         const cancellationLog = new MoveInRequestLogs();
-         cancellationLog.moveInRequest = { id: requestId } as any;
-         cancellationLog.requestType = moveInRequest.requestType;
-         cancellationLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED;
-         cancellationLog.changes = `Request cancelled by ${user?.firstName || 'Admin'}`;
-         cancellationLog.user = { id: user?.id } as any;
-         cancellationLog.actionBy = ActionByTypes.COMMUNITY_ADMIN;
-         cancellationLog.details = JSON.stringify({ cancellationRemarks, action: 'CANCELLED' });
-         cancellationLog.comments = cancellationRemarks;
-         
-         await MoveInRequestLogs.save(cancellationLog);
+        // Create cancellation log
+        const cancellationLog = new MoveInRequestLogs();
+        cancellationLog.moveInRequest = { id: requestId } as any;
+        cancellationLog.requestType = moveInRequest.requestType;
+        cancellationLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED;
+        cancellationLog.changes = `Request cancelled by ${user?.firstName || 'Admin'}`;
+        cancellationLog.user = { id: user?.id } as any;
+        cancellationLog.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        cancellationLog.details = JSON.stringify({ cancellationRemarks, action: 'CANCELLED' });
+        cancellationLog.comments = cancellationRemarks;
+
+        await MoveInRequestLogs.save(cancellationLog);
       });
 
       // Send cancellation notifications
@@ -1402,7 +1402,7 @@ export class MoveInService {
       // Check if MIP is still valid (within 30 days of approval)
       const approvalDate = moveInRequest.updatedAt || moveInRequest.createdAt;
       const daysSinceApproval = Math.ceil((new Date().getTime() - new Date(approvalDate).getTime()) / (1000 * 60 * 60 * 24));
-      
+
       if (daysSinceApproval > 30) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
@@ -1420,18 +1420,18 @@ export class MoveInService {
           updatedAt: new Date()
         });
 
-                 // Create closure log
-         const closureLog = new MoveInRequestLogs();
-         closureLog.moveInRequest = { id: requestId } as any;
-         closureLog.requestType = moveInRequest.requestType;
-         closureLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED;
-         closureLog.changes = `Request closed by ${isSecurity ? 'Security' : 'Admin'}`;
-         closureLog.user = { id: user?.id } as any;
-         closureLog.actionBy = isSecurity ? ActionByTypes.SECURITY : ActionByTypes.COMMUNITY_ADMIN;
-         closureLog.details = JSON.stringify({ closureRemarks, actualMoveInDate, action: 'CLOSED' });
-         closureLog.comments = closureRemarks;
-         
-         await MoveInRequestLogs.save(closureLog);
+        // Create closure log
+        const closureLog = new MoveInRequestLogs();
+        closureLog.moveInRequest = { id: requestId } as any;
+        closureLog.requestType = moveInRequest.requestType;
+        closureLog.status = MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED;
+        closureLog.changes = `Request closed by ${isSecurity ? 'Security' : 'Admin'}`;
+        closureLog.user = { id: user?.id } as any;
+        closureLog.actionBy = isSecurity ? TransitionRequestActionByTypes.SECURITY : TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        closureLog.details = JSON.stringify({ closureRemarks, actualMoveInDate, action: 'CLOSED' });
+        closureLog.comments = closureRemarks;
+
+        await MoveInRequestLogs.save(closureLog);
 
         // TODO: Link unit to user and mark as occupied
         // TODO: Invalidate previous user access (access cards, amenity bookings)
@@ -1460,9 +1460,9 @@ export class MoveInService {
     try {
       // TODO: Implement push notification to customer
       // Template: "Your Move-in request has been approved by admin."
-      
+
       // TODO: Implement email notification to community recipients
-      
+
       logger.info(`Approval notifications sent for move-in request ${requestId}`);
     } catch (error) {
       logger.error(`Error sending approval notifications: ${error}`);
@@ -1476,7 +1476,7 @@ export class MoveInService {
     try {
       // TODO: Implement push notification to customer
       // Template: "Your Move-in request (<Reference ID>) requires further information. Tap to view details."
-      
+
       logger.info(`RFI notifications sent for move-in request ${requestId}`);
     } catch (error) {
       logger.error(`Error sending RFI notifications: ${error}`);
@@ -1490,7 +1490,7 @@ export class MoveInService {
     try {
       // TODO: Implement push notification to customer
       // Template: "Your Move-in request (<Reference ID>) has been cancelled."
-      
+
       logger.info(`Cancellation notifications sent for move-in request ${requestId}`);
     } catch (error) {
       logger.error(`Error sending cancellation notifications: ${error}`);
