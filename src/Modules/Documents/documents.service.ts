@@ -7,6 +7,8 @@ import { MasterCommunities } from '../../Entities/MasterCommunities.entity';
 import { Communities } from '../../Entities/Communities.entity';
 import { Towers } from '../../Entities/Towers.entity';
 import { logger } from '../../Common/Utils/logger';
+import { getPaginationInfo } from '../../Common/Utils/paginationUtils';
+import { stringToBoolean } from '../../Common/Utils/common-utility';
 
 import ApiError from '../../Common/Utils/ApiError';
 import { APICodes } from '../../Common/Constants/apiCodes.en';
@@ -16,7 +18,6 @@ import { WelcomeKitService, WelcomeKitData } from './welcomeKit.service';
 
 export class DocumentsService {
 
-    // Welcome Pack Methods
     /**
      * Get Welcome Pack List
      * @returns {Promise<any>}
@@ -25,77 +26,91 @@ export class DocumentsService {
      */
     async getWelcomePackList(query: any) {
         try {
-            let { page = 1, per_page = 20, masterCommunityIds = '', communityIds = '', towerIds = '', search = '', isActive, startDate, endDate, sortBy = 'id', sortOrder = 'DESC', includeFile = false } = query;
+            let { page = 1, per_page = 20, sortBy = 'id', sortOrder = 'DESC', includeFile = false } = query;
 
-            // Validate that masterCommunityIds is provided
-            if (!masterCommunityIds || masterCommunityIds.trim() === '') {
-                throw new ApiError(httpStatus.BAD_REQUEST, 'masterCommunityIds is required', 'EC400');
+            // Only process meaningful filters - ignore empty/blank values
+            const filters: any = {};
+            
+            if (query.search && query.search.trim().length > 0) {
+                filters.search = query.search.trim();
             }
-
-            // Parse comma-separated IDs and filter out empty values
-            const parseIds = (ids: string) => {
-                if (!ids || ids.trim() === '') return [];
-                return ids.split(',').filter((e: any) => e && e.trim() !== '');
-            };
-
-            masterCommunityIds = parseIds(masterCommunityIds);
-            communityIds = parseIds(communityIds);
-            towerIds = parseIds(towerIds);
-
-            // Ensure masterCommunityIds has at least one valid ID
-            if (masterCommunityIds.length === 0) {
-                throw new ApiError(httpStatus.BAD_REQUEST, 'At least one valid masterCommunityId is required', 'EC400');
+            
+            if (query.masterCommunityIds && query.masterCommunityIds.trim().length > 0) {
+                filters.masterCommunityIds = query.masterCommunityIds.split(',').filter((id: string) => id.trim() !== '');
+            }
+            
+            if (query.communityIds && query.communityIds.trim().length > 0) {
+                filters.communityIds = query.communityIds.split(',').filter((id: string) => id.trim() !== '');
+            }
+            
+            if (query.towerIds && query.towerIds.trim().length > 0) {
+                filters.towerIds = query.towerIds.split(',').filter((id: string) => id.trim() !== '');
+            }
+            
+            if (query.isActive !== undefined && query.isActive !== '') {
+                filters.isActive = stringToBoolean(query.isActive);
+            }
+            
+            if (query.startDate && query.startDate.trim().length > 0) {
+                filters.startDate = query.startDate;
+            }
+            
+            if (query.endDate && query.endDate.trim().length > 0) {
+                filters.endDate = query.endDate;
             }
 
             const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
             
             // Check database connection status
             if (!AppDataSource.isInitialized) {
-                throw new ApiError(httpStatus.SERVICE_UNAVAILABLE, 'Database connection not available', 'EC503');
+                logger.error('Database connection not available');
+                throw new ApiError(httpStatus.SERVICE_UNAVAILABLE, APICodes.INTERNAL_SERVER_ERROR.message, APICodes.INTERNAL_SERVER_ERROR.code);
             }
             
-            // Query building will be done separately for count and data queries
-
-            // Base condition - show all records by default, filter by isActive only when specified
+            // Build where clause based on meaningful filters only
             let whereClause = "1=1";
             let whereParams: any = {};
             
-            if (isActive !== undefined && isActive !== '') {
+            if (filters.isActive !== undefined) {
                 whereClause += " AND welcomePack.isActive = :isActive";
-                whereParams.isActive = isActive === 'true' || isActive === true;
+                whereParams.isActive = filters.isActive;
             }
 
-            // Add filtering by master community - required
-            whereClause += " AND welcomePack.masterCommunityId IN (:...masterCommunityIds)";
-            whereParams.masterCommunityIds = masterCommunityIds;
+            if (filters.masterCommunityIds && filters.masterCommunityIds.length > 0) {
+                whereClause += " AND welcomePack.masterCommunityId IN (:...masterCommunityIds)";
+                whereParams.masterCommunityIds = filters.masterCommunityIds;
+            }
 
-            // Add filtering by community - only if IDs are provided
-            if (communityIds && communityIds.length > 0) {
+            if (filters.communityIds && filters.communityIds.length > 0) {
                 whereClause += " AND welcomePack.communityId IN (:...communityIds)";
-                whereParams.communityIds = communityIds;
+                whereParams.communityIds = filters.communityIds;
             }
 
-            // Add filtering by tower - only if IDs are provided
-            if (towerIds && towerIds.length > 0) {
+            if (filters.towerIds && filters.towerIds.length > 0) {
                 whereClause += " AND welcomePack.towerId IN (:...towerIds)";
-                whereParams.towerIds = towerIds;
+                whereParams.towerIds = filters.towerIds;
             }
 
-            // Add search functionality
-            if (search && search.trim() !== '') {
+            if (filters.search) {
                 whereClause += " AND (masterCommunity.name LIKE :search OR community.name LIKE :search OR tower.name LIKE :search)";
-                whereParams.search = `%${search.trim()}%`;
+                whereParams.search = `%${filters.search}%`;
             }
 
-            // Add date range filtering
-            if (startDate && startDate.trim() !== '') {
+            if (filters.startDate) {
                 whereClause += " AND DATE(welcomePack.createdAt) >= DATE(:startDate)";
-                whereParams.startDate = startDate;
+                whereParams.startDate = filters.startDate;
             }
 
-            if (endDate && endDate.trim() !== '') {
+            if (filters.endDate) {
                 whereClause += " AND DATE(welcomePack.createdAt) <= DATE(:endDate)";
-                whereParams.endDate = endDate;
+                whereParams.endDate = filters.endDate;
+            }
+
+            // Log applied filters for debugging
+            if (Object.keys(filters).length > 0) {
+                logger.info(`Welcome Pack List - Applied filters: ${JSON.stringify(filters)}`);
+            } else {
+                logger.info('Welcome Pack List - No filters applied, returning all records');
             }
 
             // Create separate query builders for count and data
@@ -112,7 +127,7 @@ export class DocumentsService {
                 .where(whereClause, whereParams);
 
             // Handle field selection for data query
-            if (includeFile === 'true' || includeFile === true) {
+            if (stringToBoolean(includeFile)) {
                 dataQuery.select([
                     'welcomePack.id',
                     'welcomePack.masterCommunityId',
@@ -195,17 +210,11 @@ export class DocumentsService {
                 } : null
             }));
 
-            return {
-                data: formattedData,
-                pagination: {
-                    currentPage: page,
-                    totalPages: Math.ceil(totalCount / per_page),
-                    totalItems: totalCount,
-                    itemsPerPage: per_page
-                }
-            };
+            const pagination = getPaginationInfo(page, per_page, totalCount);
+
+            return { data: formattedData, pagination };
         } catch (error: any) {
-            logger.error(`Error in getWelcomePackList: ${JSON.stringify(error)}`);  
+            logger.error(`Error in getWelcomePackList: ${JSON.stringify(error)}`);
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
             throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
@@ -227,42 +236,42 @@ export class DocumentsService {
             const validatedMasterCommunityId = parseInt(masterCommunityId);
             const validatedCommunityId = parseInt(communityId);
             const validatedTowerId = towerId ? parseInt(towerId) : null;
-            const validatedIsActive = isActive === 'true' || isActive === true;
+            const validatedIsActive = stringToBoolean(isActive);
             
             // Validate converted values
             if (isNaN(validatedMasterCommunityId)) {
                 logger.error(`Invalid masterCommunityId: ${masterCommunityId} cannot be converted to number`);
-                throw new ApiError(400, 'Invalid masterCommunityId: must be a number', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
             }
             if (isNaN(validatedCommunityId)) {
                 logger.error(`Invalid communityId: ${communityId} cannot be converted to number`);
-                throw new ApiError(400, 'Invalid communityId: must be a number', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
             }
             if (towerId && isNaN(validatedTowerId!)) {
                 logger.error(`Invalid towerId: ${towerId} cannot be converted to number`);
-                throw new ApiError(400, 'Invalid towerId: must be a number', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
             }
 
             // Validate file
             if (!file) {
                 logger.error('File is missing');
-                throw new ApiError(400, 'File is required', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
             }
 
             if (!file.buffer) {
                 logger.error(`File buffer is missing. File object: ${JSON.stringify(file)}`);
-                throw new ApiError(400, 'File buffer is required', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
             }
 
             if (file.size > 10 * 1024 * 1024) { // 10MB
                 logger.error(`File size ${file.size} exceeds 10MB limit`);
-                throw new ApiError(400, 'File size must be less than 10MB', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
             }
 
             const allowedTypes = ['application/pdf', 'text/html'];
             if (!allowedTypes.includes(file.mimetype)) {
                 logger.error(`File type ${file.mimetype} not allowed. Allowed types: ${allowedTypes.join(', ')}`);
-                throw new ApiError(400, 'Only PDF and HTML files are allowed', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
             }
 
             // Deactivate existing active welcome packs for the same combination
@@ -322,7 +331,7 @@ export class DocumentsService {
             
             // Validate required fields
             if (!validatedMasterCommunityId || !validatedCommunityId || !file.buffer || !userId) {
-                throw new ApiError(500, 'Missing required fields: masterCommunityId, communityId, file buffer, or userId', APICodes.INTERNAL_SERVER_ERROR.code);
+                throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.INTERNAL_SERVER_ERROR.message, APICodes.INTERNAL_SERVER_ERROR.code);
             }
             
             const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);         
@@ -333,7 +342,7 @@ export class DocumentsService {
                 
                 // Ensure we have a single entity, not an array
                 if (Array.isArray(savedWelcomePack)) {
-                    throw new ApiError(500, 'Unexpected array result from save operation', APICodes.INTERNAL_SERVER_ERROR.code);
+                    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.INTERNAL_SERVER_ERROR.message, APICodes.INTERNAL_SERVER_ERROR.code);
                 }
                 
                 // Type assertion after array check
@@ -357,8 +366,10 @@ export class DocumentsService {
             } catch (saveError: any) {      
                 throw saveError;
             }
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in createWelcomePack: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -451,8 +462,10 @@ export class DocumentsService {
 
             // Return null instead of throwing error - let the controller handle the "not found" case
             return formattedData;
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in getWelcomePackById: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -467,12 +480,12 @@ export class DocumentsService {
             const welcomePack = await this.getWelcomePackById(id, true);
 
             if (!welcomePack) {
-                throw new ApiError(404, 'Welcome pack not found', APICodes.NOT_FOUND.code);
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
             }
 
             // Check if templateString exists and is a string
             if (!('templateString' in welcomePack) || typeof (welcomePack as any).templateString !== 'string') {
-                throw new ApiError(404, 'Welcome pack file not found', APICodes.NOT_FOUND.code);
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.FILE_NOT_FOUND.message, APICodes.FILE_NOT_FOUND.code);
             }
 
             let contentType = 'application/octet-stream';
@@ -499,8 +512,10 @@ export class DocumentsService {
                 contentType,
                 fileName
             };
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in downloadWelcomePackFile: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -518,11 +533,11 @@ export class DocumentsService {
             const welcomePack = await this.getWelcomePackById(id);
 
             if (!welcomePack) {
-                throw new ApiError(404, 'Welcome pack not found', APICodes.NOT_FOUND.code);
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
             }
 
             // Convert string boolean to actual boolean if needed
-            const isActiveBoolean = data.isActive === 'true' ? true : data.isActive === 'false' ? false : data.isActive;
+            const isActiveBoolean = stringToBoolean(data.isActive);
             
             // If updating to active, deactivate other active welcome packs for the same combination
             if (isActiveBoolean === true) {
@@ -572,12 +587,12 @@ export class DocumentsService {
             if (file && file.buffer && file.buffer.length > 0 && file.size > 0 && file.mimetype) {
                 // Validate file type and size
                 if (file.size > 10 * 1024 * 1024) { // 10MB
-                    throw new ApiError(400, 'File size must be less than 10MB', APICodes.UNKNOWN_ERROR.code);
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
                 }
 
                 const allowedTypes = ['application/pdf', 'text/html'];
                 if (!allowedTypes.includes(file.mimetype)) {
-                    throw new ApiError(400, 'Only PDF and HTML files are allowed', APICodes.UNKNOWN_ERROR.code);
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
                 }
 
                 cleanData.templateString = file.buffer.toString('base64');
@@ -599,14 +614,14 @@ export class DocumentsService {
             
             // Ensure at least one field is being updated
             if (!hasUpdates) {
-                throw new ApiError(400, 'No fields to update. Please provide isActive status or upload a file.', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.UPDATE_NOT_POSSIBLE.message, APICodes.UPDATE_NOT_POSSIBLE.code);
             }
             
             welcomePack.updatedBy = userId;
             const updatedWelcomePack = await AppDataSource.getRepository(OccupancyRequestWelcomePack).save(welcomePack);
 
             if (!updatedWelcomePack) {
-                throw new ApiError(500, 'Failed to update welcome pack', APICodes.INTERNAL_SERVER_ERROR.code);
+                throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UPDATE_NOT_POSSIBLE.message, APICodes.UPDATE_NOT_POSSIBLE.code);
             }
 
             // Create history record for the update
@@ -625,8 +640,10 @@ export class DocumentsService {
             await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyData);
 
             return updatedWelcomePack;
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in updateWelcomePack: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -658,12 +675,14 @@ export class DocumentsService {
             const welcomePack = await queryBuilder.getOne();
 
             if (!welcomePack) {
-                throw new ApiError(404, 'No active welcome pack found for the specified combination', APICodes.NOT_FOUND.code);
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
             }
 
             return welcomePack;
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in getActiveWelcomePack: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -710,8 +729,10 @@ export class DocumentsService {
                 message: 'Data consistency check completed',
                 deactivatedCount: activeWelcomePacks.length - groupedWelcomePacks.size
             };
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in ensureDataConsistency: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -745,7 +766,7 @@ export class DocumentsService {
                 .where('template.templateType IN (:...templateTypes)', { templateTypes: ['move-in', 'move-out'] });
 
             // Handle field selection based on includeFile parameter
-            if (includeFile === 'true' || includeFile === true) {
+            if (stringToBoolean(includeFile)) {
                 // When includeFile is true, select all fields including templateString and select: false fields
                 queryBuilder.select([
                     'template.id',
@@ -809,19 +830,19 @@ export class DocumentsService {
 
             // Add template type filtering - templateType is now required by validation
             if (!templateType) {
-                throw new ApiError(400, 'Template type is required and must be either "move-in" or "move-out"', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
             }
             
             // Validate templateType value
             if (!['move-in', 'move-out'].includes(templateType)) {
-                throw new ApiError(400, 'Template type must be either "move-in" or "move-out"', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
             }
             
             queryBuilder.andWhere('template.templateType = :templateType', { templateType });
 
             // Add active status filtering
             if (isActive !== undefined && isActive !== '') {
-                queryBuilder.andWhere('template.isActive = :isActive', { isActive: isActive === 'true' || isActive === true });
+                queryBuilder.andWhere('template.isActive = :isActive', { isActive: stringToBoolean(isActive) });
             }
 
             // Add sorting
@@ -841,17 +862,13 @@ export class DocumentsService {
             // When includeFile is false, templateString is not selected
             // When includeFile is true, templateString is selected and returned as-is
 
-            return {
-                templates,
-                pagination: {
-                    currentPage: page,
-                    totalPages: Math.ceil(total / per_page),
-                    totalItems: total,
-                    itemsPerPage: per_page
-                }
-            };
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+            const pagination = getPaginationInfo(page, per_page, total);
+
+            return { templates, pagination };
+        } catch (error: any) {
+            logger.error(`Error in getTemplateList: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -870,31 +887,31 @@ export class DocumentsService {
             const communityId = parseInt(data.communityId);
             const towerId = data.towerId ? parseInt(data.towerId) : null;
             const templateType = data.templateType;
-            const isActive = data.isActive === 'true' || data.isActive === true;
+            const isActive = stringToBoolean(data.isActive);
 
             // Validate converted data
             if (isNaN(masterCommunityId)) {
-                throw new ApiError(400, 'Invalid masterCommunityId: must be a number', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
             }
             if (isNaN(communityId)) {
-                throw new ApiError(400, 'Invalid communityId: must be a number', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
             }
             if (data.towerId && towerId !== null && isNaN(towerId)) {
-                throw new ApiError(400, 'Invalid towerId: must be a number', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
             }
 
             // Validate file type and size
             if (!templateFile) {
-                throw new ApiError(400, 'Template file is required', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
             }
 
             if (templateFile.size > 10 * 1024 * 1024) { // 10MB
-                throw new ApiError(400, 'File size must be less than 10MB', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
             }
 
             const allowedTypes = ['application/pdf', 'text/html'];
             if (!allowedTypes.includes(templateFile.mimetype)) {
-                throw new ApiError(400, 'Only PDF and HTML files are allowed', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
             }
 
             // Deactivate existing active templates for the same combination
@@ -984,8 +1001,10 @@ export class DocumentsService {
             }
 
             return savedTemplate;
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in createTemplate: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -1048,12 +1067,14 @@ export class DocumentsService {
             const template = await queryBuilder.getOne();
 
             if (!template) {
-                throw new ApiError(404, 'Template not found', APICodes.NOT_FOUND.code);
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
             }
 
             return template;
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in getTemplateById: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -1071,11 +1092,11 @@ export class DocumentsService {
                 .getOne();
 
             if (!template) {
-                throw new ApiError(404, 'Template not found', APICodes.NOT_FOUND.code);
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
             }
 
             if (!template.templateString) {
-                throw new ApiError(400, 'Template file not found', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.FILE_NOT_FOUND.message, APICodes.FILE_NOT_FOUND.code);
             }
 
             // Convert base64 string back to buffer
@@ -1099,8 +1120,10 @@ export class DocumentsService {
                 contentType,
                 fileName
             };
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in downloadTemplateFile: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -1124,11 +1147,11 @@ export class DocumentsService {
                 .getOne();
 
             if (!template) {
-                throw new ApiError(404, 'Template not found', APICodes.NOT_FOUND.code);
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
             }
 
             // Convert string boolean to actual boolean if needed
-            const isActiveBoolean = data.isActive === 'true' ? true : data.isActive === 'false' ? false : data.isActive;
+            const isActiveBoolean = stringToBoolean(data.isActive);
             
             // If updating to active, deactivate other active templates for the same combination
             if (isActiveBoolean === true) {
@@ -1189,12 +1212,12 @@ export class DocumentsService {
             if (templateFile && templateFile.buffer && templateFile.buffer.length > 0 && templateFile.size > 0 && templateFile.mimetype) {
                 // Validate file type and size
                 if (templateFile.size > 10 * 1024 * 1024) { // 10MB
-                    throw new ApiError(400, 'File size must be less than 10MB', APICodes.UNKNOWN_ERROR.code);
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
                 }
 
                 const allowedTypes = ['application/pdf', 'text/html'];
                 if (!allowedTypes.includes(templateFile.mimetype)) {
-                    throw new ApiError(400, 'Only PDF and HTML files are allowed', APICodes.UNKNOWN_ERROR.code);
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
                 }
 
                 cleanData.templateString = templateFile.buffer.toString('base64');
@@ -1237,7 +1260,7 @@ export class DocumentsService {
             
             // Ensure at least one field is being updated
             if (!hasUpdates) {
-                throw new ApiError(400, 'No fields to update. Please provide isActive status, template type, community IDs, or upload a file.', APICodes.UNKNOWN_ERROR.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.UPDATE_NOT_POSSIBLE.message, APICodes.UPDATE_NOT_POSSIBLE.code);
             }
             
             logger.info(`Updating template with: isActive=${cleanData.isActive !== undefined ? isActiveBoolean : 'unchanged'}, hasFile=${!!(templateFile && templateFile.buffer && templateFile.buffer.length > 0)}`);
@@ -1246,7 +1269,7 @@ export class DocumentsService {
             const updatedTemplate = await AppDataSource.getRepository(OccupancyRequestTemplates).save(template);
 
             if (!updatedTemplate) {
-                throw new ApiError(500, 'Failed to update template', APICodes.INTERNAL_SERVER_ERROR.code);
+                throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UPDATE_NOT_POSSIBLE.message, APICodes.UPDATE_NOT_POSSIBLE.code);
             }
 
             // Create history record for the update
@@ -1262,8 +1285,10 @@ export class DocumentsService {
 
             logger.info(`Template updated successfully with ID: ${updatedTemplate.id}`);
             return updatedTemplate;
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in updateTemplate: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -1286,13 +1311,15 @@ export class DocumentsService {
                 .getMany();
 
             if (!history || history.length === 0) {
-                throw new ApiError(404, `No history found for template with ID ${id}`, APICodes.NOT_FOUND.code);
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
             }
 
             logger.info(`Successfully retrieved ${history.length} history records for template ID ${id}`);
             return history;
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in getTemplateHistory: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -1308,7 +1335,7 @@ export class DocumentsService {
         
         if (!AppDataSource.isInitialized) {
             logger.error('Database connection not available');
-            throw new ApiError(500, 'Database connection not available', APICodes.INTERNAL_SERVER_ERROR.code);
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.INTERNAL_SERVER_ERROR.message, APICodes.INTERNAL_SERVER_ERROR.code);
         }
 
         logger.info(`Database connection status: ${AppDataSource.isInitialized}`);
@@ -1412,7 +1439,7 @@ export class DocumentsService {
                 
             default:
                 logger.error(`Unsupported template type: ${templateType}`);
-                throw new ApiError(400, `Unsupported template type: ${templateType}`, APICodes.BAD_REQUEST.code);
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
             }
             
             if (!history || history.length === 0) {
@@ -1484,8 +1511,10 @@ export class DocumentsService {
             
             logger.info(`Successfully transformed ${transformedHistory.length} history records`);
             return transformedHistory;
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in getUnifiedHistory: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -1561,7 +1590,7 @@ export class DocumentsService {
 
             // Add active status filtering
             if (isActive !== undefined && isActive !== '') {
-                queryBuilder.andWhere('recipients.isActive = :isActive', { isActive: isActive === 'true' || isActive === true });
+                queryBuilder.andWhere('recipients.isActive = :isActive', { isActive: stringToBoolean(isActive) });
             }
 
             // Add date range filtering
@@ -1590,17 +1619,13 @@ export class DocumentsService {
 
             logger.info(`Query executed successfully, got ${recipients.length} recipients out of ${total} total`);
 
-            return {
-                officialRecipients: recipients,
-                pagination: {
-                    currentPage: page,
-                    totalPages: Math.ceil(total / per_page),
-                    totalItems: total,
-                    itemsPerPage: per_page
-                }
-            };
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+            const pagination = getPaginationInfo(page, per_page, total);
+
+            return { officialRecipients: recipients, pagination };
+        } catch (error: any) {
+            logger.error(`Error in getEmailRecipientsList: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -1622,7 +1647,7 @@ export class DocumentsService {
                 const mipEmails = mipRecipients.split(',').map((email: string) => email.trim());
                 for (const email of mipEmails) {
                     if (!this.isValidEmail(email)) {
-                        throw new ApiError(400, `Invalid email format for MIP recipient: ${email}`, APICodes.UNKNOWN_ERROR.code);
+                        throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
                     }
                 }
             }
@@ -1632,7 +1657,7 @@ export class DocumentsService {
                 const mopEmails = mopRecipients.split(',').map((email: string) => email.trim());
                 for (const email of mopEmails) {
                     if (!this.isValidEmail(email)) {
-                        throw new ApiError(400, `Invalid email format for MOP recipient: ${email}`, APICodes.UNKNOWN_ERROR.code);
+                        throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
                     }
                 }
             }
@@ -1689,19 +1714,19 @@ export class DocumentsService {
                 // First, let's check if the referenced entities exist
                 const masterCommunity = await AppDataSource.getRepository(MasterCommunities).findOne({ where: { id: masterCommunityId } });
                 if (!masterCommunity) {
-                    throw new ApiError(400, `Master Community with ID ${masterCommunityId} not found`, APICodes.UNKNOWN_ERROR.code);
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.MASTER_COMMUNITY_NOT_FOUND.message, APICodes.MASTER_COMMUNITY_NOT_FOUND.code);
                 }
 
                 const community = await AppDataSource.getRepository(Communities).findOne({ where: { id: communityId } });
                 if (!community) {
-                    throw new ApiError(400, `Community with ID ${communityId} not found`, APICodes.UNKNOWN_ERROR.code);
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.COMMUNITY_NOT_FOUND.message, APICodes.COMMUNITY_NOT_FOUND.code);
                 }
 
                 let tower = null;
                 if (towerId) {
                     tower = await AppDataSource.getRepository(Towers).findOne({ where: { id: towerId } });
                     if (!tower) {
-                        throw new ApiError(400, `Tower with ID ${towerId} not found`, APICodes.UNKNOWN_ERROR.code);
+                        throw new ApiError(httpStatus.BAD_REQUEST, APICodes.TOWER_NOT_FOUND.message, APICodes.TOWER_NOT_FOUND.code);
                     }
                 }
 
@@ -1747,10 +1772,12 @@ export class DocumentsService {
                 return savedRecipients;
             } catch (saveError: any) {
                 logger.error(`Error saving email recipients: ${JSON.stringify(saveError)}`);
-                throw new ApiError(500, `Failed to save email recipients: ${saveError.message}`, APICodes.INTERNAL_SERVER_ERROR.code);
+                throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.INTERNAL_SERVER_ERROR.message, APICodes.INTERNAL_SERVER_ERROR.code);
             }
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in createEmailRecipients: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -1775,7 +1802,7 @@ export class DocumentsService {
                 .getOne();
 
             if (!recipients) {
-                throw new ApiError(404, 'Email recipients configuration not found', APICodes.NOT_FOUND.code);
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
             }
 
             // Validate email format for MIP recipients if provided
@@ -1783,7 +1810,7 @@ export class DocumentsService {
                 const mipEmails = data.mipRecipients.split(',').map((email: string) => email.trim());
                 for (const email of mipEmails) {
                     if (!this.isValidEmail(email)) {
-                        throw new ApiError(400, `Invalid email format for MIP recipient: ${email}`, APICodes.UNKNOWN_ERROR.code);
+                        throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
                     }
                 }
             }
@@ -1793,7 +1820,7 @@ export class DocumentsService {
                 const mopEmails = data.mopRecipients.split(',').map((email: string) => email.trim());
                 for (const email of mopEmails) {
                     if (!this.isValidEmail(email)) {
-                        throw new ApiError(400, `Invalid email format for MOP recipient: ${email}`, APICodes.UNKNOWN_ERROR.code);
+                        throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
                     }
                 }
             }
@@ -1888,8 +1915,10 @@ export class DocumentsService {
 
             logger.info('Email recipients updated successfully');
             return updatedRecipients;
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in updateEmailRecipients: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -1910,8 +1939,10 @@ export class DocumentsService {
                 .getMany();
 
             return history;
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in getEmailRecipientsHistory: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -1936,8 +1967,10 @@ export class DocumentsService {
             
             logger.info('Welcome Kit PDF generated successfully');
             return pdfBuffer;
-        } catch (error) {
-            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+        } catch (error: any) {
+            logger.error(`Error in generateWelcomeKitPDF: ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
@@ -1948,27 +1981,63 @@ export class DocumentsService {
             // Get template data from database
             const template = await this.getWelcomePackById(templateId, true);
             if (!template) {
-                throw new ApiError(httpStatus.NOT_FOUND, 'Template not found', 'EC404');
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.TEMPLATE_NOT_FOUND.message, APICodes.TEMPLATE_NOT_FOUND.code);
             }
+
+            // Default values for Welcome Kit generation
+            const DEFAULT_RESIDENT_NAME = {
+                code: "EC186",
+                message: "Resident Name"
+            };
+            
+            const DEFAULT_UNIT_NUMBER = {
+                code: "EC187",
+                message: "Unit Number"
+            };
+            
+            const DEFAULT_BUILDING_NAME = {
+                code: "EC188",
+                message: "Building Name"
+            };
+            
+            const DEFAULT_COMMUNITY_NAME = {
+                code: "EC189",
+                message: "Community Name"
+            };
+            
+            const DEFAULT_MASTER_COMMUNITY_NAME = {
+                code: "EC190",
+                message: "Master Community Name"
+            };
+            
+            const DEFAULT_MOVE_IN_DATE = {
+                code: "EC185",
+                message: "Move-in Date"
+            };
+            
+            const DEFAULT_CONTACT_NUMBER = {
+                code: "EC191",
+                message: "800 SOBHA (76242)"
+            };
 
             // Merge template data with provided data
             const mergedData: WelcomeKitData = {
-                residentName: data.residentName || 'Resident Name',
-                unitNumber: data.unitNumber || 'Unit Number',
-                buildingName: data.buildingName || 'Building Name',
-                communityName: data.communityName || 'Community Name',
-                masterCommunityName: data.masterCommunityName || 'Master Community Name',
+                residentName: data.residentName || DEFAULT_RESIDENT_NAME.message,
+                unitNumber: data.unitNumber || DEFAULT_UNIT_NUMBER.message,
+                buildingName: data.buildingName || DEFAULT_BUILDING_NAME.message,
+                communityName: data.communityName || DEFAULT_COMMUNITY_NAME.message,
+                masterCommunityName: data.masterCommunityName || DEFAULT_MASTER_COMMUNITY_NAME.message,
                 dateOfIssue: data.dateOfIssue || new Date().toLocaleDateString('en-GB'),
-                moveInDate: data.moveInDate || 'Move-in Date',
+                moveInDate: data.moveInDate || DEFAULT_MOVE_IN_DATE.message,
                 referenceNumber: data.referenceNumber || `WK-${Date.now()}`,
-                contactNumber: data.contactNumber || '800 SOBHA (76242)'
+                contactNumber: data.contactNumber || DEFAULT_CONTACT_NUMBER.message
             };
 
             return await this.generateWelcomeKitPDF(mergedData);
         } catch (error: any) {
-            logger.error(`Error generating Welcome Kit PDF from template: ${JSON.stringify(error)}`);
+            logger.error(`Error in generateWelcomeKitPDFFromTemplate: ${JSON.stringify(error)}`);
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-            throw new ApiError(APICodes.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
     }
 
