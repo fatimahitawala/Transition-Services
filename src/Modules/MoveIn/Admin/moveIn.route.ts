@@ -15,7 +15,7 @@ const router = Router();
 
 // GET routes for admin move-in management
 router.get("/request", auth.auth(), validate(moveInValidation.getAdminMoveIn), catchAsync(moveInController.getAllMoveInRequestList));
-router.get('/moveInDetails/:requestId', auth.auth(), validate(moveInValidation.getAdminMoveInDetails), catchAsync(moveInController.getAllMoveInDetailsList));
+router.get('/details/:requestId', auth.auth(), validate(moveInValidation.getAdminMoveInDetails), catchAsync(moveInController.getAllMoveInDetailsList));
 
 // POST routes for creating different types of move-in requests (Admin)
 router.post('/owner', auth.auth(), validate(moveInValidation.createOwnerMoveIn), catchAsync(moveInController.createOwnerMoveInRequest));
@@ -24,19 +24,19 @@ router.post('/hho-unit', auth.auth(), validate(moveInValidation.createHhoOwnerMo
 router.post('/hhc-company', auth.auth(), validate(moveInValidation.createHhcCompanyMoveIn), catchAsync(moveInController.createHhcCompanyMoveInRequest));
 
 // Document upload route for Admin
-router.post('/request/:requestId/documents', 
-	auth.auth(), 
-	validate(moveInValidation.uploadDocuments),
-	fileUploads.fields([
-		{ name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.EJARI, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.TITLE_DEED, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.OTHER, maxCount: 4 }
-	]), 
-	catchAsync(moveInController.uploadDocuments)
+router.post('/request/:requestId/documents',
+    auth.auth(),
+    validate(moveInValidation.uploadDocuments),
+    fileUploads.fields([
+        { name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.EJARI, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.TITLE_DEED, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.OTHER, maxCount: 4 }
+    ]),
+    catchAsync(moveInController.uploadDocuments)
 );
 
 // Status management routes
