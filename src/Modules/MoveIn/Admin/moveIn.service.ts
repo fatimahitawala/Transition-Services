@@ -16,6 +16,7 @@ import { TRANSITION_DOCUMENT_TYPES } from "../../../Entities/EntityTypes/transit
 import { uploadFile } from "../../../Common/Utils/azureBlobStorage";
 import { executeInTransaction } from "../../../Common/Utils/transactionUtil";
 import { Units } from "../../../Entities/Units.entity";
+import { get } from "http";
 
 export class MoveInService {
   createMoveInRequest(body: any) {
@@ -717,85 +718,48 @@ export class MoveInService {
   async getAdminMoveIn(query: any, user: any) {
     try {
       const isSecurity = await checkIsSecurity(user);
+      let { page = 1, per_page = 20, masterCommunityIds = "", communityIds = "", towerIds = "", createdStartDate = "", createdEndDate = "", moveInStartDate = "", moveInEndDate = "" } = query;
 
-      if (isSecurity) {
-        console.log("User is part of the security team");
-      } else {
-        console.log("User is not part of the security team");
-      }
-      let {
-        page = 1,
-        per_page = 20,
-        masterCommunityIds = "",
-        communityIds = "",
-        towerIds = "",
-        createdStartDate = "",
-        createdEndDate = "",
-        moveInStartDate = "",
-        moveInEndDate = "",
-      } = query;
-      console.log("masterCommunityIds", masterCommunityIds);
       masterCommunityIds = masterCommunityIds.split(",").filter((e: any) => e);
       communityIds = communityIds.split(",").filter((e: any) => e);
       towerIds = towerIds.split(",").filter((e: any) => e);
 
-      let whereClause = "am.isActive = true";
-
-      if (masterCommunityIds && masterCommunityIds.length)
-        whereClause += ` AND am.masterCommunity IN (:...masterCommunityIds)`;
-
-      if (communityIds && communityIds.length)
-        whereClause += ` AND am.community IN (:...communityIds)`;
-
-      if (towerIds && towerIds.length)
-        whereClause += ` AND am.tower IN (:...towerIds)`;
-
-      if (createdStartDate) whereClause += ` AND am.createdAt >= :createdStartDate`;
-
-      if (createdEndDate) whereClause += ` AND am.createdAt <= :createdEndDate`;
-
-      if (moveInStartDate) whereClause += ` AND am.moveInDate >= :moveInStartDate`;
-
-      if (moveInEndDate) whereClause += ` AND am.moveInDate <= :moveInEndDate`;
-
       let getMoveInList = MoveInRequests.getRepository().createQueryBuilder("am")
         .select([
-          "am.status",
-          "am.createdAt",
-          "am.moveInDate",
-          "am.moveInRequestNo",
-          "am.requestType",
+          "am.id", "am.status", "am.createdAt", "am.moveInDate",
+          "am.moveInRequestNo", "am.requestType",
         ])
-        .where(whereClause, {
-          masterCommunityIds,
-          communityIds,
-          towerIds,
-          startDate: query.startDate,
-          endDate: query.endDate,
-        });
-
-      getMoveInList.innerJoinAndSelect("am.unit", "u", "u.isActive=1");
-      getMoveInList.innerJoinAndSelect("u.masterCommunity", "mc", "mc.isActive=1");
-      getMoveInList.innerJoinAndSelect("u.community", "c", "c.isActive=1");
-      getMoveInList.innerJoinAndSelect("u.tower", "t", "t.isActive=1");
-
-      getMoveInList.where(whereClause, { masterCommunityIds, communityIds, towerIds });
+        .innerJoinAndSelect("am.unit", "u", "u.isActive=1")
+        .innerJoinAndSelect("u.masterCommunity", "mc", "mc.isActive=1")
+        .innerJoinAndSelect("u.community", "c", "c.isActive=1")
+        .innerJoinAndSelect("u.tower", "t", "t.isActive=1")
+        .where("am.isActive=1");
 
       console.log("Query:", getMoveInList.getQuery());
       getMoveInList = checkAdminPermission(getMoveInList, { towerId: 't.id', communityId: 'c.id', masterCommunityId: 'mc.id' }, query.user);
 
-
-      console.log("Query:", getMoveInList.getQuery());
+      if (masterCommunityIds && masterCommunityIds.length) getMoveInList.andWhere(`am.masterCommunity IN (:...masterCommunityIds)`, { masterCommunityIds });
+      if (communityIds && communityIds.length) getMoveInList.andWhere(`am.community IN (:...communityIds)`, { communityIds });
+      if (towerIds && towerIds.length) getMoveInList.andWhere(`am.tower IN (:...towerIds)`, { towerIds });
+      if (createdStartDate) getMoveInList.andWhere(`am.createdAt >= :createdStartDate`, { createdStartDate });
+      if (createdEndDate) getMoveInList.andWhere(`am.createdAt <= :createdEndDate`, { createdEndDate });
+      if (moveInStartDate) getMoveInList.andWhere(`am.moveInDate >= :moveInStartDate`, { moveInStartDate });
+      if (moveInEndDate) getMoveInList.andWhere(`am.moveInDate <= :moveInEndDate`, { moveInEndDate });
 
       if (isSecurity) {
         getMoveInList.andWhere("am.status IN (:...allowedStatuses)", { allowedStatuses: [MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED, MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED] });
       }
-      getMoveInList.offset((page - 1) * per_page).limit(per_page);
+
+      getMoveInList.orderBy("am.createdAt", "DESC")
+        .offset((page - 1) * per_page)
+        .limit(per_page);
 
       const list = await getMoveInList.getMany();
       const count = await getMoveInList.getCount();
       const pagination = getPaginationInfo(page, per_page, count);
+
       return { data: list, pagination };
+
     } catch (error) {
       logger.error(`Error in getAdminMoveIn : ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
