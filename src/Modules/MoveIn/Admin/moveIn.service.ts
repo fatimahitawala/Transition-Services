@@ -717,6 +717,12 @@ export class MoveInService {
   async getAdminMoveIn(query: any, user: any) {
     try {
       const isSecurity = await checkIsSecurity(user);
+
+      if (isSecurity) {
+        console.log("User is part of the security team");
+      } else {
+        console.log("User is not part of the security team");
+      }
       let {
         page = 1,
         per_page = 20,
@@ -728,7 +734,7 @@ export class MoveInService {
         moveInStartDate = "",
         moveInEndDate = "",
       } = query;
-
+      console.log("masterCommunityIds", masterCommunityIds);
       masterCommunityIds = masterCommunityIds.split(",").filter((e: any) => e);
       communityIds = communityIds.split(",").filter((e: any) => e);
       towerIds = towerIds.split(",").filter((e: any) => e);
