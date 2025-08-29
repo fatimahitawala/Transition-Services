@@ -758,8 +758,7 @@ export class MoveInService {
 
       if (moveInEndDate) whereClause += ` AND am.moveInDate <= :moveInEndDate`;
 
-      let getMoveInList = MoveInRequests.getRepository()
-        .createQueryBuilder("am")
+      let getMoveInList = MoveInRequests.getRepository().createQueryBuilder("am")
         .select([
           "am.status",
           "am.createdAt",
@@ -782,7 +781,11 @@ export class MoveInService {
 
       getMoveInList.where(whereClause, { masterCommunityIds, communityIds, towerIds });
 
+      console.log("Query:", getMoveInList.getQuery());
       getMoveInList = checkAdminPermission(getMoveInList, { towerId: 't.id', communityId: 'c.id', masterCommunityId: 'mc.id' }, query.user);
+
+
+      console.log("Query:", getMoveInList.getQuery());
 
       if (isSecurity) {
         getMoveInList.andWhere("am.status IN (:...allowedStatuses)", { allowedStatuses: [MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED, MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED] });
