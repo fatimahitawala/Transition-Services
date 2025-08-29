@@ -14,17 +14,9 @@ export class MoveInController {
     const { query } = req;
     const { unitId } = req.params;
 
-    const moveInRequestList = await moveInService.getMobileMoveIn(
-      query,
-      Number(unitId)
-    );
+    const moveInRequestList = await moveInService.getMobileMoveIn(query, Number(unitId));
 
-    return successResponseWithPaginationData(
-      res,
-      APICodes.LISTING_SUCCESS,
-      moveInRequestList.data,
-      moveInRequestList.pagination
-    );
+    return successResponseWithPaginationData(res, APICodes.LISTING_SUCCESS, moveInRequestList.data, moveInRequestList.pagination);
   }
 
   // Removed generic createMoveInRequest in favor of type-specific endpoints
@@ -94,9 +86,9 @@ export class MoveInController {
     const { user }: Record<string, any> = req;
     const { requestId } = req.params;
     const { files, body } = req as any;
-    
+
     logger.debug(`MOVE-IN | UPLOAD DOCUMENTS | REQUEST ID: ${requestId} | USER: ${user?.id} | FILES: ${JSON.stringify(files)}`);
-    
+
     const result = await moveInService.uploadDocuments(Number(requestId), files, body, user);
     return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
   }
