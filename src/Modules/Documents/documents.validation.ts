@@ -34,7 +34,6 @@ export class DocumentsValidation {
             'string.empty': APICodes.COMMUNITY_REQUIRED.message
         }),
         towerId: Joi.string().optional().allow(''),
-        templateString: Joi.string().optional(),
         isActive: Joi.string().valid('true', 'false', true, false).default('true')
     });
 
@@ -59,6 +58,7 @@ export class DocumentsValidation {
             'number.base': APICodes.TOWER_ID_MUST_BE_NUMBER.message,
             'number.integer': APICodes.TOWER_ID_MUST_BE_NUMBER.message
         }),
+        fileId: Joi.number().integer().optional(),
         isActive: Joi.alternatives().try(
             Joi.boolean(),
             Joi.string().valid('true', 'false')
@@ -219,6 +219,15 @@ export class DocumentsValidation {
     });
 
     updateEmailRecipients = Joi.object({
+        masterCommunityId: Joi.number().integer().optional().messages({
+            'number.base': APICodes.MASTER_COMMUNITY_ID_MUST_BE_NUMBER.message
+        }),
+        communityId: Joi.number().integer().optional().messages({
+            'number.base': APICodes.COMMUNITY_ID_MUST_BE_NUMBER.message
+        }),
+        towerId: Joi.number().integer().optional().allow(null).messages({
+            'number.base': APICodes.TOWER_ID_MUST_BE_NUMBER.message
+        }),
         mipRecipients: Joi.string().optional().messages({
             'string.empty': APICodes.MIP_RECIPIENTS_CANNOT_BE_EMPTY.message
         }),
