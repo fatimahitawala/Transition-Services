@@ -126,18 +126,27 @@ export class DocumentsValidation {
         includeFile: Joi.alternatives().try(Joi.boolean(), Joi.string().valid('true', 'false')).default(false).optional()
     });
 
-    createTemplate = Joi.object({
-        masterCommunityId: Joi.number().integer().required(),
-        communityId: Joi.number().integer().required(),
-        towerId: Joi.number().integer().optional().allow(null),
-        templateType: Joi.string().valid('move-in', 'move-out').required(),
-        isActive: Joi.boolean().default(true)
-    });
+    createTemplate = {
+        params: Joi.object({
+            templateType: Joi.string().valid('move-in', 'move-out').required(),
+        }),
+        body: Joi.object({
+            masterCommunityId: Joi.number().integer().required(),
+            communityId: Joi.number().integer().required(),
+            towerId: Joi.number().integer().optional().allow(null),
+            isActive: Joi.boolean().default(true)
+        })
+    };
 
-    getTemplateById = Joi.object({
-        id: Joi.number().integer().required(),
-        includeFile: Joi.boolean().default(false)
-    });
+    getTemplateById = {
+        params: Joi.object({
+            templateType: Joi.string().valid('move-in', 'move-out').required(),
+            id: Joi.number().integer().required(),
+        }),
+        query: Joi.object({
+            includeFile: Joi.boolean().default(false)
+        })
+    };
 
     getUnifiedHistory = Joi.object({
         templateType: Joi.string().valid('move-in', 'move-out', 'welcome-pack', 'recipient-mail').required().messages({
@@ -151,23 +160,25 @@ export class DocumentsValidation {
         })
     });
 
-    updateTemplate = Joi.object({
-        isActive: Joi.boolean().optional().messages({
-            'boolean.base': APICodes.ISACTIVE_MUST_BE_BOOLEAN.message
+    updateTemplate = {
+        params: Joi.object({
+            id: Joi.number().integer().required(),
         }),
-        masterCommunityId: Joi.number().integer().optional().messages({
-            'number.base': APICodes.MASTER_COMMUNITY_ID_MUST_BE_NUMBER.message
-        }),
-        communityId: Joi.number().integer().optional().messages({
-            'number.base': APICodes.COMMUNITY_ID_MUST_BE_NUMBER.message
-        }),
-        towerId: Joi.number().integer().optional().allow(null).messages({
-            'number.base': APICodes.TOWER_ID_MUST_BE_NUMBER.message
-        }),
-        templateType: Joi.string().valid('move-in', 'move-out').optional().messages({
-            'any.only': APICodes.TEMPLATE_TYPE_INVALID.message
+        body: Joi.object({
+            isActive: Joi.boolean().optional().messages({
+                'boolean.base': APICodes.ISACTIVE_MUST_BE_BOOLEAN.message
+            }),
+            masterCommunityId: Joi.number().integer().optional().messages({
+                'number.base': APICodes.MASTER_COMMUNITY_ID_MUST_BE_NUMBER.message
+            }),
+            communityId: Joi.number().integer().optional().messages({
+                'number.base': APICodes.COMMUNITY_ID_MUST_BE_NUMBER.message
+            }),
+            towerId: Joi.number().integer().optional().allow(null).messages({
+                'number.base': APICodes.TOWER_ID_MUST_BE_NUMBER.message
+            })
         })
-    });
+    };
 
     // Email Recipients Validation Methods
     getEmailRecipientsList = Joi.object({
