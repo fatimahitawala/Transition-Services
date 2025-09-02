@@ -68,7 +68,8 @@ export class DocumentsController {
 
     async createTemplate(req: Request, res: Response) {
         const { user: { id: userId = '' } }: Record<string, any> = req;
-        const data = { ...req.body, templateFile: req.file };
+        const { templateType } = req.params as any;
+        const data = { ...req.body, templateType, templateFile: req.file };
         const result = await documentsService.createTemplate(data, req.file, userId);
         return successResponseWithData(res, APICodes.CREATE_SUCCESS, result);
     }

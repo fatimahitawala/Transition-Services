@@ -144,4 +144,5 @@ export class MoveInController {
     const result = await moveInService.closeMoveInRequest(Number(requestId), closureRemarks, new Date(actualMoveInDate), user);
     return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
   }
+
 }

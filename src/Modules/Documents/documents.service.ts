@@ -370,7 +370,7 @@ export class DocumentsService {
                 throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
             }
 
-            const allowedTypes = ['application/pdf', 'text/html'];
+            const allowedTypes = ['application/pdf'];
             if (!allowedTypes.includes(file.mimetype)) {
                 logger.error(`File type ${file.mimetype} not allowed. Allowed types: ${allowedTypes.join(', ')}`);
                 throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
@@ -415,24 +415,18 @@ export class DocumentsService {
                 });
             }
 
-            // Handle file storage based on file type
+            // Handle file storage (PDF only)
             let templateString: string | null = null;
             let fileId: number | null = null;
-
-            if (file.mimetype === 'application/pdf') {
-                // For PDF files, upload to Azure Blob Storage and store file reference
-                const { uploadFile } = await import('../../Common/Utils/azureBlobStorage');
-                const uploadedFile = await uploadFile(file.originalname, file, `welcome-pack/${validatedMasterCommunityId}/${validatedCommunityId}/`, userId);
-                
-                if (uploadedFile && typeof uploadedFile === 'object' && 'id' in uploadedFile) {
-                    fileId = uploadedFile.id;
-                } else {
-                    logger.error('Failed to upload PDF file to Azure Blob Storage');
-                    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
-                }
-            } else if (file.mimetype === 'text/html') {
-                // For HTML files, store as base64 in templateString
-                templateString = file.buffer.toString('base64');
+            // For PDF files, upload to Azure Blob Storage and store file reference
+            const { uploadFile } = await import('../../Common/Utils/azureBlobStorage');
+            const uploadedFile = await uploadFile(file.originalname, file, `welcome-pack/${validatedMasterCommunityId}/${validatedCommunityId}/`, userId);
+            
+            if (uploadedFile && typeof uploadedFile === 'object' && 'id' in uploadedFile) {
+                fileId = uploadedFile.id;
+            } else {
+                logger.error('Failed to upload PDF file to Azure Blob Storage');
+                throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
             }
 
             // Create new welcome pack
@@ -451,7 +445,7 @@ export class DocumentsService {
             }
             
             // Validate required fields
-            if (!validatedMasterCommunityId || !validatedCommunityId || (!templateString && !fileId) || !userId) {
+            if (!validatedMasterCommunityId || !validatedCommunityId || (!fileId) || !userId) {
                 throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.INTERNAL_SERVER_ERROR.message, APICodes.INTERNAL_SERVER_ERROR.code);
             }
             
@@ -693,7 +687,8 @@ export class DocumentsService {
      */
     async updateWelcomePack(id: number, data: any, file: any, userId: number) {
         try {
-            const welcomePack = await this.getWelcomePackById(id);
+            // Load the real entity, not the formatted DTO
+            const welcomePack = await AppDataSource.getRepository(OccupancyRequestWelcomePack).findOne({ where: { id } });
 
             if (!welcomePack) {
                 throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
@@ -762,33 +757,38 @@ export class DocumentsService {
                     throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
                 }
 
-                const allowedTypes = ['application/pdf', 'text/html'];
+                const allowedTypes = ['application/pdf'];
                 if (!allowedTypes.includes(file.mimetype)) {
                     throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
                 }
 
-                // Handle file storage based on file type
-                if (file.mimetype === 'application/pdf') {
-                    // For PDF files, upload to Azure Blob Storage and store file reference
-                    const { uploadFile } = await import('../../Common/Utils/azureBlobStorage');
-                    const uploadedFile = await uploadFile(file.originalname, file, `welcome-pack/${welcomePack.masterCommunityId}/${welcomePack.communityId}/`, userId);
-                    
-                    if (uploadedFile && typeof uploadedFile === 'object' && 'id' in uploadedFile) {
-                        welcomePack.fileId = uploadedFile.id;
-                        welcomePack.templateString = null; // Clear templateString for PDF files
-                    } else {
-                        logger.error('Failed to upload PDF file to Azure Blob Storage');
-                        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
-                    }
-                } else if (file.mimetype === 'text/html') {
-                    // For HTML files, store as base64 in templateString
-                    welcomePack.templateString = file.buffer.toString('base64');
-                    welcomePack.fileId = null; // Clear fileId for HTML files
+                // Handle file storage (PDF only)
+                // For PDF files, upload to Azure Blob Storage and store file reference
+                const { uploadFile } = await import('../../Common/Utils/azureBlobStorage');
+                const uploadedFile = await uploadFile(file.originalname, file, `welcome-pack/${welcomePack.masterCommunityId}/${welcomePack.communityId}/`, userId);
+                
+                if (uploadedFile && typeof uploadedFile === 'object' && 'id' in uploadedFile) {
+                    welcomePack.fileId = uploadedFile.id;
+                    welcomePack.templateString = null; // Clear templateString
+                } else {
+                    logger.error('Failed to upload PDF file to Azure Blob Storage');
+                    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
                 }
             }
 
             // Update specific fields based on what's provided
             let hasUpdates = false;
+            
+            // Allow updating file reference via existing fileId (optional)
+            if (cleanData.fileId !== undefined) {
+                const fileUpload = await AppDataSource.getRepository(FileUploads).findOne({ where: { id: cleanData.fileId } });
+                if (!fileUpload) {
+                    throw new ApiError(httpStatus.NOT_FOUND, APICodes.FILE_NOT_FOUND.message, APICodes.FILE_NOT_FOUND.code);
+                }
+                welcomePack.fileId = cleanData.fileId;
+                welcomePack.templateString = null; // Ensure templateString cleared when using fileId
+                hasUpdates = true;
+            }
             
             // Update location fields if provided
             if (cleanData.masterCommunityId !== undefined) {
@@ -1120,7 +1120,7 @@ export class DocumentsService {
                 throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
             }
 
-            const allowedTypes = ['application/pdf', 'text/html'];
+            const allowedTypes = ['text/html'];
             if (!allowedTypes.includes(templateFile.mimetype)) {
                 throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
             }
@@ -1432,7 +1432,7 @@ export class DocumentsService {
                     throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
                 }
 
-                const allowedTypes = ['application/pdf', 'text/html'];
+                const allowedTypes = ['text/html'];
                 if (!allowedTypes.includes(templateFile.mimetype)) {
                     throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
                 }
@@ -2055,17 +2055,22 @@ export class DocumentsService {
                 (data.towerId !== undefined && data.towerId !== recipients.tower ? recipients.tower.id : null)
             );
 
-            // If setting to active, check for conflicts and deactivate existing ones
-            if (data.isActive === true) {
+            // Resolve target location for conflict checks (use incoming if provided)
+            const targetMasterCommunityId = data.masterCommunityId !== undefined ? data.masterCommunityId : recipients.masterCommunity.id;
+            const targetCommunityId = data.communityId !== undefined ? data.communityId : recipients.community.id;
+            const targetTowerId = data.towerId !== undefined ? data.towerId : (recipients.tower ? recipients.tower.id : null);
+
+            // If setting to active or location is changing, check for conflicts and deactivate existing ones for target location
+            if (isActiveBoolean === true || isLocationChanging) {
                 const queryBuilder = AppDataSource.getRepository(OccupancyRequestEmailRecipients)
                     .createQueryBuilder('recipients')
                     .where('recipients.id != :id', { id })
-                    .andWhere('recipients.masterCommunity.id = :masterCommunityId', { masterCommunityId: recipients.masterCommunity.id })
-                    .andWhere('recipients.community.id = :communityId', { communityId: recipients.community.id })
+                    .andWhere('recipients.masterCommunity.id = :masterCommunityId', { masterCommunityId: targetMasterCommunityId })
+                    .andWhere('recipients.community.id = :communityId', { communityId: targetCommunityId })
                     .andWhere('recipients.isActive = :isActive', { isActive: true });
 
-                if (recipients.tower) {
-                    queryBuilder.andWhere('recipients.tower.id = :towerId', { towerId: recipients.tower.id });
+                if (targetTowerId !== null && targetTowerId !== undefined) {
+                    queryBuilder.andWhere('recipients.tower.id = :towerId', { towerId: targetTowerId });
                 } else {
                     queryBuilder.andWhere('recipients.tower.id IS NULL');
                 }
@@ -2114,7 +2119,18 @@ export class DocumentsService {
                 recipients.mopRecipients = data.mopRecipients.trim();
             }
             if (data.isActive !== undefined) {
-                recipients.isActive = data.isActive;
+                recipients.isActive = isActiveBoolean;
+            }
+
+            // Update location fields if provided
+            if (data.masterCommunityId !== undefined) {
+                recipients.masterCommunity = { id: data.masterCommunityId } as any;
+            }
+            if (data.communityId !== undefined) {
+                recipients.community = { id: data.communityId } as any;
+            }
+            if (data.towerId !== undefined) {
+                recipients.tower = data.towerId ? ({ id: data.towerId } as any) : null;
             }
 
             recipients.updatedBy = userId;
