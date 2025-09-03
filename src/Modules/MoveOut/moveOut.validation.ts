@@ -36,4 +36,12 @@ export class MoveOutValidation {
             moveOutDate: Joi.date().required(),
         })
     }
+
+    public createMoveOutRequestByUser = {
+        body: Joi.object().keys({
+            unitId: Joi.number().required(),
+            moveOutDate: Joi.date().required(),
+            comments: Joi.string().allow('', null).optional().default("N/A")
+        })
+    }
 } 

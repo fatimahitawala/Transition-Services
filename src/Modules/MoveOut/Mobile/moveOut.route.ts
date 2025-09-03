@@ -12,6 +12,7 @@ const authMiddleware = new AuthMiddleware();
 
 router.get('/request-list', authMiddleware.auth(), catchAsync(moveOutController.getMoveOutList));
 router.put('/cancel/:requestId', authMiddleware.auth(), validate(moveOutValidation.cancelMoveOutRequestByUser), catchAsync(moveOutController.cancelMoveOutRequestByUser));
+router.post('/create-request', authMiddleware.auth(), validate(moveOutValidation.createMoveOutRequestByUser), catchAsync(moveOutController.createMoveOutRequestByUser));
 
 export default router;
 
@@ -25,7 +26,7 @@ export default router;
 
 /**
  * @swagger
- * /move-out/moveOutList:
+ * /move-out/request-list:
  *   get:
  *     summary: Get list of move out requests
  *     tags: [MoveOut]
@@ -40,7 +41,7 @@ export default router;
 
 /**
  * @swagger
- * /move-out/cancelMoveOutRequest/{requestId}:
+ * /move-out/cancel/{requestId}:
  *   put:
  *     summary: Cancel a move out request
  *     tags: [MoveOut]
@@ -54,6 +55,43 @@ export default router;
  *     responses:
  *       200:
  *         description: Move out request canceled successfully
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ */
+
+/**
+ * @swagger
+ * /move-out/create-request:
+ *   post:
+ *     summary: Create a new move out request
+ *     tags: [MoveOut]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - unitId
+ *               - moveOutDate
+ *             properties:
+ *               unitId:
+ *                 type: integer
+ *                 description: ID of the unit to move out from
+ *               moveOutDate:
+ *                 type: string
+ *                 format: date
+ *                 description: Date of move out
+ *               comments:
+ *                 type: string
+ *                 description: Additional comments
+ *     responses:
+ *       201:
+ *         description: Move out request created successfully
  *       400:
  *         description: Bad request
  *       401:

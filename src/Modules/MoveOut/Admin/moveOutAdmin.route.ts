@@ -28,7 +28,7 @@ export default router;
 
 /**
  * @swagger
- * /admin/move-out/moveOutList:
+ * /admin/move-out/request-list:
  *   get:
  *     summary: Get all move out requests
  *     tags: [MoveOut]
@@ -111,7 +111,7 @@ export default router;
 
 /**
  * @swagger
- * /admin/move-out/moveOutDetails/{requestId}:
+ * /admin/move-out/request-details/{requestId}:
  *   get:
  *     summary: Get move out request details
  *     tags: [MoveOut]
@@ -127,7 +127,7 @@ export default router;
 
 /**
  * @swagger
- * /admin/move-out/updateStatus/{action}/{requestId}:
+ * /admin/move-out/update-status/{action}/{requestId}:
  *   put:
  *     summary: Update move out request status
  *     tags: [MoveOut]
