@@ -25,31 +25,94 @@ export class MoveInService {
   // Removed old generic placeholder createMoveInRequest
 
   async createOwnerMoveIn(data: any, user: any) {
-    // Map owner UI fields to details
-    const { details = {}, ...rest } = data || {};
-    const ownerDetails = {
-      adults: details.adults,
-      children: details.children,
-      householdStaffs: details.householdStaffs,
-      pets: details.pets,
-      comments: details.detailsText || rest.comments || null,
-      // Optional toggles
-      peopleOfDetermination: details.peopleOfDetermination,
-    };
-    return this.createMoveIn({ ...rest, details: ownerDetails, requestType: MOVE_IN_USER_TYPES.OWNER }, user);
+    try {
+      // Map owner UI fields to details (user details come from Users table, not stored here)
+      const { details = {}, ...rest } = data || {};
+      const ownerDetails = {
+        // Occupancy details
+        adults: details.adults,
+        children: details.children,
+        householdStaffs: details.householdStaffs,
+        pets: details.pets,
+        peopleOfDetermination: details.peopleOfDetermination,
+        // Store detailsText in comments field when peopleOfDetermination is true
+        comments: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
+      };
+
+      logger.debug(`Owner Details mapped: ${JSON.stringify(ownerDetails)}`);
+      return this.createMoveIn({ ...rest, details: ownerDetails, requestType: MOVE_IN_USER_TYPES.OWNER }, user);
+    } catch (error) {
+      logger.error(`Error in createOwnerMoveIn Mobile: ${JSON.stringify(error)}`);
+      throw error;
+    }
   }
 
   async createTenantMoveIn(data: any, user: any) {
-    return this.createMoveIn({ ...data, requestType: MOVE_IN_USER_TYPES.TENANT }, user);
+    try {
+      // Map tenant UI fields to details (user details come from Users table, not stored here)
+      const { details = {}, ...rest } = data || {};
+      const tenantDetails = {
+        // Personal details
+        firstName: details.firstName || rest.firstName,
+        lastName: details.lastName || rest.lastName,
+        email: details.email || rest.email,
+        dialCode: details.dialCode || rest.dialCode,
+        phoneNumber: details.phoneNumber || rest.phoneNumber,
+        nationality: details.nationality || rest.nationality,
+        emiratesIdNumber: details.emiratesIdNumber || rest.emiratesIdNumber,
+        emiratesIdExpiryDate: details.emiratesIdExpiryDate || rest.emiratesIdExpiryDate,
+        tenancyContractStartDate: details.tenancyContractStartDate || rest.tenancyContractStartDate,
+        tenancyContractEndDate: details.tenancyContractEndDate || rest.tenancyContractEndDate,
+        
+        // Occupancy details
+        adults: details.adults,
+        children: details.children,
+        householdStaffs: details.householdStaffs,
+        pets: details.pets,
+        peopleOfDetermination: details.peopleOfDetermination,
+        termsAccepted: details.termsAccepted,
+        
+        // Store detailsText in comments field when peopleOfDetermination is true
+        comments: details.peopleOfDetermination && details.detailsText ? details.detailsText : (rest.comments || null),
+      };
+
+      logger.debug(`Tenant Details mapped: ${JSON.stringify(tenantDetails)}`);
+      return this.createMoveIn({ ...rest, details: tenantDetails, requestType: MOVE_IN_USER_TYPES.TENANT }, user);
+    } catch (error) {
+      logger.error(`Error in createTenantMoveIn Mobile: ${JSON.stringify(error)}`);
+      throw error;
+    }
   }
 
   async createHhoOwnerMoveIn(data: any, user: any) {
-    return this.createMoveIn({ ...data, requestType: MOVE_IN_USER_TYPES.HHO_OWNER }, user);
+    // Map HHO Owner UI fields to details and enrich with user profile data so required columns are populated
+    const { details = {}, ...rest } = data || {};
+    const hhoDetails = {
+      // Required owner identity fields expected by MoveInRequestDetailsHhoOwner
+      ownerFirstName: user?.firstName || user?.name?.split(' ')?.[0] || 'Guest',
+      ownerLastName: user?.lastName || user?.name?.split(' ')?.slice(1).join(' ') || 'User',
+      email: user?.email || `guest${user?.id || 'user'}@onesobha.com`,
+      dialCode: user?.dialCode?.dialCode || user?.dialCode || '+971',
+      phoneNumber: user?.mobile || user?.phoneNumber || user?.phone || '000000000',
+      nationality: user?.nationality || 'UAE',
+
+      // Permit fields coming from the mobile UI payload
+      unitPermitNumber: details.unitPermitNumber,
+      unitPermitStartDate: details.unitPermitStartDate,
+      unitPermitExpiryDate: details.unitPermitExpiryDate,
+
+      // Optional comment
+      comments: rest.comments || null,
+    };
+
+    return this.createMoveIn({ ...rest, details: hhoDetails, requestType: MOVE_IN_USER_TYPES.HHO_OWNER }, user);
   }
 
   async createHhcCompanyMoveIn(data: any, user: any) {
     return this.createMoveIn({ ...data, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
   }
+
+
 
   // ============ UPDATE METHODS ============
   async updateOwnerMoveIn(requestId: number, data: any, user: any) {
@@ -67,6 +130,8 @@ export class MoveInService {
   async updateHhcCompanyMoveIn(requestId: number, data: any, user: any) {
     return this.updateMoveIn(requestId, { ...data, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
   }
+
+
 
   async uploadHhcCompanyDocuments(requestId: number, files: any, user: any) {
     try {
@@ -915,7 +980,6 @@ export class MoveInService {
                 name,
                 companyName: company,
                 companyEmail,
-                countryCode,
                 operatorOfficeNumber,
                 tradeLicenseNumber,
                 tenancyContractStartDate,
@@ -1139,7 +1203,6 @@ export class MoveInService {
         entity.name = details.name; // Now map directly to the name field
         entity.companyName = details.company;
         entity.companyEmail = details.companyEmail;
-        entity.countryCode = details.countryCode;
         entity.operatorOfficeNumber = details.operatorOfficeNumber;
         entity.tradeLicenseNumber = details.tradeLicenseNumber;
         entity.tenancyContractStartDate = details.tenancyContractStartDate;

@@ -108,6 +108,11 @@ export class MoveInvalidation {
             pets: Joi.number().integer().min(0).max(6).required(),
             peopleOfDetermination: Joi.boolean().default(false).required(),
             termsAccepted: Joi.boolean().valid(true).required(),
+            detailsText: Joi.when('peopleOfDetermination', {
+              is: true,
+              then: Joi.string().required(),
+              otherwise: Joi.string().allow('').optional(),
+            }),
           })
           .required(),
       })
@@ -119,6 +124,13 @@ export class MoveInvalidation {
       .keys({
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        // Owner identity (can come from UI; if omitted, will be derived from authenticated user)
+        ownerFirstName: Joi.string().max(100).optional(),
+        ownerLastName: Joi.string().max(100).optional(),
+        email: Joi.string().email().max(255).optional(),
+        dialCode: Joi.string().max(10).optional(),
+        phoneNumber: Joi.string().max(20).optional(),
+        nationality: Joi.string().max(100).optional(),
         comments: Joi.string().allow('').optional(),
         additionalInfo: Joi.string().allow('').optional(),
         details: Joi.object()
@@ -153,9 +165,6 @@ export class MoveInvalidation {
         unitPermitNumber: Joi.string().required(),
         leaseStartDate: Joi.date().iso().required(),
         leaseEndDate: Joi.date().iso().custom(validateDateAfter('leaseStartDate', APICodes.LEASE_DATE_RANGE)).required(),
-        nationality: Joi.string().required(),
-        emiratesIdNumber: Joi.string().required(),
-        emiratesIdExpiryDate: Joi.date().iso().custom(validateEmiratesIdExpiry).required(),
         comments: Joi.string().allow('').optional(),
         additionalInfo: Joi.string().allow('').optional(),
         details: Joi.object()
@@ -224,29 +233,6 @@ export class MoveInvalidation {
       .required(),
   };
 
-  public updateHhoOwnerMoveIn = {
-    params: Joi.object().keys({ requestId: Joi.number().required() }),
-    body: Joi.object()
-      .keys({
-        unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
-        comments: Joi.string().allow('').optional(),
-        additionalInfo: Joi.string().allow('').optional(),
-        details: Joi.object()
-          .keys({
-            unitPermitNumber: Joi.string().required(),
-            unitPermitStartDate: Joi.date().iso().required(),
-            unitPermitExpiryDate: Joi.date()
-              .iso()
-              .custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE))
-              .required(),
-            termsAccepted: Joi.boolean().valid(true).required(),
-          })
-          .required(),
-      })
-      .required(),
-  };
-
   public updateHhcCompanyMoveIn = {
     params: Joi.object().keys({ requestId: Joi.number().required() }),
     body: Joi.object()
@@ -278,6 +264,31 @@ export class MoveInvalidation {
       })
       .required(),
   };
+
+  public updateHhoOwnerMoveIn = {
+    params: Joi.object().keys({ requestId: Joi.number().required() }),
+    body: Joi.object()
+      .keys({
+        unitId: Joi.number().required(),
+        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        comments: Joi.string().allow('').optional(),
+        additionalInfo: Joi.string().allow('').optional(),
+        details: Joi.object()
+          .keys({
+            unitPermitNumber: Joi.string().required(),
+            unitPermitStartDate: Joi.date().iso().required(),
+            unitPermitExpiryDate: Joi.date()
+              .iso()
+              .custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE))
+              .required(),
+            termsAccepted: Joi.boolean().valid(true).required(),
+          })
+          .required(),
+      })
+      .required(),
+  };
+
+
 
   public uploadDocuments = {
     params: Joi.object().keys({

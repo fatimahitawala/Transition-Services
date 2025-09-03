@@ -5,14 +5,14 @@ import { MoveInRequests } from "../../../Entities/MoveInRequests.entity";
 import { getPaginationInfo } from "../../../Common/Utils/paginationUtils";
 import { checkAdminPermission, checkIsSecurity } from "../../../Common/Utils/adminAccess";
 import { logger } from "../../../Common/Utils/logger";
-import { MOVE_IN_USER_TYPES, MOVE_IN_AND_OUT_REQUEST_STATUS, TransitionRequestActionByTypes } from "../../../Entities/EntityTypes";
+import { MOVE_IN_USER_TYPES, MOVE_IN_AND_OUT_REQUEST_STATUS } from "../../../Entities/EntityTypes";
 import { MoveInRequestDetailsHhcCompany } from "../../../Entities/MoveInRequestDetailsHhcCompany.entity";
 import { MoveInRequestDetailsHhoOwner } from "../../../Entities/MoveInRequestDetailsHhoOwner.entity";
 import { MoveInRequestDetailsTenant } from "../../../Entities/MoveInRequestDetailsTenant.entity";
 import { MoveInRequestDetailsOwner } from "../../../Entities/MoveInRequestDetailsOwner.entity";
 import { MoveInRequestLogs } from "../../../Entities/MoveInRequestLogs.entity";
 import { MoveInRequestDocuments } from "../../../Entities/MoveInRequestDocuments.entity";
-import { TRANSITION_DOCUMENT_TYPES } from "../../../Entities/EntityTypes/transition";
+import { TRANSITION_DOCUMENT_TYPES, TransitionRequestActionByTypes } from "../../../Entities/EntityTypes/transition";
 import { uploadFile } from "../../../Common/Utils/azureBlobStorage";
 import { executeInTransaction } from "../../../Common/Utils/transactionUtil";
 import { Units } from "../../../Entities/Units.entity";
@@ -90,9 +90,9 @@ export class MoveInService {
 
       // Business Logic Validations for Owner, Tenant, HHO-Unit, and HHO-Company Move-in Requests
       if (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
-        // 1. Check if unit is vacant
-        const isUnitVacant = await this.checkUnitVacancy(Number(unitId));
-        if (!isUnitVacant) {
+        // 1. Allow multiple OPEN requests; block only if an APPROVED request already exists
+        const isUnitAvailableForNewRequest = await this.checkUnitAvailabilityForNewRequest(Number(unitId));
+        if (!isUnitAvailableForNewRequest) {
           throw new ApiError(
             httpStatus.CONFLICT,
             APICodes.UNIT_NOT_VACANT.message,
@@ -100,7 +100,7 @@ export class MoveInService {
           );
         }
 
-        // 2. Check for overlapping requests
+        // 2. Overlap: allow overlaps for OPEN/PENDING; only block if an APPROVED request exists
         const overlapCheck = await this.checkOverlappingRequests(Number(unitId), new Date(moveInDate));
         if (overlapCheck.hasOverlap) {
           throw new ApiError(
@@ -352,11 +352,16 @@ export class MoveInService {
         entity.nationality = details.nationality;
 
         // Details from request
-        entity.adults = details.adults;
-        entity.children = details.children;
-        entity.householdStaffs = details.householdStaffs;
-        entity.pets = details.pets;
+        entity.adults = details.adults ?? 0;
+        entity.children = details.children ?? 0;
+        entity.householdStaffs = details.householdStaffs ?? 0;
+        entity.pets = details.pets ?? 0;
         entity.comments = details.comments;
+
+        // Permit fields
+        entity.unitPermitNumber = details.unitPermitNumber ?? null;
+        entity.unitPermitStartDate = details.unitPermitStartDate ?? null;
+        entity.unitPermitExpiryDate = details.unitPermitExpiryDate ?? null;
 
         // Optional fields
         // entity.peopleOfDetermination = details.peopleOfDetermination;
@@ -372,16 +377,16 @@ export class MoveInService {
         entity.passportNumber = details.passportNumber || null;
         entity.visaNumber = details.visaNumber || null;
         entity.powerOfAttorneyNumber = details.powerOfAttorneyNumber || null;
-        entity.attorneyName = details.attorneyName || "";
-        entity.attorneyPhone = details.attorneyPhone || "";
-        entity.ejariNumber = details.ejariNumber || "";
-        entity.dtcmPermitNumber = details.dtcmPermitNumber || "";
-        entity.emergencyContactName = details.emergencyContactName || "";
-        entity.relationship = details.relationship || "";
-        entity.monthlyRent = details.monthlyRent || "";
-        entity.securityDeposit = details.securityDeposit || "";
-        entity.maintenanceFee = details.maintenanceFee || null;
-        entity.currency = details.currency || null;
+        entity.attorneyName = details.attorneyName ?? "";
+        entity.attorneyPhone = details.attorneyPhone ?? "";
+        entity.ejariNumber = details.ejariNumber ?? "";
+        entity.dtcmPermitNumber = details.dtcmPermitNumber ?? "";
+        entity.emergencyContactName = details.emergencyContactName ?? "";
+        entity.relationship = details.relationship ?? "";
+        entity.monthlyRent = details.monthlyRent ?? null;
+        entity.securityDeposit = details.securityDeposit ?? null;
+        entity.maintenanceFee = details.maintenanceFee ?? null;
+        entity.currency = details.currency ?? null;
 
         entity.createdBy = userId;
         entity.updatedBy = userId;
@@ -395,15 +400,17 @@ export class MoveInService {
         entity.name = details.name; // Now map directly to the name field
         entity.companyName = details.company;
         entity.companyEmail = details.companyEmail;
-        entity.countryCode = details.countryCode;
         entity.operatorOfficeNumber = details.operatorOfficeNumber;
         entity.tradeLicenseNumber = details.tradeLicenseNumber;
+        entity.tradeLicenseExpiryDate = details.tradeLicenseExpiryDate;
         entity.tenancyContractStartDate = details.tenancyContractStartDate;
         entity.unitPermitStartDate = details.unitPermitStartDate;
         entity.unitPermitExpiryDate = details.unitPermitExpiryDate;
         entity.unitPermitNumber = details.unitPermitNumber;
         entity.leaseStartDate = details.leaseStartDate;
         entity.leaseEndDate = details.leaseEndDate;
+        entity.dtcmStartDate = details.dtcmStartDate;
+        entity.dtcmExpiryDate = details.dtcmExpiryDate;
         entity.nationality = details.nationality;
         entity.emiratesIdNumber = details.emiratesIdNumber;
         entity.emiratesIdExpiryDate = details.emiratesIdExpiryDate;
@@ -433,10 +440,9 @@ export class MoveInService {
         children: details.children,
         householdStaffs: details.householdStaffs,
         pets: details.pets,
-        comments: details.detailsText || rest.comments || null,
-
-        // Optional toggles
         peopleOfDetermination: details.peopleOfDetermination,
+        // Store detailsText in comments field when peopleOfDetermination is true
+        comments: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
       };
 
       logger.debug(`Owner Details mapped: ${JSON.stringify(ownerDetails)}`);
@@ -449,7 +455,35 @@ export class MoveInService {
 
   async createTenantMoveIn(data: any, user: any) {
     try {
-      return this.createMoveInRequest({ ...data, requestType: MOVE_IN_USER_TYPES.TENANT }, user);
+      // Map tenant UI fields to details (user details come from Users table, not stored here)
+      const { details = {}, ...rest } = data || {};
+      const tenantDetails = {
+        // Personal details
+        firstName: details.firstName || rest.firstName,
+        lastName: details.lastName || rest.lastName,
+        email: details.email || rest.email,
+        dialCode: details.dialCode || rest.dialCode,
+        phoneNumber: details.phoneNumber || rest.phoneNumber,
+        nationality: details.nationality || rest.nationality,
+        emiratesIdNumber: details.emiratesIdNumber || rest.emiratesIdNumber,
+        emiratesIdExpiryDate: details.emiratesIdExpiryDate || rest.emiratesIdExpiryDate,
+        tenancyContractStartDate: details.tenancyContractStartDate || rest.tenancyContractStartDate,
+        tenancyContractEndDate: details.tenancyContractEndDate || rest.tenancyContractEndDate,
+        
+        // Occupancy details
+        adults: details.adults,
+        children: details.children,
+        householdStaffs: details.householdStaffs,
+        pets: details.pets,
+        peopleOfDetermination: details.peopleOfDetermination,
+        termsAccepted: details.termsAccepted,
+        
+        // Store detailsText in comments field when peopleOfDetermination is true
+        comments: details.peopleOfDetermination && details.detailsText ? details.detailsText : (rest.comments || null),
+      };
+
+      logger.debug(`Tenant Details mapped: ${JSON.stringify(tenantDetails)}`);
+      return this.createMoveInRequest({ ...rest, details: tenantDetails, requestType: MOVE_IN_USER_TYPES.TENANT }, user);
     } catch (error) {
       logger.error(`Error in createTenantMoveIn Admin: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
@@ -462,46 +496,22 @@ export class MoveInService {
       // Map HHO Owner UI fields to details
       const { details = {}, ...rest } = data || {};
       const hhoOwnerDetails = {
-        // Required fields - populate from user or provide defaults
-        ownerFirstName: user?.firstName || user?.name?.split(' ')[0] || 'Admin',
-        ownerLastName: user?.lastName || user?.name?.split(' ').slice(1).join(' ') || 'User',
-        email: user?.email || `admin${user?.id || 'user'}@onesobha.com`,
-        dialCode: user?.dialCode?.dialCode || user?.dialCode || '+971',
-        phoneNumber: user?.mobile || user?.phoneNumber || user?.phone || '000000000',
-        nationality: user?.nationality || 'UAE',
+        // Owner identity: use UI values if present, else fallback to admin user
+        ownerFirstName: rest.ownerFirstName || user?.firstName || user?.name?.split(' ')?.[0] || 'Admin',
+        ownerLastName: rest.ownerLastName || user?.lastName || user?.name?.split(' ')?.slice(1).join(' ') || 'User',
+        email: rest.email || user?.email || `admin${user?.id || 'user'}@onesobha.com`,
+        dialCode: rest.dialCode || user?.dialCode?.dialCode || user?.dialCode || '+971',
+        phoneNumber: rest.phoneNumber || user?.mobile || user?.phoneNumber || user?.phone || '000000000',
+        nationality: rest.nationality || user?.nationality || 'UAE',
 
-        // Details from request
-        adults: details.adults || 1,
-        children: details.children || 0,
-        householdStaffs: details.householdStaffs || 0,
-        pets: details.pets || 0,
+        // Comments
         comments: rest.comments || null,
 
-        // Optional fields with defaults
-        peopleOfDetermination: details.peopleOfDetermination || false,
-        termsAccepted: details.termsAccepted || false,
-
-        // Additional required fields with defaults
-        attorneyFirstName: null,
-        attorneyLastName: null,
-        dateOfBirth: null,
-        emergencyContactDialCode: null,
-        emergencyContactNumber: null,
-        emiratesIdNumber: null,
-        passportNumber: null,
-        visaNumber: null,
-        powerOfAttorneyNumber: null,
-        attorneyName: null,
-        attorneyPhone: null,
-        ejariNumber: null,
-        dtcmPermitNumber: null,
-        emergencyContactName: null,
-        relationship: null,
-        monthlyRent: null,
-        securityDeposit: null,
-        maintenanceFee: null,
-        currency: null
-      };
+        // Permit fields from request
+        unitPermitNumber: details.unitPermitNumber,
+        unitPermitStartDate: details.unitPermitStartDate,
+        unitPermitExpiryDate: details.unitPermitExpiryDate,
+      } as any;
 
       logger.debug(`HHO Owner Details mapped: ${JSON.stringify(hhoOwnerDetails)}`);
       return this.createMoveInRequest({ ...rest, details: hhoOwnerDetails, requestType: MOVE_IN_USER_TYPES.HHO_OWNER }, user);
@@ -514,7 +524,28 @@ export class MoveInService {
 
   async createHhcCompanyMoveIn(data: any, user: any) {
     try {
-      return this.createMoveInRequest({ ...data, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
+      const { details = {}, ...rest } = data || {};
+      const hhcCompanyDetails = {
+        name: rest.name,
+        company: rest.company, // Keep as 'company' since createDetailsRecord expects this field name
+        companyEmail: rest.companyEmail,
+        operatorOfficeNumber: rest.operatorOfficeNumber,
+        tradeLicenseNumber: rest.tradeLicenseNumber,
+        tradeLicenseExpiryDate: rest.tradeLicenseExpiryDate,
+        tenancyContractStartDate: rest.tenancyContractStartDate,
+        unitPermitStartDate: rest.unitPermitStartDate,
+        unitPermitExpiryDate: rest.unitPermitExpiryDate,
+        unitPermitNumber: rest.unitPermitNumber,
+        leaseStartDate: rest.leaseStartDate,
+        leaseEndDate: rest.leaseEndDate,
+        dtcmStartDate: rest.dtcmStartDate,
+        dtcmExpiryDate: rest.dtcmExpiryDate,
+        nationality: rest.nationality,
+        emiratesIdNumber: rest.emiratesIdNumber,
+        emiratesIdExpiryDate: rest.emiratesIdExpiryDate,
+      } as any;
+
+      return this.createMoveInRequest({ ...rest, details: { ...hhcCompanyDetails, ...details }, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
     } catch (error) {
       logger.error(`Error in createHhcCompanyMoveIn Admin: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
@@ -836,23 +867,18 @@ export class MoveInService {
 
 
 
-  // Check if unit is vacant (no active or pending move-in requests)
-  private async checkUnitVacancy(unitId: number): Promise<boolean> {
+  // Check if unit is available for a new move-in request (no APPROVED request exists)
+  private async checkUnitAvailabilityForNewRequest(unitId: number): Promise<boolean> {
     try {
-      const existingRequest = await MoveInRequests.getRepository()
+      const existingApprovedRequest = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
-        .andWhere("mir.status IN (:...statuses)", {
-          statuses: [
-            MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN,
-            MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
-            MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING
-          ]
-        })
+        .andWhere("mir.status = :approvedStatus", { approvedStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED })
         .andWhere("mir.isActive = 1")
         .getOne();
 
-      return !existingRequest; // Unit is vacant if no active request exists
+      // Unit is available if there is NO approved request
+      return !existingApprovedRequest;
     } catch (error) {
       logger.error(`Error checking unit vacancy: ${error}`);
       throw new ApiError(
@@ -869,12 +895,8 @@ export class MoveInService {
       const overlappingRequests = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
-        .andWhere("mir.status NOT IN (:...excludedStatuses)", {
-          excludedStatuses: [
-            MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED,
-            MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED
-          ]
-        })
+        // Only consider APPROVED requests as blocking for overlap purposes
+        .andWhere("mir.status = :approvedStatus", { approvedStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED })
         .andWhere("mir.isActive = 1")
         .getMany();
 

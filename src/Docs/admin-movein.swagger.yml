@@ -130,7 +130,7 @@ paths:
   /admin/move-in/owner:
     post:
       summary: Create owner move-in request (Admin)
-      description: Create a move-in request on behalf of an owner
+      description: Create a move-in request on behalf of an owner. All dates must be in ISO 8601 format (YYYY-MM-DD) and moveInDate must be at least 30 days in the future.
       tags: [Admin MoveIn Management]
       security:
         - bearerAuth: []
@@ -145,40 +145,73 @@ paths:
                 unitId:
                   type: integer
                   description: ID of the unit for move-in
-                  example: 123
+                  example: 7
                 moveInDate:
                   type: string
                   format: date
-                  description: Move-in date (at least 30 days in the future)
-                  example: "2025-08-28"
-                comments:
-                  type: string
-                  nullable: true
-                  description: Additional comments
-                  example: "Owner moving in after renovation"
-                additionalInfo:
-                  type: string
-                  nullable: true
-                  description: Additional information
-                  example: "Renovation completed"
+                  description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be at least 30 days in the future.
+                  example: "2025-09-17"
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
                 details:
                   type: object
-                  required: [titleDeedNumber, titleDeedDate, termsAccepted]
+                  required: [adults, children, householdStaffs, pets]
                   properties:
-                    titleDeedNumber:
-                      type: string
-                      description: Title deed number
-                      example: "TD123456"
-                    titleDeedDate:
-                      type: string
-                      format: date
-                      description: Title deed date
-                      example: "2020-01-15"
-                    termsAccepted:
+                    adults:
+                      type: integer
+                      minimum: 1
+                      maximum: 6
+                      description: Number of adults (1-6)
+                      example: 1
+                    children:
+                      type: integer
+                      minimum: 0
+                      maximum: 6
+                      description: Number of children (0-6)
+                      example: 0
+                    householdStaffs:
+                      type: integer
+                      minimum: 0
+                      maximum: 4
+                      description: Number of household staff (0-4)
+                      example: 0
+                    pets:
+                      type: integer
+                      minimum: 0
+                      maximum: 6
+                      description: Number of pets (0-6)
+                      example: 0
+                    peopleOfDetermination:
                       type: boolean
-                      enum: [true]
-                      description: Terms and conditions acceptance
-                      example: true
+                      description: Whether any occupants have special needs
+                      example: false
+                    detailsText:
+                      type: string
+                      description: Details about special needs assistance (required when peopleOfDetermination is true)
+                      example: "Need wheelchair assistance for elderly or people of determination during move-in"
+            examples:
+              without_special_needs:
+                summary: Owner move-in without special needs
+                value:
+                  unitId: 7
+                  moveInDate: "2025-09-17"
+                  details:
+                    adults: 1
+                    children: 0
+                    householdStaffs: 0
+                    pets: 0
+                    peopleOfDetermination: false
+              with_special_needs:
+                summary: Owner move-in with special needs
+                value:
+                  unitId: 7
+                  moveInDate: "2025-09-17"
+                  details:
+                    adults: 2
+                    children: 1
+                    householdStaffs: 1
+                    pets: 1
+                    peopleOfDetermination: true
+                    detailsText: "Need wheelchair assistance for elderly or people of determination during move-in"
       responses:
         '201':
           description: Owner move-in request created successfully
@@ -207,7 +240,7 @@ paths:
   /admin/move-in/tenant:
     post:
       summary: Create tenant move-in request (Admin)
-      description: Create a move-in request on behalf of a tenant
+      description: Create a new move-in request for a tenant. All dates must be in ISO 8601 format (YYYY-MM-DD) and moveInDate must be at least 30 days in the future.
       tags: [Admin MoveIn Management]
       security:
         - bearerAuth: []
@@ -217,7 +250,20 @@ paths:
           application/json:
             schema:
               type: object
-              required: [unitId, moveInDate, details]
+              required:
+                - unitId
+                - moveInDate
+                - firstName
+                - lastName
+                - email
+                - dialCode
+                - phoneNumber
+                - nationality
+                - emiratesIdNumber
+                - emiratesIdExpiryDate
+                - tenancyContractStartDate
+                - tenancyContractEndDate
+                - details
               properties:
                 unitId:
                   type: integer
@@ -226,46 +272,169 @@ paths:
                 moveInDate:
                   type: string
                   format: date
-                  description: Move-in date (at least 30 days in the future)
-                  example: "2025-08-28"
+                  description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be at least 30 days in the future.
+                  example: "2025-12-20"
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
+                firstName:
+                  type: string
+                  maxLength: 100
+                  description: Tenant's first name
+                  example: "John"
+                lastName:
+                  type: string
+                  maxLength: 100
+                  description: Tenant's last name
+                  example: "Doe"
+                email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  description: Tenant's email address
+                  example: "john.doe@example.com"
+                dialCode:
+                  type: string
+                  maxLength: 10
+                  description: Country dial code
+                  example: "+971"
+                phoneNumber:
+                  type: string
+                  maxLength: 20
+                  description: Phone number
+                  example: "501234567"
+                nationality:
+                  type: string
+                  maxLength: 100
+                  description: Tenant's nationality
+                  example: "UAE"
+                emiratesIdNumber:
+                  type: string
+                  description: Emirates ID number
+                  example: "784-1985-1234567-8"
+                emiratesIdExpiryDate:
+                  type: string
+                  format: date
+                  description: Emirates ID expiry date in ISO 8601 format (YYYY-MM-DD)
+                  example: "2026-12-31"
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
+                tenancyContractStartDate:
+                  type: string
+                  format: date
+                  description: Tenancy contract start date in ISO 8601 format (YYYY-MM-DD)
+                  example: "2025-09-01"
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
+                tenancyContractEndDate:
+                  type: string
+                  format: date
+                  description: Tenancy contract end date in ISO 8601 format (YYYY-MM-DD). Must be after tenancyContractStartDate.
+                  example: "2026-08-31"
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
                 comments:
                   type: string
                   nullable: true
-                  description: Additional comments
-                  example: "Tenant moving in after lease agreement"
+                  description: Additional comments for the move-in request
+                  example: "Need early access for furniture delivery"
                 additionalInfo:
                   type: string
                   nullable: true
                   description: Additional information
-                  example: "Lease agreement signed"
+                  example: ""
                 details:
                   type: object
-                  required: [ejariNumber, ejariDate, leaseStartDate, leaseEndDate, termsAccepted]
+                  required:
+                    - adults
+                    - children
+                    - householdStaffs
+                    - pets
+                    - peopleOfDetermination
+                    - termsAccepted
                   properties:
-                    ejariNumber:
-                      type: string
-                      description: Ejari contract number
-                      example: "EJ123456"
-                    ejariDate:
-                      type: string
-                      format: date
-                      description: Ejari contract date
-                      example: "2025-01-15"
-                    leaseStartDate:
-                      type: string
-                      format: date
-                      description: Lease start date
-                      example: "2025-02-01"
-                    leaseEndDate:
-                      type: string
-                      format: date
-                      description: Lease end date
-                      example: "2027-01-31"
+                    adults:
+                      type: integer
+                      minimum: 1
+                      maximum: 6
+                      description: Number of adults (1-6)
+                      example: 2
+                    children:
+                      type: integer
+                      minimum: 0
+                      maximum: 6
+                      description: Number of children (0-6)
+                      example: 1
+                    householdStaffs:
+                      type: integer
+                      minimum: 0
+                      maximum: 4
+                      description: Number of household staff (0-4)
+                      example: 1
+                    pets:
+                      type: integer
+                      minimum: 0
+                      maximum: 6
+                      description: Number of pets (0-6)
+                      example: 1
+                    peopleOfDetermination:
+                      type: boolean
+                      description: Whether any occupants have special needs
+                      example: true
                     termsAccepted:
                       type: boolean
                       enum: [true]
-                      description: Terms and conditions acceptance
+                      description: Must be true to accept terms and conditions
                       example: true
+                    detailsText:
+                      type: string
+                      description: Details about special needs assistance (required when peopleOfDetermination is true)
+                      example: "Need wheelchair assistance for elderly or people of determination during move-in"
+            examples:
+              without_special_needs:
+                summary: Tenant move-in without special needs
+                value:
+                  unitId: 123
+                  moveInDate: "2025-12-20"
+                  firstName: "John"
+                  lastName: "Doe"
+                  email: "john.doe@example.com"
+                  dialCode: "+971"
+                  phoneNumber: "501234567"
+                  nationality: "UAE"
+                  emiratesIdNumber: "784-1985-1234567-8"
+                  emiratesIdExpiryDate: "2026-12-31"
+                  tenancyContractStartDate: "2025-09-01"
+                  tenancyContractEndDate: "2026-08-31"
+                  comments: "Need early access for furniture delivery"
+                  additionalInfo: ""
+                  details:
+                    adults: 2
+                    children: 1
+                    householdStaffs: 0
+                    pets: 1
+                    peopleOfDetermination: false
+                    termsAccepted: true
+              with_special_needs:
+                summary: Tenant move-in with special needs
+                value:
+                  unitId: 123
+                  moveInDate: "2025-12-20"
+                  firstName: "John"
+                  lastName: "Doe"
+                  email: "john.doe@example.com"
+                  dialCode: "+971"
+                  phoneNumber: "501234567"
+                  nationality: "UAE"
+                  emiratesIdNumber: "784-1985-1234567-8"
+                  emiratesIdExpiryDate: "2026-12-31"
+                  tenancyContractStartDate: "2025-09-01"
+                  tenancyContractEndDate: "2026-08-31"
+                  comments: "Need early access for furniture delivery"
+                  additionalInfo: ""
+                  details:
+                    adults: 2
+                    children: 1
+                    householdStaffs: 1
+                    pets: 1
+                    peopleOfDetermination: true
+                    termsAccepted: true
+                    detailsText: "Need wheelchair assistance for elderly or people of determination during move-in"
       responses:
         '201':
           description: Tenant move-in request created successfully
@@ -304,7 +473,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [unitId, moveInDate, ownerFirstName, ownerLastName, email, dialCode, phoneNumber, nationality, details]
+              required: [unitId, moveInDate, details]
               properties:
                 unitId:
                   type: integer
@@ -318,33 +487,33 @@ paths:
                 ownerFirstName:
                   type: string
                   maxLength: 100
-                  description: Owner first name
+                  description: Owner first name (optional; derived from auth user if omitted)
                   example: "John"
                 ownerLastName:
                   type: string
                   maxLength: 100
-                  description: Owner last name
+                  description: Owner last name (optional; derived from auth user if omitted)
                   example: "Doe"
                 email:
                   type: string
                   format: email
                   maxLength: 255
-                  description: Owner email address
+                  description: Owner email address (optional; derived from auth user if omitted)
                   example: "john.doe@example.com"
                 dialCode:
                   type: string
                   maxLength: 10
-                  description: Phone country dial code (e.g., +971)
+                  description: Phone country dial code (optional; derived from auth user if omitted)
                   example: "+971"
                 phoneNumber:
                   type: string
                   maxLength: 20
-                  description: Owner phone number
+                  description: Owner phone number (optional; derived from auth user if omitted)
                   example: "501234567"
                 nationality:
                   type: string
                   maxLength: 100
-                  description: Owner nationality
+                  description: Owner nationality (optional; derived from auth user if omitted)
                   example: "UAE"
                 comments:
                   type: string
@@ -406,8 +575,8 @@ paths:
 
   /admin/move-in/hhc-company:
     post:
-      summary: Create HHO Company move-in request (Admin)
-      description: Create a move-in request on behalf of an HHO Company
+      summary: Create HHC Company move-in request (Admin)
+      description: Create a move-in request on behalf of an HHC Company. All dates must be in ISO 8601 format (YYYY-MM-DD) and moveInDate must be at least 30 days in the future.
       tags: [Admin MoveIn Management]
       security:
         - bearerAuth: []
@@ -417,90 +586,162 @@ paths:
           application/json:
             schema:
               type: object
-              required: [unitId, userEmail, moveInDate, representativeName, companyName, companyEmail, officeContactNumber, tradeLicenseNumber, tradeLicenseExpiryDate, leaseStartDate, leaseEndDate, nationality, emiratesIdNumber, emiratesIdExpiryDate, dtcmStartDate, dtcmEndDate]
+              required:
+                - unitId
+                - moveInDate
+                - userEmail
+                - firstName
+                - lastName
+                - mobileNumber
+                - name
+                - company
+                - companyEmail
+                - operatorOfficeNumber
+                - tradeLicenseNumber
+                - tradeLicenseExpiryDate
+                - nationality
+                - emiratesIdNumber
+                - emiratesIdExpiryDate
+                - tenancyContractStartDate
+                - unitPermitStartDate
+                - unitPermitExpiryDate
+                - unitPermitNumber
+                - leaseStartDate
+                - leaseEndDate
+                - dtcmStartDate
+                - dtcmExpiryDate
+                - details
               properties:
                 unitId:
                   type: integer
                   description: ID of the unit for move-in
                   example: 123
-                userEmail:
-                  type: string
-                  format: email
-                  description: Email of the HHO Company user
-                  example: "company@example.com"
                 moveInDate:
                   type: string
                   format: date
-                  description: Requested move-in date
-                  example: "2025-02-15"
-                representativeName:
+                  description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be at least 30 days in the future.
+                  example: "2025-09-20"
+                  pattern: '^\d{4}-\d{2}-\d{2}$'
+                userEmail:
                   type: string
-                  maxLength: 100
-                  description: Name of the company representative
-                  example: "John Smith"
-                companyName:
+                  format: email
+                  description: User email address
+                  example: "essa.mohammed@gmail.com"
+                firstName:
                   type: string
-                  maxLength: 200
-                  description: Name of the company
-                  example: "ABC Trading Company LLC"
+                  description: User first name
+                  example: "Essa"
+                middleName:
+                  type: string
+                  nullable: true
+                  description: User middle name (optional)
+                  example: "Mohammed"
+                lastName:
+                  type: string
+                  description: User last name
+                  example: "Mohammed"
+                mobileNumber:
+                  type: string
+                  description: User mobile number
+                  example: "0555 0898XX"
+                name:
+                  type: string
+                  description: Company representative name
+                  example: "Essa"
+                company:
+                  type: string
+                  description: Company name
+                  example: "ABC Company"
                 companyEmail:
                   type: string
                   format: email
                   description: Company email address
-                  example: "info@abctrading.com"
-                officeContactNumber:
+                  example: "abccompany@gmail.com"
+                operatorOfficeNumber:
                   type: string
-                  maxLength: 20
-                  description: Office contact number with country code
-                  example: "+971501234567"
+                  description: Office contact number
+                  example: "+971 122345678"
                 tradeLicenseNumber:
                   type: string
-                  maxLength: 50
-                  description: Company trade license number
-                  example: "TL123456"
+                  description: Trade license number
+                  example: "12345678"
                 tradeLicenseExpiryDate:
                   type: string
                   format: date
-                  description: Trade license expiry date
+                  description: Trade license expiry date (YYYY-MM-DD)
                   example: "2026-12-31"
-                leaseStartDate:
-                  type: string
-                  format: date
-                  description: Lease start date
-                  example: "2025-01-01"
-                leaseEndDate:
-                  type: string
-                  format: date
-                  description: Lease end date
-                  example: "2027-12-31"
                 nationality:
                   type: string
-                  maxLength: 50
-                  description: Nationality of the representative
-                  example: "UAE"
+                  description: Representative nationality
+                  example: "United Arab Emirates"
                 emiratesIdNumber:
                   type: string
-                  maxLength: 20
                   description: Emirates ID number
-                  example: "784-1985-1234567-8"
+                  example: "12345678"
                 emiratesIdExpiryDate:
                   type: string
                   format: date
-                  description: Emirates ID expiry date
+                  description: Emirates ID expiry date (YYYY-MM-DD)
                   example: "2030-05-15"
+                tenancyContractStartDate:
+                  type: string
+                  format: date
+                  description: Tenancy contract start date (YYYY-MM-DD)
+                  example: "2025-09-01"
+                unitPermitStartDate:
+                  type: string
+                  format: date
+                  description: Unit permit start date (YYYY-MM-DD)
+                  example: "2025-09-20"
+                unitPermitExpiryDate:
+                  type: string
+                  format: date
+                  description: Unit permit expiry date (YYYY-MM-DD) - must be after start date
+                  example: "2026-09-20"
+                unitPermitNumber:
+                  type: string
+                  description: Unit permit number
+                  example: "42388"
+                leaseStartDate:
+                  type: string
+                  format: date
+                  description: Lease start date (YYYY-MM-DD)
+                  example: "2025-09-20"
+                leaseEndDate:
+                  type: string
+                  format: date
+                  description: Lease end date (YYYY-MM-DD) - must be after start date
+                  example: "2026-09-20"
                 dtcmStartDate:
                   type: string
                   format: date
-                  description: DTCM start date
-                  example: "2025-01-01"
-                dtcmEndDate:
+                  description: DTCM start date (YYYY-MM-DD)
+                  example: "2025-09-01"
+                dtcmExpiryDate:
                   type: string
                   format: date
-                  description: DTCM end date
+                  description: DTCM expiry date (YYYY-MM-DD) - must be after start date
                   example: "2027-12-31"
+                comments:
+                  type: string
+                  nullable: true
+                  description: Additional comments
+                additionalInfo:
+                  type: string
+                  nullable: true
+                  description: Additional information
+                details:
+                  type: object
+                  required: [termsAccepted]
+                  properties:
+                    termsAccepted:
+                      type: boolean
+                      enum: [true]
+                      example: true
+                      description: Must be true to accept terms and conditions
       responses:
         '201':
-          description: HHO Company move-in request created successfully
+          description: HHC Company move-in request created successfully
           content:
             application/json:
               schema:
@@ -511,7 +752,7 @@ paths:
                     example: true
                   message:
                     type: string
-                    example: "HHO Company move-in request created successfully"
+                    example: "HHC Company move-in request created successfully"
                   data:
                     $ref: '#/components/schemas/MoveInRequest'
         '400':

@@ -22,11 +22,13 @@ router.post('/request/tenant', auth.auth(), validate(moveInValidation.createTena
 router.post('/request/hho-unit', auth.auth(), validate(moveInValidation.createHhoOwnerMoveIn), catchAsync(moveInController.createHhoOwnerMoveInRequest));
 router.post('/request/hhc-company', auth.auth(), validate(moveInValidation.createHhcCompanyMoveIn), catchAsync(moveInController.createHhcCompanyMoveInRequest));
 
+
 // PUT routes to edit existing move-in requests by type
 router.put('/request/owner/:requestId', auth.auth(), validate(moveInValidation.updateOwnerMoveIn), catchAsync(moveInController.updateOwnerMoveInRequest));
 router.put('/request/tenant/:requestId', auth.auth(), validate(moveInValidation.updateTenantMoveIn), catchAsync(moveInController.updateTenantMoveInRequest));
 router.put('/request/hho-unit/:requestId', auth.auth(), validate(moveInValidation.updateHhoOwnerMoveIn), catchAsync(moveInController.updateHhoOwnerMoveInRequest));
 router.put('/request/hhc-company/:requestId', auth.auth(), validate(moveInValidation.updateHhcCompanyMoveIn), catchAsync(moveInController.updateHhcCompanyMoveInRequest));
+
 
 // Single comprehensive document upload route (following AmenityRegistration pattern)
 router.post('/request/:requestId/documents',
@@ -70,7 +72,8 @@ router.post('/request/:requestId/documents',
  * @swagger
  * /move-in/request/owner:
  *   post:
- *     summary: Create owner move-in request
+ *     summary: Create owner move-in request (Mobile)
+ *     description: Create a new move-in request for an owner. All dates must be in ISO 8601 format (YYYY-MM-DD) and moveInDate must be at least 30 days in the future.
  *     tags: [MoveIn]
  *     security:
  *       - bearerAuth: []
@@ -80,67 +83,191 @@ router.post('/request/:requestId/documents',
  *         application/json:
  *           schema:
  *             type: object
- *             required: [unitId, moveInDate, details]
+ *             required:
+ *               - unitId
+ *               - moveInDate
+ *               - details
  *             properties:
  *               unitId:
  *                 type: integer
+ *                 description: ID of the unit for move-in
+ *                 example: 7
  *               moveInDate:
  *                 type: string
  *                 format: date
- *               comments:
- *                 type: string
- *                 nullable: true
- *               additionalInfo:
- *                 type: string
- *                 nullable: true
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be at least 30 days in the future.
+ *                 example: "2025-09-17"
+ *                 pattern: '^\d{4}-\d{2}-\d{2}$'
  *               details:
  *                 type: object
- *                 required: [adults, children, householdStaffs, pets]
+ *                 required:
+ *                   - adults
+ *                   - children
+ *                   - householdStaffs
+ *                   - pets
  *                 properties:
  *                   adults:
  *                     type: integer
  *                     minimum: 1
  *                     maximum: 6
- *                     default: 1
+ *                     description: Number of adults (1-6)
+ *                     example: 1
  *                   children:
  *                     type: integer
  *                     minimum: 0
  *                     maximum: 6
- *                     default: 0
+ *                     description: Number of children (0-6)
+ *                     example: 0
  *                   householdStaffs:
  *                     type: integer
  *                     minimum: 0
  *                     maximum: 4
+ *                     description: Number of household staff (0-4)
+ *                     example: 0
  *                   pets:
  *                     type: integer
  *                     minimum: 0
  *                     maximum: 6
- *                     default: 0
+ *                     description: Number of pets (0-6)
+ *                     example: 0
  *                   peopleOfDetermination:
  *                     type: boolean
+ *                     description: Whether any occupants have special needs
+ *                     example: false
  *                   detailsText:
  *                     type: string
+ *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
+ *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
  *           examples:
- *             sample:
+ *             without_special_needs:
+ *               summary: Owner move-in without special needs
  *               value:
- *                 unitId: 123
- *                 moveInDate: "2025-08-01"
- *                 comments: "Optional comment"
- *                 additionalInfo: ""
+ *                 unitId: 7
+ *                 moveInDate: "2025-09-17"
  *                 details:
  *                   adults: 1
  *                   children: 0
  *                   householdStaffs: 0
  *                   pets: 0
  *                   peopleOfDetermination: false
- *                   detailsText: ""
+ *             with_special_needs:
+ *               summary: Owner move-in with special needs
+ *               value:
+ *                 unitId: 7
+ *                 moveInDate: "2025-09-17"
+ *                 details:
+ *                   adults: 2
+ *                   children: 1
+ *                   householdStaffs: 1
+ *                   pets: 1
+ *                   peopleOfDetermination: true
+ *                   detailsText: "Need wheelchair assistance for elderly or people of determination during move-in"
  *     responses:
  *       201:
- *         description: Created
+ *         description: Move-in request created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: "SC012"
+ *                 message:
+ *                   type: string
+ *                   example: "Created successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 123
+ *                     moveInRequestNo:
+ *                       type: string
+ *                       example: "MIN-UNIT-123-456"
+ *                     status:
+ *                       type: string
+ *                       example: "APPROVED"
+ *                     requestType:
+ *                       type: string
+ *                       example: "OWNER"
+ *                     moveInDate:
+ *                       type: string
+ *                       format: date
+ *                       example: "2025-09-17"
+ *                     isAutoApproved:
+ *                       type: boolean
+ *                       example: true
+ *                     moveInPermitUrl:
+ *                       type: string
+ *                       example: "move-in-permit-123.pdf"
  *       400:
- *         description: Bad request
+ *         description: Bad request - validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "MoveInDate must be in ISO 8601 date format"
+ *                 code:
+ *                   type: string
+ *                   example: "EC041"
  *       401:
- *         description: Unauthorized
+ *         description: Unauthorized - authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Unauthorized access"
+ *                 code:
+ *                   type: string
+ *                   example: "EC001"
+ *       422:
+ *         description: Validation error - move-in date must be at least 30 days in the future
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Move-in date must be at least 30 days in the future"
+ *                 code:
+ *                   type: string
+ *                   example: "EC042"
+ *       500:
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Unknown error occurred"
+ *                 code:
+ *                   type: string
+ *                   example: "EC006"
  */
 
 /**
@@ -292,6 +419,60 @@ router.post('/request/:requestId/documents',
  *                     enum: [true]
  *                     description: Must be true to accept terms and conditions
  *                     example: true
+ *                   detailsText:
+ *                     type: string
+ *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
+ *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
+ *           examples:
+ *             without_special_needs:
+ *               summary: Tenant move-in without special needs
+ *               value:
+ *                 unitId: 123
+ *                 moveInDate: "2025-12-20"
+ *                 firstName: "John"
+ *                 lastName: "Doe"
+ *                 email: "john.doe@example.com"
+ *                 dialCode: "+971"
+ *                 phoneNumber: "501234567"
+ *                 nationality: "UAE"
+ *                 emiratesIdNumber: "784-1985-1234567-8"
+ *                 emiratesIdExpiryDate: "2026-12-31"
+ *                 tenancyContractStartDate: "2025-09-01"
+ *                 tenancyContractEndDate: "2026-08-31"
+ *                 comments: "Need early access for furniture delivery"
+ *                 additionalInfo: ""
+ *                 details:
+ *                   adults: 2
+ *                   children: 1
+ *                   householdStaffs: 0
+ *                   pets: 1
+ *                   peopleOfDetermination: false
+ *                   termsAccepted: true
+ *             with_special_needs:
+ *               summary: Tenant move-in with special needs
+ *               value:
+ *                 unitId: 123
+ *                 moveInDate: "2025-12-20"
+ *                 firstName: "John"
+ *                 lastName: "Doe"
+ *                 email: "john.doe@example.com"
+ *                 dialCode: "+971"
+ *                 phoneNumber: "501234567"
+ *                 nationality: "UAE"
+ *                 emiratesIdNumber: "784-1985-1234567-8"
+ *                 emiratesIdExpiryDate: "2026-12-31"
+ *                 tenancyContractStartDate: "2025-09-01"
+ *                 tenancyContractEndDate: "2026-08-31"
+ *                 comments: "Need early access for furniture delivery"
+ *                 additionalInfo: ""
+ *                 details:
+ *                   adults: 2
+ *                   children: 1
+ *                   householdStaffs: 1
+ *                   pets: 1
+ *                   peopleOfDetermination: true
+ *                   termsAccepted: true
+ *                   detailsText: "Need wheelchair assistance for elderly or people of determination during move-in"
  *     responses:
  *       201:
  *         description: Move-in request created successfully
@@ -354,6 +535,31 @@ router.post('/request/:requestId/documents',
  *                 nullable: true
  *                 description: Additional information
  *                 example: ""
+ *               ownerFirstName:
+ *                 type: string
+ *                 description: Owner first name (optional; derived from auth user if omitted)
+ *                 example: "John"
+ *               ownerLastName:
+ *                 type: string
+ *                 description: Owner last name (optional; derived from auth user if omitted)
+ *                 example: "Doe"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Owner email (optional; derived from auth user if omitted)
+ *                 example: "john.doe@example.com"
+ *               dialCode:
+ *                 type: string
+ *                 description: Dial code (optional; derived from auth user if omitted)
+ *                 example: "+971"
+ *               phoneNumber:
+ *                 type: string
+ *                 description: Phone number (optional; derived from auth user if omitted)
+ *                 example: "501234567"
+ *               nationality:
+ *                 type: string
+ *                 description: Nationality (optional; derived from auth user if omitted)
+ *                 example: "UAE"
  *               details:
  *                 type: object
  *                 required: [unitPermitNumber, unitPermitStartDate, unitPermitExpiryDate, termsAccepted]
@@ -477,30 +683,8 @@ router.post('/request/:requestId/documents',
  *         description: Updated successfully
  */
 
-/**
- * @swagger
- * /move-in/request/hhc-company/{requestId}:
- *   put:
- *     summary: Update HHC company move-in request
- *     tags: [MoveIn]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: requestId
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/HhcCompanyMoveInPayload'
- *     responses:
- *       200:
- *         description: Updated successfully
- */
+
+
 
 /**
  * @swagger
@@ -671,6 +855,31 @@ router.post('/request/:requestId/documents',
  *         description: Unauthorized - authentication required
  *       422:
  *         description: Validation error - move-in date must be at least 30 days in the future
+ */
+
+/**
+ * @swagger
+ * /move-in/request/hhc-company/{requestId}:
+ *   put:
+ *     summary: Update HHC company move-in request
+ *     tags: [MoveIn]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/HhcCompanyMoveInPayload'
+ *     responses:
+ *       200:
+ *         description: Updated successfully
  */
 
 /**

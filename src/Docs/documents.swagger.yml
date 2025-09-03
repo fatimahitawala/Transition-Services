@@ -137,7 +137,7 @@ paths:
                 welcomePackFile:
                   type: string
                   format: binary
-                  description: Welcome pack file (PDF or HTML)
+                  description: Welcome pack file (PDF only)
                 isActive:
                   type: string
                   enum: ['true', 'false']
@@ -252,7 +252,10 @@ paths:
                 welcomePackFile:
                   type: string
                   format: binary
-                  description: Welcome pack file (PDF or HTML) - optional for updates
+                  description: Welcome pack file (PDF only) - optional for updates
+                fileId:
+                  type: integer
+                  description: Existing uploaded file ID to reference (alternative to upload)
       responses:
         '200':
           description: Welcome pack updated successfully
@@ -478,7 +481,7 @@ paths:
                 templateFile:
                   type: string
                   format: binary
-                  description: Template file (PDF or HTML)
+                  description: Template file (HTML only)
                 isActive:
                   type: string
                   enum: ['true', 'false']
@@ -607,7 +610,7 @@ paths:
                 templateFile:
                   type: string
                   format: binary
-                  description: Template file (PDF or HTML) - optional for updates
+                  description: Template file (HTML only) - optional for updates
       responses:
         '200':
           description: Occupancy template updated successfully
