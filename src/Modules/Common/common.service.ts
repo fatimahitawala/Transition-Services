@@ -22,7 +22,17 @@ import { integrationUrls } from "../../Common/Constants/urls";
 import { AccessCardRequests } from "../../Entities/AccessCardRequests.entity";
 
 export class CommonService {
-
+    /**
+     * Deactivate access card requests tied to the unit for the given customer user.
+     * - Cancels pending requests directly.
+     * - For closed requests, raises cancellation requests (parking/community) via Community Service.
+     *
+     * @param unitId           Unit identifier.
+     * @param updatedBy        Admin/system user id performing the action (audit updatedBy).
+     * @param customerUserId   Customer user id to operate on.
+     * @param integrationToken Salesforce integration token forwarded downstream.
+     * @returns A summary object of operations performed per type/status.
+     */
     async deActivateAccessCardRequests(unitId: number, updatedBy: number, customerUserId: number, integrationToken: string) {
 
         const response: any = {};
@@ -115,6 +125,15 @@ export class CommonService {
     }
 
 
+    /**
+     * Cancel all amenity bookings for a unit made by the given customer user.
+     * Sets status=CANCELLED, flags isCancelled, records cancel date and reason.
+     *
+     * @param unitId           Unit identifier.
+     * @param customerUserId   Customer user id whose bookings are cancelled.
+     * @param userId           Admin/system user id performing the action (audit updatedBy).
+     * @param cancelReason     Optional cancel reason; defaults to 'Unit Auto De-Allocation'.
+     */
     async cancelAllAmenityBookingsForUnit(unitId: number, customerUserId?: number, userId?: number, cancelReason?: string) {
         try {
             const updateData: any = {
@@ -133,6 +152,13 @@ export class CommonService {
             throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
         }
     }
+    /**
+     * Fetch the active user role mapping for the unit and customer user.
+     * Returns a raw object with keys: role, userRoleId, roleName; undefined if none.
+     *
+     * @param unitId           Unit identifier.
+     * @param customerUserId   Customer user id to check.
+     */
     async getExistingUserRoleForUnit(unitId: number, customerUserId?: number) {
         try {
             const userRole = await UserRoles.getRepository().createQueryBuilder("ur")
@@ -151,6 +177,14 @@ export class CommonService {
         }
     }
 
+    /**
+     * Deactivate the user's role for the unit (sets isActive=false, endDate) and audit the change.
+     *
+     * @param unitId             Unit identifier.
+     * @param customerUserId     Customer user id whose role is removed.
+     * @param userId             Admin/system user id performing the action (audit updatedBy, logs).
+     * @param existingUserRoleId Existing user role id used for logging/audit.
+     */
     async removeUserRoleFromUnit(unitId: number, customerUserId: number, userId: number, existingUserRoleId: any) {
         try {
             // De-Activate the existing user role for the unit for that user
@@ -170,6 +204,14 @@ export class CommonService {
         }
     }
 
+    /**
+     * Revoke family/service access mappings provided by the user for the unit, and audit the change.
+     *
+     * @param unitId             Unit identifier.
+     * @param customerUserId     Customer user id whose provided access will be removed.
+     * @param userId             Admin/system user id performing the action (audit updatedBy, logs).
+     * @param existingUserRoleId Existing user role id used for logging/audit.
+     */
     async removeFamilyMemberAccessAndAccessProvidedByUser(unitId: number, customerUserId: number, userId: number, existingUserRoleId: any) {
         try {
             await FamilyMemberServiceMappings.getRepository().createQueryBuilder("fmsm")
@@ -195,6 +237,14 @@ export class CommonService {
         }
 
     }
+    /**
+     * Cancel active Power of Attorney requests and deactivate POA records for the unit/user.
+     *
+     * @param unitId           Unit identifier.
+     * @param userId           Admin/system user id performing the action (audit updatedBy).
+     * @param customerUserId   Customer user id whose POA artifacts are cancelled.
+     * @param integrationToken Optional token reserved for integrations.
+     */
     async cancelAllPOARequests(unitId: number, userId: number, customerUserId: number, integrationToken?: string) {
         try {
             //cancel all POA requests for the unit
@@ -217,6 +267,15 @@ export class CommonService {
         }
     }
 
+    /**
+     * Deactivate owner role for the unit and, if the user is no longer an owner elsewhere,
+     * auto-approve pending user update requests via User Service (profile/communication).
+     *
+     * @param unitId           Unit identifier.
+     * @param userId           Admin/system user id performing the action (audit updatedBy).
+     * @param customerUserId   Customer user id affected.
+     * @param integrationToken Token for downstream approval calls.
+     */
     async cancelAllUserRoles(unitId: number, userId: number, customerUserId: number, integrationToken?: string) {
         try {
             const role = await Roles.getRepository().createQueryBuilder('r').select(['r.id']).where('r.slug=:slug', { slug: 'owner' }).getOne();
@@ -325,6 +384,14 @@ export class CommonService {
         }
     }
 
+    /**
+     * Cancel all service requests created by the customer for the unit.
+     * Placeholder for future modules; currently returns true.
+     *
+     * @param unitId           Unit identifier.
+     * @param customerUserId   Customer user id whose service requests are cancelled.
+     * @param userId           Admin/system user id performing the action (audit updatedBy).
+     */
     async cancelAllServiceRequests(unitId: number, customerUserId: number, userId: number) {
         try {
             return true;
@@ -333,6 +400,13 @@ export class CommonService {
         }
     }
 
+    /**
+     * Cancel all active visitor requests for a unit created by the specified customer user.
+     *
+     * @param unitId           Unit identifier.
+     * @param customerUserId   Customer user id whose visitor requests will be cancelled.
+     * @param userId           Admin/system user id performing the action (audit updatedBy).
+     */
     async cancelAllVisitorRequests(unitId: number, customerUserId: number, userId: number) {
         try {
             logger.debug(`Cancelling Visitor Requests for Unit ID: ${unitId} made by User ID: ${customerUserId}`);
@@ -346,6 +420,15 @@ export class CommonService {
             logger.error(`Error in cancelling Visitor Requests for Unit ID: ${unitId} | Error: ${error}`);
         }
     }
+    /**
+     * Orchestrate removal of the user's mappings for a unit:
+     * - Deactivate role for the unit
+     * - Revoke family access and service mappings
+     *
+     * @param unitId           Unit identifier.
+     * @param userId           Admin/system user id performing the action (audit updatedBy).
+     * @param customerUserId   Customer user id to operate on.
+     */
     async removeUserMappingsFromUnit(unitId: number, userId: number, customerUserId: number) {
         try {
             const existingUserRole = await this.getExistingUserRoleForUnit(unitId, customerUserId);
