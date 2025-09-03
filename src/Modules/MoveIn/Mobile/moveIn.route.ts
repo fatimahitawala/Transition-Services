@@ -13,29 +13,35 @@ const auth = new AuthMiddleware();
 
 const router = Router();
 // GET routes
-router.get("/request", auth.auth(), catchAsync(moveInController.getAllMoveInRequestList));
+router.get("/request-list", auth.auth(), catchAsync(moveInController.getAllMoveInRequestList));
 router.get("/request/:unitId", auth.auth(), catchAsync(moveInController.getAllMoveInRequestList));
 
 // POST routes for different move-in request types
 router.post('/request/owner', auth.auth(), validate(moveInValidation.createOwnerMoveIn), catchAsync(moveInController.createOwnerMoveInRequest));
 router.post('/request/tenant', auth.auth(), validate(moveInValidation.createTenantMoveIn), catchAsync(moveInController.createTenantMoveInRequest));
-router.post('/request/hho-owner', auth.auth(), validate(moveInValidation.createHhoOwnerMoveIn), catchAsync(moveInController.createHhoOwnerMoveInRequest));
+router.post('/request/hho-unit', auth.auth(), validate(moveInValidation.createHhoOwnerMoveIn), catchAsync(moveInController.createHhoOwnerMoveInRequest));
 router.post('/request/hhc-company', auth.auth(), validate(moveInValidation.createHhcCompanyMoveIn), catchAsync(moveInController.createHhcCompanyMoveInRequest));
 
+// PUT routes to edit existing move-in requests by type
+router.put('/request/owner/:requestId', auth.auth(), validate(moveInValidation.updateOwnerMoveIn), catchAsync(moveInController.updateOwnerMoveInRequest));
+router.put('/request/tenant/:requestId', auth.auth(), validate(moveInValidation.updateTenantMoveIn), catchAsync(moveInController.updateTenantMoveInRequest));
+router.put('/request/hho-unit/:requestId', auth.auth(), validate(moveInValidation.updateHhoOwnerMoveIn), catchAsync(moveInController.updateHhoOwnerMoveInRequest));
+router.put('/request/hhc-company/:requestId', auth.auth(), validate(moveInValidation.updateHhcCompanyMoveIn), catchAsync(moveInController.updateHhcCompanyMoveInRequest));
+
 // Single comprehensive document upload route (following AmenityRegistration pattern)
-router.post('/request/:requestId/documents', 
-	auth.auth(), 
-	validate(moveInValidation.uploadDocuments),
-	fileUploads.fields([
-		{ name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.EJARI, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.TITLE_DEED, maxCount: 1 },
-		{ name: TRANSITION_DOCUMENT_TYPES.OTHER, maxCount: 4 }
-	]), 
-	catchAsync(moveInController.uploadDocuments)
+router.post('/request/:requestId/documents',
+    auth.auth(),
+    validate(moveInValidation.uploadDocuments),
+    fileUploads.fields([
+        { name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.EJARI, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.TITLE_DEED, maxCount: 1 },
+        { name: TRANSITION_DOCUMENT_TYPES.OTHER, maxCount: 4 }
+    ]),
+    catchAsync(moveInController.uploadDocuments)
 );
 
 /**
@@ -313,10 +319,10 @@ router.post('/request/:requestId/documents',
 
 /**
  * @swagger
- * /move-in/request/hho-owner:
+ * /move-in/request/hho-unit:
  *   post:
- *     summary: Create HHO owner move-in request
- *     description: Create a new move-in request for a home owner. All dates must be in ISO 8601 format (YYYY-MM-DD) and moveInDate must be at least 30 days in the future.
+ *     summary: Create HHO unit move-in request
+ *     description: Create a new move-in request for a holiday home unit owner. All dates must be in ISO 8601 format (YYYY-MM-DD) and moveInDate must be at least 30 days in the future.
  *     tags: [MoveIn]
  *     security:
  *       - bearerAuth: []
@@ -350,9 +356,27 @@ router.post('/request/:requestId/documents',
  *                 example: ""
  *               details:
  *                 type: object
- *                 required: []
- *                 description: Additional details object
- *                 example: {}
+ *                 required: [unitPermitNumber, unitPermitStartDate, unitPermitExpiryDate, termsAccepted]
+ *                 properties:
+ *                   unitPermitNumber:
+ *                     type: string
+ *                     description: Unit permit number as shown in the app screen
+ *                     example: "42388"
+ *                   unitPermitStartDate:
+ *                     type: string
+ *                     format: date
+ *                     description: Unit permit start date in ISO 8601 format (YYYY-MM-DD)
+ *                     example: "2027-08-27"
+ *                   unitPermitExpiryDate:
+ *                     type: string
+ *                     format: date
+ *                     description: Unit permit end/expiry date in ISO 8601 format (YYYY-MM-DD)
+ *                     example: "2028-08-27"
+ *                   termsAccepted:
+ *                     type: boolean
+ *                     enum: [true]
+ *                     description: Must be true to accept terms and conditions
+ *                     example: true
  *     responses:
  *       201:
  *         description: Move-in request created successfully
@@ -376,6 +400,106 @@ router.post('/request/:requestId/documents',
  *         description: Unauthorized - authentication required
  *       422:
  *         description: Validation error - move-in date must be at least 30 days in the future
+ */
+
+/**
+ * @swagger
+ * /move-in/request/owner/{requestId}:
+ *   put:
+ *     summary: Update owner move-in request
+ *     tags: [MoveIn]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/OwnerMoveInPayload'
+ *     responses:
+ *       200:
+ *         description: Updated successfully
+ */
+
+/**
+ * @swagger
+ * /move-in/request/tenant/{requestId}:
+ *   put:
+ *     summary: Update tenant move-in request
+ *     tags: [MoveIn]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/TenantMoveInPayload'
+ *     responses:
+ *       200:
+ *         description: Updated successfully
+ */
+
+/**
+ * @swagger
+ * /move-in/request/hho-unit/{requestId}:
+ *   put:
+ *     summary: Update HHO unit move-in request
+ *     tags: [MoveIn]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/HhoUnitMoveInPayload'
+ *     responses:
+ *       200:
+ *         description: Updated successfully
+ */
+
+/**
+ * @swagger
+ * /move-in/request/hhc-company/{requestId}:
+ *   put:
+ *     summary: Update HHC company move-in request
+ *     tags: [MoveIn]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/HhcCompanyMoveInPayload'
+ *     responses:
+ *       200:
+ *         description: Updated successfully
  */
 
 /**
@@ -641,9 +765,58 @@ export default router;
 *   get:
 *     summary: Close a move in request
 *     tags: [MoveIn]
+*     parameters:
+*       - in: query
+*         name: page
+*         schema:
+*           type: integer
+*           default: 1
+*       - in: query
+*         name: per_page
+*         schema:
+*           type: integer
+*           default: 20
+*       - in: query
+*         name: requestId
+*         schema:
+*           type: string
+*       - in: query
+*         name: moveOutType
+*         schema:
+*           type: string
+*       - in: query
+*         name: masterCommunity
+*         schema:
+*           type: string
+*       - in: query
+*         name: community
+*         schema:
+*           type: string
+*       - in: query
+*         name: tower
+*         schema:
+*           type: string
+*       - in: query
+*         name: unit
+*         schema:
+*           type: string
+*       - in: query
+*         name: createdDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: moveOutDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: requestStatus
+*         schema:
+*           type: string
 *     responses:
 *       200:
-*         description: Move in request 
+*         description: A list of move in requests
 */
 
 /**
@@ -653,14 +826,57 @@ export default router;
 *     summary: get a move in request List
 *     tags: [MoveOut]
 *     parameters:
-*       - in: path
-*         name: unitId
-*         required: true
-*         description: The ID of the move out request
-*    
+*       - in: query
+*         name: page
+*         schema:
+*           type: integer
+*           default: 1
+*       - in: query
+*         name: per_page
+*         schema:
+*           type: integer
+*           default: 20
+*       - in: query
+*         name: requestId
+*         schema:
+*           type: string
+*       - in: query
+*         name: moveOutType
+*         schema:
+*           type: string
+*       - in: query
+*         name: masterCommunity
+*         schema:
+*           type: string
+*       - in: query
+*         name: community
+*         schema:
+*           type: string
+*       - in: query
+*         name: tower
+*         schema:
+*           type: string
+*       - in: query
+*         name: unit
+*         schema:
+*           type: string
+*       - in: query
+*         name: createdDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: moveOutDate
+*         schema:
+*           type: string
+*           format: date
+*       - in: query
+*         name: requestStatus
+*         schema:
+*           type: string
 *     responses:
 *       200:
-*         description: Move out request closed
+*         description: A list of move out requests
 */
 
 

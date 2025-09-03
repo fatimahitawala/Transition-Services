@@ -6,9 +6,11 @@ import { OccupancyRequestEmailRecipients } from '../../Entities/OccupancyRequest
 import { MasterCommunities } from '../../Entities/MasterCommunities.entity';
 import { Communities } from '../../Entities/Communities.entity';
 import { Towers } from '../../Entities/Towers.entity';
+import { FileUploads } from '../../Entities/FileUploads.entity';
 import { logger } from '../../Common/Utils/logger';
 import { getPaginationInfo } from '../../Common/Utils/paginationUtils';
 import { stringToBoolean } from '../../Common/Utils/common-utility';
+import config from '../../Common/Config/config';
 
 import ApiError from '../../Common/Utils/ApiError';
 import { APICodes } from '../../Common/Constants/apiCodes.en';
@@ -17,6 +19,66 @@ import httpStatus from 'http-status';
 import { WelcomeKitService, WelcomeKitData } from './welcomeKit.service';
 
 export class DocumentsService {
+
+    /**
+     * Write a unified history row into occupancy_request_template_history using the new minimal schema.
+     */
+    private async writeUnifiedHistory(params: {
+        templateType: string,
+        createdBy: number | string,
+        updatedBy: number | string,
+        templateData: Record<string, any>,
+        masterCommunityId?: number | null,
+        communityId?: number | null,
+        towerId?: number | null,
+        occupancyRequestTemplatesId?: number | null,
+        occupancyRequestWelcomePackId?: number | null,
+        occupancyRequestEmailRecipientsId?: number | null,
+    }): Promise<void> {
+        const {
+            templateType,
+            createdBy,
+            updatedBy,
+            templateData,
+            masterCommunityId = null,
+            communityId = null,
+            towerId = null,
+            occupancyRequestTemplatesId = null,
+            occupancyRequestWelcomePackId = null,
+            occupancyRequestEmailRecipientsId = null,
+        } = params;
+
+        try {
+            await AppDataSource.query(
+                `INSERT INTO occupancy_request_template_history (
+                    template_type,
+                    created_by,
+                    updated_by,
+                    template_data,
+                    occupancy_request_templates_id,
+                    occupancy_request_welcome_pack_id,
+                    occupancy_request_email_recipients_id,
+                    master_community_id,
+                    community_id,
+                    tower_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    templateType,
+                    Number(createdBy) || null,
+                    Number(updatedBy) || null,
+                    JSON.stringify(templateData ?? {}),
+                    occupancyRequestTemplatesId,
+                    occupancyRequestWelcomePackId,
+                    occupancyRequestEmailRecipientsId,
+                    masterCommunityId,
+                    communityId,
+                    towerId,
+                ]
+            );
+        } catch (e) {
+            logger.error(`Failed to write unified history: ${JSON.stringify(e)}`);
+        }
+    }
 
     /**
      * Get Welcome Pack List
@@ -118,6 +180,7 @@ export class DocumentsService {
                 .leftJoin('welcomePack.masterCommunity', 'masterCommunity')
                 .leftJoin('welcomePack.community', 'community')
                 .leftJoin('welcomePack.tower', 'tower')
+                .select('welcomePack.id') // Select only the ID for counting
                 .where(whereClause, whereParams);
 
             const dataQuery = welcomePackRepository.createQueryBuilder('welcomePack')
@@ -134,6 +197,7 @@ export class DocumentsService {
                     'welcomePack.communityId',
                     'welcomePack.towerId',
                     'welcomePack.templateString',
+                    'welcomePack.fileId',
                     'welcomePack.isActive',
                     'welcomePack.createdAt',
                     'welcomePack.updatedAt',
@@ -147,7 +211,8 @@ export class DocumentsService {
                     'tower.name'
                 ]);
             } else {
-                dataQuery.select([
+                // Always include the sortBy field in the select statement
+                const baseFields = [
                     'welcomePack.id',
                     'welcomePack.masterCommunityId',
                     'welcomePack.communityId',
@@ -159,7 +224,14 @@ export class DocumentsService {
                     'community.name',
                     'tower.id',
                     'tower.name'
-                ]);
+                ];
+                
+                // Add sortBy field if it's not already included
+                if (sortBy && !baseFields.includes(`welcomePack.${sortBy}`)) {
+                    baseFields.push(`welcomePack.${sortBy}`);
+                }
+                
+                dataQuery.select(baseFields);
             }
 
             // Add sorting to data query
@@ -188,26 +260,56 @@ export class DocumentsService {
             }
 
             // Format response data with nested objects
-            const formattedData = data.map((item: any) => ({
-                id: item.id,
-                templateString: item.templateString,
-                isActive: item.isActive,
-                createdAt: item.createdAt,
-                updatedAt: item.updatedAt,
-                createdBy: item.createdBy,
-                updatedBy: item.updatedBy,
-                masterCommunity: item.masterCommunity ? {
-                    id: item.masterCommunity.id,
-                    name: item.masterCommunity.name
-                } : null,
-                community: item.community ? {
-                    id: item.community.id,
-                    name: item.community.name
-                } : null,
-                tower: item.tower ? {
-                    id: item.tower.id,
-                    name: item.tower.name
-                } : null
+            const formattedData = await Promise.all(data.map(async (item: any) => {
+                const formattedItem: any = {
+                    id: item.id,
+                    templateString: item.templateString,
+                    fileId: item.fileId,
+                    isActive: item.isActive,
+                    createdAt: item.createdAt,
+                    updatedAt: item.updatedAt,
+                    createdBy: item.createdBy,
+                    updatedBy: item.updatedBy,
+                    masterCommunity: item.masterCommunity ? {
+                        id: item.masterCommunity.id,
+                        name: item.masterCommunity.name
+                    } : null,
+                    community: item.community ? {
+                        id: item.community.id,
+                        name: item.community.name
+                    } : null,
+                    tower: item.tower ? {
+                        id: item.tower.id,
+                        name: item.tower.name
+                    } : null
+                };
+
+                // Add file information if includeFile is true and fileId exists
+                if (stringToBoolean(includeFile) && item.fileId) {
+                    try {
+                        const fileUpload = await AppDataSource.getRepository(FileUploads).findOne({
+                            where: { id: item.fileId }
+                        });
+                        
+                        if (fileUpload) {
+                            formattedItem.fileInfo = {
+                                id: fileUpload.id,
+                                fileName: fileUpload.fileOriginalName || fileUpload.fileName,
+                                fileSize: fileUpload.fileSize,
+                                fileType: fileUpload.fileType,
+                                fileExtension: fileUpload.fileExtension,
+                                filePath: fileUpload.filePath,
+                                // Generate full URL for Azure Blob Storage
+                                fileUrl: `${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/application/${fileUpload.filePath}`
+                            };
+                        }
+                    } catch (fileError: any) {
+                        logger.error(`Error fetching file info for fileId ${item.fileId}: ${JSON.stringify(fileError)}`);
+                        // Continue without file info if there's an error
+                    }
+                }
+
+                return formattedItem;
             }));
 
             const pagination = getPaginationInfo(page, per_page, totalCount);
@@ -222,7 +324,7 @@ export class DocumentsService {
 
     /**
      * Create Welcome Pack
-     * @return {Promise<OccupancyRequestWelcomePack>}
+     * @returns {Promise<OccupancyRequestWelcomePack>}
      * @throws {Error}
      * @param data
      * @param file
@@ -268,7 +370,7 @@ export class DocumentsService {
                 throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
             }
 
-            const allowedTypes = ['application/pdf', 'text/html'];
+            const allowedTypes = ['application/pdf'];
             if (!allowedTypes.includes(file.mimetype)) {
                 logger.error(`File type ${file.mimetype} not allowed. Allowed types: ${allowedTypes.join(', ')}`);
                 throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
@@ -300,26 +402,39 @@ export class DocumentsService {
                 existingPack.updatedBy = userId;
                 await AppDataSource.getRepository(OccupancyRequestWelcomePack).save(existingPack);
                 
-                // Create history record for deactivated welcome pack
-                const deactivatedHistoryData = {
+                // Unified history for deactivation
+                await this.writeUnifiedHistory({
                     templateType: 'welcome-pack',
-                    occupancyRequestWelcomePack: { id: existingPack.id },
+                    createdBy: userId,
+                    updatedBy: userId,
+                    templateData: { action: 'deactivate', isActive: false },
                     masterCommunityId: existingPack.masterCommunityId,
                     communityId: existingPack.communityId,
-                    towerId: existingPack.towerId,
-                    templateString: existingPack.templateString,
-                    isActive: false, // Mark as deactivated
-                    createdBy: userId,
-                    updatedBy: userId
-                };
-                await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(deactivatedHistoryData);
+                    towerId: existingPack.towerId ?? null,
+                    occupancyRequestWelcomePackId: existingPack.id,
+                });
+            }
+
+            // Handle file storage (PDF only)
+            let templateString: string | null = null;
+            let fileId: number | null = null;
+            // For PDF files, upload to Azure Blob Storage and store file reference
+            const { uploadFile } = await import('../../Common/Utils/azureBlobStorage');
+            const uploadedFile = await uploadFile(file.originalname, file, `welcome-pack/${validatedMasterCommunityId}/${validatedCommunityId}/`, userId);
+            
+            if (uploadedFile && typeof uploadedFile === 'object' && 'id' in uploadedFile) {
+                fileId = uploadedFile.id;
+            } else {
+                logger.error('Failed to upload PDF file to Azure Blob Storage');
+                throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
             }
 
             // Create new welcome pack
             const welcomePackData: any = {
                 masterCommunityId: validatedMasterCommunityId,
                 communityId: validatedCommunityId,
-                templateString: file.buffer.toString('base64'),
+                templateString: templateString,
+                fileId: fileId,
                 isActive: validatedIsActive,
                 createdBy: userId,
                 updatedBy: userId
@@ -330,7 +445,7 @@ export class DocumentsService {
             }
             
             // Validate required fields
-            if (!validatedMasterCommunityId || !validatedCommunityId || !file.buffer || !userId) {
+            if (!validatedMasterCommunityId || !validatedCommunityId || (!fileId) || !userId) {
                 throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.INTERNAL_SERVER_ERROR.message, APICodes.INTERNAL_SERVER_ERROR.code);
             }
             
@@ -348,20 +463,22 @@ export class DocumentsService {
                 // Type assertion after array check
                 const welcomePackEntity = savedWelcomePack as OccupancyRequestWelcomePack;
 
-                // Create history record
-                const historyData = {
+                // Unified history for creation
+                await this.writeUnifiedHistory({
                     templateType: 'welcome-pack',
-                    occupancyRequestWelcomePack: { id: welcomePackEntity.id },
+                    createdBy: userId,
+                    updatedBy: userId,
+                    templateData: {
+                        action: 'create',
+                        fileId: welcomePackEntity.fileId ?? null,
+                        hasTemplateString: Boolean(welcomePackEntity.templateString),
+                        isActive: welcomePackEntity.isActive,
+                    },
                     masterCommunityId: welcomePackEntity.masterCommunityId,
                     communityId: welcomePackEntity.communityId,
                     towerId: welcomePackEntity.towerId ?? null,
-                    templateString: welcomePackEntity.templateString,
-                    isActive: welcomePackEntity.isActive,
-                    createdBy: userId,
-                    updatedBy: userId
-                };
-
-                await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyData);
+                    occupancyRequestWelcomePackId: welcomePackEntity.id,
+                });
                 return welcomePackEntity;
             } catch (saveError: any) {      
                 throw saveError;
@@ -391,13 +508,14 @@ export class DocumentsService {
                 .where('welcomePack.id = :id', { id });
 
             if (includeFile) {
-                // When includeFile is true, select all fields including templateString and select: false fields
+                // When includeFile is true, select all fields including templateString, fileId and select: false fields
                 queryBuilder.select([
                     'welcomePack.id',
                     'welcomePack.masterCommunityId',
                     'welcomePack.communityId',
                     'welcomePack.towerId',
                     'welcomePack.templateString',
+                    'welcomePack.fileId',
                     'welcomePack.isActive',
                     'welcomePack.createdAt',
                     'welcomePack.updatedAt',
@@ -455,9 +573,37 @@ export class DocumentsService {
                 } : null
             };
 
-            // Add templateString if includeFile is true
-            if (includeFile && welcomePack.templateString) {
-                formattedData.templateString = welcomePack.templateString;
+            // Add templateString and fileId if includeFile is true
+            if (includeFile) {
+                if (welcomePack.templateString) {
+                    formattedData.templateString = welcomePack.templateString;
+                }
+                if (welcomePack.fileId) {
+                    formattedData.fileId = welcomePack.fileId;
+                    
+                    // Fetch file information from FileUploads entity
+                    try {
+                        const fileUpload = await AppDataSource.getRepository(FileUploads).findOne({
+                            where: { id: welcomePack.fileId }
+                        });
+                        
+                        if (fileUpload) {
+                            formattedData.fileInfo = {
+                                id: fileUpload.id,
+                                fileName: fileUpload.fileOriginalName || fileUpload.fileName,
+                                fileSize: fileUpload.fileSize,
+                                fileType: fileUpload.fileType,
+                                fileExtension: fileUpload.fileExtension,
+                                filePath: fileUpload.filePath,
+                                // Generate full URL for Azure Blob Storage
+                                fileUrl: `${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/application/${fileUpload.filePath}`
+                            };
+                        }
+                    } catch (fileError: any) {
+                        logger.error(`Error fetching file info for fileId ${welcomePack.fileId}: ${JSON.stringify(fileError)}`);
+                        // Continue without file info if there's an error
+                    }
+                }
             }
 
             // Return null instead of throwing error - let the controller handle the "not found" case
@@ -483,28 +629,39 @@ export class DocumentsService {
                 throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
             }
 
-            // Check if templateString exists and is a string
-            if (!('templateString' in welcomePack) || typeof (welcomePack as any).templateString !== 'string') {
+            // Check if we have either templateString or fileId
+            if (!('templateString' in welcomePack) && !('fileId' in welcomePack)) {
                 throw new ApiError(httpStatus.NOT_FOUND, APICodes.FILE_NOT_FOUND.message, APICodes.FILE_NOT_FOUND.code);
             }
 
             let contentType = 'application/octet-stream';
             let fileName = `welcome-pack-${id}`;
+            let fileBuffer: Buffer;
 
-            // Convert Base64 string back to Buffer
-            const fileBuffer = Buffer.from((welcomePack as any).templateString, 'base64');
+            if ((welcomePack as any).fileId) {
+                // For PDF files, return direct Blob URL (no streaming)
+                try {
+                    const fileUpload = await AppDataSource.getRepository(FileUploads).findOne({
+                        where: { id: (welcomePack as any).fileId }
+                    });
 
-            // Try to determine if it's PDF or HTML based on content
-            if (fileBuffer.length >= 4 && 
-                fileBuffer[0] === 0x25 && 
-                fileBuffer[1] === 0x50 && 
-                fileBuffer[2] === 0x44 && 
-                fileBuffer[3] === 0x46) {
-                contentType = 'application/pdf';
-                fileName += '.pdf';
-            } else {
+                    if (!fileUpload) {
+                        throw new ApiError(httpStatus.NOT_FOUND, APICodes.FILE_NOT_FOUND.message, APICodes.FILE_NOT_FOUND.code);
+                    }
+
+                    const fileUrl = `https://${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/application/${fileUpload.filePath}`;
+                    return { fileUrl } as any;
+                } catch (fileError: any) {
+                    logger.error(`Error building file URL for welcome-pack ${id}: ${JSON.stringify(fileError)}`);
+                    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.FILE_NOT_FOUND.message, APICodes.FILE_NOT_FOUND.code);
+                }
+            } else if ((welcomePack as any).templateString) {
+                // Handle HTML file via templateString
+                fileBuffer = Buffer.from((welcomePack as any).templateString, 'base64');
                 contentType = 'text/html';
                 fileName += '.html';
+            } else {
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.FILE_NOT_FOUND.message, APICodes.FILE_NOT_FOUND.code);
             }
 
             return {
@@ -530,7 +687,8 @@ export class DocumentsService {
      */
     async updateWelcomePack(id: number, data: any, file: any, userId: number) {
         try {
-            const welcomePack = await this.getWelcomePackById(id);
+            // Load the real entity, not the formatted DTO
+            const welcomePack = await AppDataSource.getRepository(OccupancyRequestWelcomePack).findOne({ where: { id } });
 
             if (!welcomePack) {
                 throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
@@ -539,17 +697,28 @@ export class DocumentsService {
             // Convert string boolean to actual boolean if needed
             const isActiveBoolean = stringToBoolean(data.isActive);
             
-            // If updating to active, deactivate other active welcome packs for the same combination
-            if (isActiveBoolean === true) {
+            // Check if location fields are being updated
+            const isLocationChanging = (
+                (data.masterCommunityId !== undefined && data.masterCommunityId !== welcomePack.masterCommunityId) ||
+                (data.communityId !== undefined && data.communityId !== welcomePack.communityId) ||
+                (data.towerId !== undefined && data.towerId !== welcomePack.towerId)
+            );
+
+            // If updating to active or location is changing, deactivate other active welcome packs for the same combination
+            if (isActiveBoolean === true || isLocationChanging) {
+                const targetMasterCommunityId = data.masterCommunityId !== undefined ? data.masterCommunityId : welcomePack.masterCommunityId;
+                const targetCommunityId = data.communityId !== undefined ? data.communityId : welcomePack.communityId;
+                const targetTowerId = data.towerId !== undefined ? data.towerId : welcomePack.towerId;
+
                 const queryBuilder = AppDataSource.getRepository(OccupancyRequestWelcomePack)
                     .createQueryBuilder('welcomePack')
                     .where('welcomePack.id != :id', { id })
-                    .andWhere('welcomePack.masterCommunityId = :masterCommunityId', { masterCommunityId: welcomePack.masterCommunityId })
-                    .andWhere('welcomePack.communityId = :communityId', { communityId: welcomePack.communityId })
+                    .andWhere('welcomePack.masterCommunityId = :masterCommunityId', { masterCommunityId: targetMasterCommunityId })
+                    .andWhere('welcomePack.communityId = :communityId', { communityId: targetCommunityId })
                     .andWhere('welcomePack.isActive = :isActive', { isActive: true });
 
-                if ((welcomePack as any).towerId) {
-                    queryBuilder.andWhere('welcomePack.towerId = :towerId', { towerId: (welcomePack as any).towerId });
+                if (targetTowerId !== null && targetTowerId !== undefined) {
+                    queryBuilder.andWhere('welcomePack.towerId = :towerId', { towerId: targetTowerId });
                 } else {
                     queryBuilder.andWhere('welcomePack.towerId IS NULL');
                 }
@@ -563,19 +732,17 @@ export class DocumentsService {
                         activeWelcomePack.updatedBy = userId;
                         await AppDataSource.getRepository(OccupancyRequestWelcomePack).save(activeWelcomePack);
                         
-                        // Create history record for deactivated welcome pack
-                        const deactivatedHistoryData = {
+                        // Unified history entry
+                        await this.writeUnifiedHistory({
                             templateType: 'welcome-pack',
-                            occupancyRequestWelcomePack: { id: activeWelcomePack.id },
+                            createdBy: userId,
+                            updatedBy: userId,
+                            templateData: { action: 'deactivate', isActive: false },
                             masterCommunityId: activeWelcomePack.masterCommunityId,
                             communityId: activeWelcomePack.communityId,
-                            towerId: activeWelcomePack.towerId,
-                            templateString: activeWelcomePack.templateString,
-                            isActive: false, // Mark as deactivated
-                            createdBy: userId,
-                            updatedBy: userId
-                        };
-                        await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(deactivatedHistoryData);
+                            towerId: activeWelcomePack.towerId ?? null,
+                            occupancyRequestWelcomePackId: activeWelcomePack.id,
+                        });
                     }
                 }
             }
@@ -590,16 +757,54 @@ export class DocumentsService {
                     throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
                 }
 
-                const allowedTypes = ['application/pdf', 'text/html'];
+                const allowedTypes = ['application/pdf'];
                 if (!allowedTypes.includes(file.mimetype)) {
                     throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
                 }
 
-                cleanData.templateString = file.buffer.toString('base64');
+                // Handle file storage (PDF only)
+                // For PDF files, upload to Azure Blob Storage and store file reference
+                const { uploadFile } = await import('../../Common/Utils/azureBlobStorage');
+                const uploadedFile = await uploadFile(file.originalname, file, `welcome-pack/${welcomePack.masterCommunityId}/${welcomePack.communityId}/`, userId);
+                
+                if (uploadedFile && typeof uploadedFile === 'object' && 'id' in uploadedFile) {
+                    welcomePack.fileId = uploadedFile.id;
+                    welcomePack.templateString = null; // Clear templateString
+                } else {
+                    logger.error('Failed to upload PDF file to Azure Blob Storage');
+                    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
+                }
             }
 
             // Update specific fields based on what's provided
             let hasUpdates = false;
+            
+            // Allow updating file reference via existing fileId (optional)
+            if (cleanData.fileId !== undefined) {
+                const fileUpload = await AppDataSource.getRepository(FileUploads).findOne({ where: { id: cleanData.fileId } });
+                if (!fileUpload) {
+                    throw new ApiError(httpStatus.NOT_FOUND, APICodes.FILE_NOT_FOUND.message, APICodes.FILE_NOT_FOUND.code);
+                }
+                welcomePack.fileId = cleanData.fileId;
+                welcomePack.templateString = null; // Ensure templateString cleared when using fileId
+                hasUpdates = true;
+            }
+            
+            // Update location fields if provided
+            if (cleanData.masterCommunityId !== undefined) {
+                welcomePack.masterCommunityId = cleanData.masterCommunityId;
+                hasUpdates = true;
+            }
+            
+            if (cleanData.communityId !== undefined) {
+                welcomePack.communityId = cleanData.communityId;
+                hasUpdates = true;
+            }
+            
+            if (cleanData.towerId !== undefined) {
+                welcomePack.towerId = cleanData.towerId;
+                hasUpdates = true;
+            }
             
             if (cleanData.isActive !== undefined) {
                 welcomePack.isActive = isActiveBoolean;
@@ -608,7 +813,6 @@ export class DocumentsService {
             
             // Update templateString if file is provided
             if (file && file.buffer && file.buffer.length > 0 && file.size > 0 && file.mimetype) {
-                welcomePack.templateString = file.buffer.toString('base64');
                 hasUpdates = true;
             }
             
@@ -624,20 +828,22 @@ export class DocumentsService {
                 throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UPDATE_NOT_POSSIBLE.message, APICodes.UPDATE_NOT_POSSIBLE.code);
             }
 
-            // Create history record for the update
-            const historyData = {
+            // Unified history for update
+            await this.writeUnifiedHistory({
                 templateType: 'welcome-pack',
-                occupancyRequestWelcomePack: { id: updatedWelcomePack.id },
+                createdBy: userId,
+                updatedBy: userId,
+                templateData: {
+                    action: 'update',
+                    fileId: updatedWelcomePack.fileId ?? null,
+                    hasTemplateString: Boolean(updatedWelcomePack.templateString),
+                    isActive: updatedWelcomePack.isActive,
+                },
                 masterCommunityId: updatedWelcomePack.masterCommunityId,
                 communityId: updatedWelcomePack.communityId,
-                towerId: updatedWelcomePack.towerId,
-                templateString: updatedWelcomePack.templateString,
-                isActive: updatedWelcomePack.isActive,
-                createdBy: userId,
-                updatedBy: userId // Add missing updatedBy field
-            };
-
-            await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyData);
+                towerId: updatedWelcomePack.towerId ?? null,
+                occupancyRequestWelcomePackId: updatedWelcomePack.id,
+            });
 
             return updatedWelcomePack;
         } catch (error: any) {
@@ -747,6 +953,16 @@ export class DocumentsService {
         try {
             const { page = 1, per_page = 20, search, masterCommunityIds = '', communityIds = '', towerIds = '', templateType, includeFile = false, sortBy = 'createdAt', sortOrder = 'DESC', isActive } = query;
 
+            // Validate templateType is provided
+            if (!templateType) {
+                throw new ApiError(httpStatus.BAD_REQUEST, 'Template type is required. Must be either "move-in" or "move-out"', 'TEMPLATE_TYPE_REQUIRED');
+            }
+            
+            // Validate templateType value
+            if (!['move-in', 'move-out'].includes(templateType)) {
+                throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid template type. Must be either "move-in" or "move-out"', 'INVALID_TEMPLATE_TYPE');
+            }
+
             // Parse comma-separated IDs and filter out empty values
             const parseIds = (ids: string) => {
                 if (!ids || ids.trim() === '') return [];
@@ -763,7 +979,7 @@ export class DocumentsService {
                 .leftJoinAndSelect('template.masterCommunity', 'masterCommunity')
                 .leftJoinAndSelect('template.community', 'community')
                 .leftJoinAndSelect('template.tower', 'tower')
-                .where('template.templateType IN (:...templateTypes)', { templateTypes: ['move-in', 'move-out'] });
+                .where('template.templateType = :templateType', { templateType });
 
             // Handle field selection based on includeFile parameter
             if (stringToBoolean(includeFile)) {
@@ -789,7 +1005,7 @@ export class DocumentsService {
                 ]);
             } else {
                 // When includeFile is false, explicitly select only the fields we want (excluding templateString and select: false fields)
-                queryBuilder.select([
+                const baseFields = [
                     'template.id',
                     'template.masterCommunityId',
                     'template.communityId',
@@ -802,7 +1018,14 @@ export class DocumentsService {
                     'community.name',
                     'tower.id',
                     'tower.name'
-                ]);
+                ];
+                
+                // Add sortBy field if it's not already included
+                if (sortBy && !baseFields.includes(`template.${sortBy}`)) {
+                    baseFields.push(`template.${sortBy}`);
+                }
+                
+                queryBuilder.select(baseFields);
             }
 
             // Add filtering by master community - only if IDs are provided
@@ -827,18 +1050,6 @@ export class DocumentsService {
                     { search: `%${search.trim()}%` }
                 );
             }
-
-            // Add template type filtering - templateType is now required by validation
-            if (!templateType) {
-                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
-            }
-            
-            // Validate templateType value
-            if (!['move-in', 'move-out'].includes(templateType)) {
-                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
-            }
-            
-            queryBuilder.andWhere('template.templateType = :templateType', { templateType });
 
             // Add active status filtering
             if (isActive !== undefined && isActive !== '') {
@@ -909,7 +1120,7 @@ export class DocumentsService {
                 throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
             }
 
-            const allowedTypes = ['application/pdf', 'text/html'];
+            const allowedTypes = ['text/html'];
             if (!allowedTypes.includes(templateFile.mimetype)) {
                 throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
             }
@@ -931,21 +1142,18 @@ export class DocumentsService {
             const existingTemplates = await queryBuilder.getMany();
 
             if (existingTemplates.length > 0) {
-                // Create history records for existing templates
+                // Unified history for existing (about to deactivate)
                 for (const template of existingTemplates) {
-                    try {
-                        const historyRecord = AppDataSource.getRepository(OccupancyRequestTemplateHistory).create({
-                            occupancyRequestTemplates: template,
-                            templateType: template.templateType,
-                            isActive: template.isActive,
-                            createdBy: parseInt(userId),
-                            updatedBy: parseInt(userId)
-                        });
-                        await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
-                    } catch (historyError) {
-                        logger.error(`Error creating history record: ${JSON.stringify(historyError)}`);
-                        throw historyError;
-                    }
+                    await this.writeUnifiedHistory({
+                        templateType: template.templateType,
+                        createdBy: parseInt(userId),
+                        updatedBy: parseInt(userId),
+                        templateData: { action: 'deactivate', isActive: false },
+                        masterCommunityId: template.masterCommunityId,
+                        communityId: template.communityId,
+                        towerId: template.towerId ?? null,
+                        occupancyRequestTemplatesId: template.id,
+                    });
                 }
 
                 // Deactivate existing templates
@@ -984,21 +1192,17 @@ export class DocumentsService {
                 throw saveError;
             }
 
-            // Create history record
-            try {
-                const historyRecord = AppDataSource.getRepository(OccupancyRequestTemplateHistory).create({
-                    occupancyRequestTemplates: savedTemplate as unknown as OccupancyRequestTemplates,
-                    templateType: (savedTemplate as unknown as OccupancyRequestTemplates).templateType,
-                    isActive: (savedTemplate as unknown as OccupancyRequestTemplates).isActive,
-                    createdBy: parseInt(userId),
-                    updatedBy: parseInt(userId) // Add this line to fix the history table error
-                });
-
-                await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
-            } catch (historyError) {
-                logger.error(`Error creating history record for new template: ${JSON.stringify(historyError)}`);
-                throw historyError;
-            }
+            // Unified history for creation
+            await this.writeUnifiedHistory({
+                templateType: (savedTemplate as any).templateType,
+                createdBy: parseInt(userId),
+                updatedBy: parseInt(userId),
+                templateData: { action: 'create', isActive: (savedTemplate as any).isActive },
+                masterCommunityId: (savedTemplate as any).masterCommunityId,
+                communityId: (savedTemplate as any).communityId,
+                towerId: (savedTemplate as any).towerId ?? null,
+                occupancyRequestTemplatesId: (savedTemplate as any).id,
+            });
 
             return savedTemplate;
         } catch (error: any) {
@@ -1153,42 +1357,55 @@ export class DocumentsService {
             // Convert string boolean to actual boolean if needed
             const isActiveBoolean = stringToBoolean(data.isActive);
             
-            // If updating to active, deactivate other active templates for the same combination
-            if (isActiveBoolean === true) {
+            // Check if location fields are being updated
+            const isLocationChanging = (
+                (data.masterCommunityId !== undefined && data.masterCommunityId !== template.masterCommunityId) ||
+                (data.communityId !== undefined && data.communityId !== template.communityId) ||
+                (data.towerId !== undefined && data.towerId !== template.towerId)
+            );
+
+            // If updating to active or location is changing, deactivate other active templates for the same combination
+            if (isActiveBoolean === true || isLocationChanging) {
+                const targetMasterCommunityId = data.masterCommunityId !== undefined ? data.masterCommunityId : template.masterCommunityId;
+                const targetCommunityId = data.communityId !== undefined ? data.communityId : template.communityId;
+                const targetTowerId = data.towerId !== undefined ? data.towerId : template.towerId;
+
                 const queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplates)
                     .createQueryBuilder('template')
                     .where('template.id != :id', { id })
-                    .andWhere('template.masterCommunityId = :masterCommunityId', { masterCommunityId: template.masterCommunityId })
-                    .andWhere('template.communityId = :communityId', { communityId: template.communityId })
+                    .andWhere('template.masterCommunityId = :masterCommunityId', { masterCommunityId: targetMasterCommunityId })
+                    .andWhere('template.communityId = :communityId', { communityId: targetCommunityId })
                     .andWhere('template.templateType = :templateType', { templateType: template.templateType })
                     .andWhere('template.isActive = :isActive', { isActive: true });
 
-                if (template.towerId) {
-                    queryBuilder.andWhere('template.towerId = :towerId', { towerId: template.towerId });
+                if (targetTowerId !== null && targetTowerId !== undefined) {
+                    queryBuilder.andWhere('template.towerId = :towerId', { towerId: targetTowerId });
                 } else {
                     queryBuilder.andWhere('template.towerId IS NULL');
                 }
 
-                const existingTemplates = await queryBuilder.getMany();
+                const activeTemplates = await queryBuilder.getMany();
 
-                if (existingTemplates.length > 0) {
-                    // Create history records for existing templates
-                    for (const existingTemplate of existingTemplates) {
-                        const historyRecord = AppDataSource.getRepository(OccupancyRequestTemplateHistory).create({
-                            occupancyRequestTemplates: existingTemplate,
-                            templateType: existingTemplate.templateType,
-                            isActive: existingTemplate.isActive,
+                if (activeTemplates.length > 0) {
+                    // Deactivate existing templates
+                    for (const activeTemplate of activeTemplates) {
+                        activeTemplate.isActive = false;
+                        activeTemplate.updatedBy = parseInt(userId);
+                        await AppDataSource.getRepository(OccupancyRequestTemplates).save(activeTemplate);
+                        
+                        // Create history record for deactivated template
+                        const deactivatedHistoryData = {
+                            templateType: activeTemplate.templateType,
+                            occupancyRequestTemplates: { id: activeTemplate.id },
+                            masterCommunityId: activeTemplate.masterCommunityId,
+                            communityId: activeTemplate.communityId,
+                            towerId: activeTemplate.towerId,
+                            templateString: activeTemplate.templateString || '',
+                            isActive: false, // Mark as deactivated
                             createdBy: parseInt(userId),
                             updatedBy: parseInt(userId)
-                        });
-                        await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
-                    }
-
-                    // Deactivate existing templates
-                    for (const existingTemplate of existingTemplates) {
-                        existingTemplate.isActive = false;
-                        existingTemplate.updatedBy = parseInt(userId);
-                        await AppDataSource.getRepository(OccupancyRequestTemplates).save(existingTemplate);
+                        };
+                        await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(deactivatedHistoryData);
                     }
                 }
             }
@@ -1215,11 +1432,12 @@ export class DocumentsService {
                     throw new ApiError(httpStatus.BAD_REQUEST, APICodes.FILE_UPLOAD_ERROR.message, APICodes.FILE_UPLOAD_ERROR.code);
                 }
 
-                const allowedTypes = ['application/pdf', 'text/html'];
+                const allowedTypes = ['text/html'];
                 if (!allowedTypes.includes(templateFile.mimetype)) {
                     throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
                 }
 
+                // For both PDF and HTML files, store as base64 in templateString
                 cleanData.templateString = templateFile.buffer.toString('base64');
             }
 
@@ -1272,16 +1490,17 @@ export class DocumentsService {
                 throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UPDATE_NOT_POSSIBLE.message, APICodes.UPDATE_NOT_POSSIBLE.code);
             }
 
-            // Create history record for the update
-            const historyRecord = AppDataSource.getRepository(OccupancyRequestTemplateHistory).create({
-                occupancyRequestTemplates: updatedTemplate,
+            // Unified history for update
+            await this.writeUnifiedHistory({
                 templateType: updatedTemplate.templateType,
-                isActive: updatedTemplate.isActive,
                 createdBy: parseInt(userId),
-                updatedBy: parseInt(userId)
+                updatedBy: parseInt(userId),
+                templateData: { action: 'update', isActive: updatedTemplate.isActive },
+                masterCommunityId: updatedTemplate.masterCommunityId,
+                communityId: updatedTemplate.communityId,
+                towerId: updatedTemplate.towerId ?? null,
+                occupancyRequestTemplatesId: updatedTemplate.id,
             });
-
-            await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
 
             logger.info(`Template updated successfully with ID: ${updatedTemplate.id}`);
             return updatedTemplate;
@@ -1348,20 +1567,21 @@ export class DocumentsService {
             switch (templateType) {
             case 'move-in':
             case 'move-out':
-                // For move-in and move-out templates
+                // For move-in and move-out templates - select only columns that exist post-migration
                 queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplateHistory)
                     .createQueryBuilder('history')
-                    .addSelect('history.createdAt')
-                    .addSelect('history.updatedAt')
-                    .addSelect('history.createdBy')
-                    .addSelect('history.updatedBy')
-                    .addSelect('history.masterCommunityId')
-                    .addSelect('history.communityId')
-                    .addSelect('history.towerId')
-                    .addSelect('history.templateString')
-                    .addSelect('history.isActive')
-                    .addSelect('history.mipRecipients')
-                    .addSelect('history.mopRecipients')
+                    .select([
+                        'history.id',
+                        'history.templateType',
+                        'history.createdAt',
+                        'history.updatedAt',
+                        'history.createdBy',
+                        'history.updatedBy',
+                        'history.masterCommunityId',
+                        'history.communityId',
+                        'history.towerId',
+                        'history.occupancyRequestTemplatesId',
+                    ])
                     .where('history.occupancyRequestTemplatesId = :id', { id })
                     .andWhere('history.templateType = :templateType', { templateType })
                     .orderBy('history.createdAt', 'DESC');
@@ -1378,20 +1598,21 @@ export class DocumentsService {
                 break;
                 
             case 'welcome-pack':
-                // For welcome pack templates
+                // For welcome pack templates - select only existing columns
                 queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplateHistory)
                     .createQueryBuilder('history')
-                    .addSelect('history.createdAt')
-                    .addSelect('history.updatedAt')
-                    .addSelect('history.createdBy')
-                    .addSelect('history.updatedBy')
-                    .addSelect('history.masterCommunityId')
-                    .addSelect('history.communityId')
-                    .addSelect('history.towerId')
-                    .addSelect('history.templateString')
-                    .addSelect('history.isActive')
-                    .addSelect('history.mipRecipients')
-                    .addSelect('history.mopRecipients')
+                    .select([
+                        'history.id',
+                        'history.templateType',
+                        'history.createdAt',
+                        'history.updatedAt',
+                        'history.createdBy',
+                        'history.updatedBy',
+                        'history.masterCommunityId',
+                        'history.communityId',
+                        'history.towerId',
+                        'history.occupancyRequestWelcomePackId',
+                    ])
                     .where('history.occupancyRequestWelcomePackId = :id', { id })
                     .andWhere('history.templateType = :templateType', { templateType })
                     .orderBy('history.createdAt', 'DESC');
@@ -1408,20 +1629,21 @@ export class DocumentsService {
                 break;
                 
             case 'recipient-mail':
-                // For email recipient templates
+                // For email recipient templates - select only existing columns
                 queryBuilder = AppDataSource.getRepository(OccupancyRequestTemplateHistory)
                     .createQueryBuilder('history')
-                    .addSelect('history.createdAt')
-                    .addSelect('history.updatedAt')
-                    .addSelect('history.createdBy')
-                    .addSelect('history.updatedBy')
-                    .addSelect('history.masterCommunityId')
-                    .addSelect('history.communityId')
-                    .addSelect('history.towerId')
-                    .addSelect('history.templateString')
-                    .addSelect('history.isActive')
-                    .addSelect('history.mipRecipients')
-                    .addSelect('history.mopRecipients')
+                    .select([
+                        'history.id',
+                        'history.templateType',
+                        'history.createdAt',
+                        'history.updatedAt',
+                        'history.createdBy',
+                        'history.updatedBy',
+                        'history.masterCommunityId',
+                        'history.communityId',
+                        'history.towerId',
+                        'history.occupancyRequestEmailRecipientsId',
+                    ])
                     .where('history.occupancyRequestEmailRecipientsId = :id', { id })
                     .andWhere('history.templateType = :templateType', { templateType })
                     .orderBy('history.createdAt', 'DESC');
@@ -1449,20 +1671,46 @@ export class DocumentsService {
             
             logger.info(`Found ${history.length} history records for templateType: ${templateType}, id: ${id}`);
             
-            // Transform the data to include nested objects for masterCommunity, community, and tower
-            const transformedHistory = history.map((record: any) => {
-                const transformed: any = {
-                    id: record.id,
-                    templateType: record.templateType,
-                    templateString: record.templateString,
-                    isActive: record.isActive,
-                    createdAt: record.createdAt,
-                    updatedAt: record.updatedAt,
-                    createdBy: record.createdBy,
-                    updatedBy: record.updatedBy,
-                    mipRecipients: record.mipRecipients,
-                    mopRecipients: record.mopRecipients
-                };
+                         // Transform the data to include nested objects for masterCommunity, community, and tower
+             const transformedHistory = await Promise.all(history.map(async (record: any) => {
+                 const transformed: any = {
+                     id: record.id,
+                     templateType: record.templateType,
+                     templateString: record.templateString,
+                     fileId: record.fileId,
+                     isActive: record.isActive,
+                     createdAt: record.createdAt,
+                     updatedAt: record.updatedAt,
+                     createdBy: record.createdBy,
+                     updatedBy: record.updatedBy,
+                     mipRecipients: record.mipRecipients,
+                     mopRecipients: record.mopRecipients
+                 };
+
+                 // Add file information for welcome-pack templates if fileId exists
+                 if (record.templateType === 'welcome-pack' && record.fileId) {
+                     try {
+                         const fileUpload = await AppDataSource.getRepository(FileUploads).findOne({
+                             where: { id: record.fileId }
+                         });
+                         
+                         if (fileUpload) {
+                             transformed.fileInfo = {
+                                 id: fileUpload.id,
+                                 fileName: fileUpload.fileOriginalName || fileUpload.fileName,
+                                 fileSize: fileUpload.fileSize,
+                                 fileType: fileUpload.fileType,
+                                 fileExtension: fileUpload.fileExtension,
+                                 filePath: fileUpload.filePath,
+                                 // Generate full URL for Azure Blob Storage
+                                 fileUrl: `${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/application/${fileUpload.filePath}`
+                             };
+                         }
+                     } catch (fileError: any) {
+                         logger.error(`Error fetching file info for fileId ${record.fileId}: ${JSON.stringify(fileError)}`);
+                         // Continue without file info if there's an error
+                     }
+                 }
 
                 // Add nested objects for masterCommunity, community, and tower using IDs
                 if (record.masterCommunityId) {
@@ -1507,7 +1755,7 @@ export class DocumentsService {
                 }
 
                 return transformed;
-            });
+            }))
             
             logger.info(`Successfully transformed ${transformedHistory.length} history records`);
             return transformedHistory;
@@ -1528,7 +1776,19 @@ export class DocumentsService {
         try {
             logger.info(`Starting getEmailRecipientsList with query: ${JSON.stringify(query)}`);
 
-            const { page = 1, per_page = 20, search = '', masterCommunityIds = '', communityIds = '', towerIds = '', isActive, startDate, endDate, sortBy = 'createdAt', sortOrder = 'DESC' } = query;
+            const { 
+                page = 1, 
+                per_page = 20, 
+                search = '', 
+                masterCommunityIds = '', 
+                communityIds = '', 
+                towerIds = '', 
+                isActive, 
+                startDate, 
+                endDate, 
+                sortBy = 'createdAt', 
+                sortOrder = 'DESC' 
+            } = query;
 
             // Parse comma-separated IDs and filter out empty values
             const parseIds = (ids: string) => {
@@ -1580,7 +1840,7 @@ export class DocumentsService {
                 queryBuilder.andWhere('recipients.tower.id IN (:...towerIds)', { towerIds: parsedTowerIds });
             }
 
-            // Add search functionality
+            // Add search functionality - only if search term is provided
             if (search && search.trim() !== '') {
                 queryBuilder.andWhere(
                     '(masterCommunity.name LIKE :search OR community.name LIKE :search OR tower.name LIKE :search OR recipients.mipRecipients LIKE :search OR recipients.mopRecipients LIKE :search)',
@@ -1588,12 +1848,12 @@ export class DocumentsService {
                 );
             }
 
-            // Add active status filtering
+            // Add active status filtering - only if isActive is provided
             if (isActive !== undefined && isActive !== '') {
                 queryBuilder.andWhere('recipients.isActive = :isActive', { isActive: stringToBoolean(isActive) });
             }
 
-            // Add date range filtering
+            // Add date range filtering - only if dates are provided
             if (startDate && startDate.trim() !== '') {
                 queryBuilder.andWhere('DATE(recipients.createdAt) >= DATE(:startDate)', { startDate });
             }
@@ -1685,26 +1945,17 @@ export class DocumentsService {
                 existing.updatedBy = userId;
                 await AppDataSource.getRepository(OccupancyRequestEmailRecipients).save(existing);
                 
-                // Create history record for the deactivated record
-                try {
-                    const deactivatedHistoryRecord = new OccupancyRequestTemplateHistory();
-                    deactivatedHistoryRecord.templateType = 'recipient-mail';
-                    deactivatedHistoryRecord.occupancyRequestEmailRecipients = existing;
-                    deactivatedHistoryRecord.mipRecipients = existing.mipRecipients;
-                    deactivatedHistoryRecord.mopRecipients = existing.mopRecipients;
-                    deactivatedHistoryRecord.isActive = false; // Deactivated
-                    deactivatedHistoryRecord.masterCommunityId = existing.masterCommunity.id;
-                    deactivatedHistoryRecord.communityId = existing.community.id;
-                    deactivatedHistoryRecord.towerId = existing.tower ? existing.tower.id : null;
-                    deactivatedHistoryRecord.createdBy = userId;
-                    deactivatedHistoryRecord.updatedBy = userId;
-
-                    await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(deactivatedHistoryRecord);
-                    logger.info('History record created for deactivated recipient');
-                } catch (historyError: any) {
-                    logger.error(`Error creating history record for deactivated recipient: ${JSON.stringify(historyError)}`);
-                    // Continue with the main operation even if history creation fails
-                }
+                // Unified history for deactivation
+                await this.writeUnifiedHistory({
+                    templateType: 'recipient-mail',
+                    createdBy: userId,
+                    updatedBy: userId,
+                    templateData: { action: 'deactivate', isActive: false, mipRecipients: existing.mipRecipients, mopRecipients: existing.mopRecipients },
+                    masterCommunityId: existing.masterCommunity.id,
+                    communityId: existing.community.id,
+                    towerId: existing.tower ? existing.tower.id : null,
+                    occupancyRequestEmailRecipientsId: existing.id,
+                });
 
                 logger.info(`Deactivated existing email recipient with ID ${existing.id}`);
             }
@@ -1745,28 +1996,17 @@ export class DocumentsService {
 
                 const savedRecipients = await AppDataSource.getRepository(OccupancyRequestEmailRecipients).save(recipients);
 
-                // Create template history record for email recipients
-                const historyRecord = new OccupancyRequestTemplateHistory();
-                historyRecord.templateType = 'recipient-mail';
-                historyRecord.occupancyRequestEmailRecipients = savedRecipients;
-                historyRecord.mipRecipients = savedRecipients.mipRecipients;
-                historyRecord.mopRecipients = savedRecipients.mopRecipients;
-                historyRecord.isActive = savedRecipients.isActive;
-                historyRecord.masterCommunityId = savedRecipients.masterCommunity.id;
-                historyRecord.communityId = savedRecipients.community.id;
-                historyRecord.towerId = savedRecipients.tower ? savedRecipients.tower.id : null;
-                historyRecord.createdBy = userId;
-                historyRecord.updatedBy = userId;
-
-                try {
-                    await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
-                    logger.info('History record created successfully');
-                } catch (historyError: any) {
-                    logger.error(`Error creating history record: ${JSON.stringify(historyError)}`);
-                    logger.error(`History record data: ${JSON.stringify(historyRecord)}`);
-                    // Continue with the main operation even if history creation fails
-                    logger.warn('Continuing without history record due to error');
-                }
+                // Unified history for creation
+                await this.writeUnifiedHistory({
+                    templateType: 'recipient-mail',
+                    createdBy: userId,
+                    updatedBy: userId,
+                    templateData: { action: 'create', isActive: savedRecipients.isActive, mipRecipients: savedRecipients.mipRecipients, mopRecipients: savedRecipients.mopRecipients },
+                    masterCommunityId: savedRecipients.masterCommunity.id,
+                    communityId: savedRecipients.community.id,
+                    towerId: savedRecipients.tower ? savedRecipients.tower.id : null,
+                    occupancyRequestEmailRecipientsId: savedRecipients.id,
+                });
 
                 logger.info('Email recipients created successfully');
                 return savedRecipients;
@@ -1805,37 +2045,32 @@ export class DocumentsService {
                 throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
             }
 
-            // Validate email format for MIP recipients if provided
-            if (data.mipRecipients && data.mipRecipients.trim() !== '') {
-                const mipEmails = data.mipRecipients.split(',').map((email: string) => email.trim());
-                for (const email of mipEmails) {
-                    if (!this.isValidEmail(email)) {
-                        throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
-                    }
-                }
-            }
+            // Convert string boolean to actual boolean if needed
+            const isActiveBoolean = stringToBoolean(data.isActive);
+            
+            // Check if location fields are being updated
+            const isLocationChanging = (
+                (data.masterCommunityId !== undefined && data.masterCommunityId !== recipients.masterCommunity.id) ||
+                (data.communityId !== undefined && data.communityId !== recipients.community.id) ||
+                (data.towerId !== undefined && data.towerId !== recipients.tower ? recipients.tower.id : null)
+            );
 
-            // Validate email format for MOP recipients if provided
-            if (data.mopRecipients && data.mopRecipients.trim() !== '') {
-                const mopEmails = data.mopRecipients.split(',').map((email: string) => email.trim());
-                for (const email of mopEmails) {
-                    if (!this.isValidEmail(email)) {
-                        throw new ApiError(httpStatus.BAD_REQUEST, APICodes.VALIDATION_ERROR.message, APICodes.VALIDATION_ERROR.code);
-                    }
-                }
-            }
+            // Resolve target location for conflict checks (use incoming if provided)
+            const targetMasterCommunityId = data.masterCommunityId !== undefined ? data.masterCommunityId : recipients.masterCommunity.id;
+            const targetCommunityId = data.communityId !== undefined ? data.communityId : recipients.community.id;
+            const targetTowerId = data.towerId !== undefined ? data.towerId : (recipients.tower ? recipients.tower.id : null);
 
-            // If setting to active, check for conflicts and deactivate existing ones
-            if (data.isActive === true) {
+            // If setting to active or location is changing, check for conflicts and deactivate existing ones for target location
+            if (isActiveBoolean === true || isLocationChanging) {
                 const queryBuilder = AppDataSource.getRepository(OccupancyRequestEmailRecipients)
                     .createQueryBuilder('recipients')
                     .where('recipients.id != :id', { id })
-                    .andWhere('recipients.masterCommunity.id = :masterCommunityId', { masterCommunityId: recipients.masterCommunity.id })
-                    .andWhere('recipients.community.id = :communityId', { communityId: recipients.community.id })
+                    .andWhere('recipients.masterCommunity.id = :masterCommunityId', { masterCommunityId: targetMasterCommunityId })
+                    .andWhere('recipients.community.id = :communityId', { communityId: targetCommunityId })
                     .andWhere('recipients.isActive = :isActive', { isActive: true });
 
-                if (recipients.tower) {
-                    queryBuilder.andWhere('recipients.tower.id = :towerId', { towerId: recipients.tower.id });
+                if (targetTowerId !== null && targetTowerId !== undefined) {
+                    queryBuilder.andWhere('recipients.tower.id = :towerId', { towerId: targetTowerId });
                 } else {
                     queryBuilder.andWhere('recipients.tower.id IS NULL');
                 }
@@ -1884,7 +2119,18 @@ export class DocumentsService {
                 recipients.mopRecipients = data.mopRecipients.trim();
             }
             if (data.isActive !== undefined) {
-                recipients.isActive = data.isActive;
+                recipients.isActive = isActiveBoolean;
+            }
+
+            // Update location fields if provided
+            if (data.masterCommunityId !== undefined) {
+                recipients.masterCommunity = { id: data.masterCommunityId } as any;
+            }
+            if (data.communityId !== undefined) {
+                recipients.community = { id: data.communityId } as any;
+            }
+            if (data.towerId !== undefined) {
+                recipients.tower = data.towerId ? ({ id: data.towerId } as any) : null;
             }
 
             recipients.updatedBy = userId;
@@ -1892,26 +2138,17 @@ export class DocumentsService {
             // Save updated recipients
             const updatedRecipients = await AppDataSource.getRepository(OccupancyRequestEmailRecipients).save(recipients);
 
-            // Create history record for the updated recipient
-            try {
-                const historyRecord = new OccupancyRequestTemplateHistory();
-                historyRecord.templateType = 'recipient-mail';
-                historyRecord.occupancyRequestEmailRecipients = updatedRecipients;
-                historyRecord.mipRecipients = updatedRecipients.mipRecipients;
-                historyRecord.mopRecipients = updatedRecipients.mopRecipients;
-                historyRecord.isActive = updatedRecipients.isActive;
-                historyRecord.masterCommunityId = updatedRecipients.masterCommunity.id;
-                historyRecord.communityId = updatedRecipients.community.id;
-                historyRecord.towerId = updatedRecipients.tower ? updatedRecipients.tower.id : null;
-                historyRecord.createdBy = userId;
-                historyRecord.updatedBy = userId;
-
-                await AppDataSource.getRepository(OccupancyRequestTemplateHistory).save(historyRecord);
-                logger.info('History record created for updated recipient');
-            } catch (historyError: any) {
-                logger.error(`Error creating history record for updated recipient: ${JSON.stringify(historyError)}`);
-                // Continue with the main operation even if history creation fails
-            }
+            // Unified history for update
+            await this.writeUnifiedHistory({
+                templateType: 'recipient-mail',
+                createdBy: userId,
+                updatedBy: userId,
+                templateData: { action: 'update', isActive: updatedRecipients.isActive, mipRecipients: updatedRecipients.mipRecipients, mopRecipients: updatedRecipients.mopRecipients },
+                masterCommunityId: updatedRecipients.masterCommunity.id,
+                communityId: updatedRecipients.community.id,
+                towerId: updatedRecipients.tower ? updatedRecipients.tower.id : null,
+                occupancyRequestEmailRecipientsId: updatedRecipients.id,
+            });
 
             logger.info('Email recipients updated successfully');
             return updatedRecipients;

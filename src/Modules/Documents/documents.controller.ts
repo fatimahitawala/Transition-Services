@@ -43,7 +43,11 @@ export class DocumentsController {
     async downloadWelcomePackFile(req: Request, res: Response) {
         const { params: { id } }: Record<string, any> = req;
         const result = await documentsService.downloadWelcomePackFile(parseInt(id));
-
+        // If service returned a direct fileUrl (PDF), respond with URL for client-side download
+        if ((result as any)?.fileUrl) {
+            return successResponseWithData(res, APICodes.COMMON_SUCCESS, { fileUrl: (result as any).fileUrl });
+        }
+        // Otherwise, return binary (HTML template case)
         return successResponseWithBinaryData(res, APICodes.COMMON_SUCCESS, result.buffer, result.contentType, result.fileName);
     }
 
@@ -56,13 +60,16 @@ export class DocumentsController {
     // Consolidated template controller methods
     async getTemplateList(req: Request, res: Response) {
         const { user: { id: userId = '' } }: Record<string, any> = req;
-        const result = await documentsService.getTemplateList(req.query, userId);
+        const { templateType } = req.params;
+        const queryWithTemplateType = { ...req.query, templateType };
+        const result = await documentsService.getTemplateList(queryWithTemplateType, userId);
         return successResponseWithPaginationData(res, APICodes.COMMON_SUCCESS, result.templates, result.pagination);
     }
 
     async createTemplate(req: Request, res: Response) {
         const { user: { id: userId = '' } }: Record<string, any> = req;
-        const data = { ...req.body, templateFile: req.file };
+        const { templateType } = req.params as any;
+        const data = { ...req.body, templateType, templateFile: req.file };
         const result = await documentsService.createTemplate(data, req.file, userId);
         return successResponseWithData(res, APICodes.CREATE_SUCCESS, result);
     }
@@ -92,7 +99,7 @@ export class DocumentsController {
             communityName: body.communityName || body.buildingName,
             masterCommunityName: body.masterCommunityName || APICodes.DEFAULT_MASTER_COMMUNITY.message,
             dateOfIssue: body.dateOfIssue || new Date().toLocaleDateString('en-GB'),
-            moveInDate: body.moveInDate || APICodes.DEFAULT_MOVE_IN_DATE.message,
+            moveInDate: body.moveInDate || new Date().toLocaleDateString('en-GB'),
             referenceNumber: body.referenceNumber || `WK-${Date.now()}`,
             contactNumber: body.contactNumber || APICodes.DEFAULT_CONTACT_NUMBER.message
         };
