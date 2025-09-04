@@ -9,18 +9,18 @@ const moveInAtLeastDaysLater = (days: number) => (value: any, helpers: any) => {
   const now = new Date();
   const maxDate = new Date();
   maxDate.setDate(now.getDate() + days);
-  
+
   // Check if date is in the future (not today or past)
   if (inputDate <= now) {
     return helpers.message(APICodes.MOVE_IN_DATE_FUTURE.message);
   }
-  
+
   // Check if date is within specified days from today (not beyond)
   if (inputDate > maxDate) {
     const message = APICodes.MOVE_IN_DATE_WITHIN_DAYS.message.replace('{days}', days.toString());
     return helpers.message(message);
   }
-  
+
   return value;
 };
 
@@ -45,7 +45,7 @@ export function validateMoveIn(req: Request, res: Response, next: NextFunction) 
 }
 
 export class MoveInvalidation {
-    
+
   public getAdminMoveIn = {
     query: Joi.object().keys({
       page: Joi.number().optional(),
@@ -57,6 +57,10 @@ export class MoveInvalidation {
       names: Joi.string().optional(),
       amenityIds: Joi.string().optional(),
       withAccess: Joi.boolean().optional(),
+      createdStartDate: Joi.date().optional(),
+      createdEndDate: Joi.date().optional(),
+      moveInStartDate: Joi.date().optional(),
+      moveInEndDate: Joi.date().optional(),
     }),
   };
 

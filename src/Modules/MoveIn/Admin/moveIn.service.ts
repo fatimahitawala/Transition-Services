@@ -469,7 +469,7 @@ export class MoveInService {
         emiratesIdExpiryDate: details.emiratesIdExpiryDate || rest.emiratesIdExpiryDate,
         tenancyContractStartDate: details.tenancyContractStartDate || rest.tenancyContractStartDate,
         tenancyContractEndDate: details.tenancyContractEndDate || rest.tenancyContractEndDate,
-        
+
         // Occupancy details
         adults: details.adults,
         children: details.children,
@@ -477,7 +477,7 @@ export class MoveInService {
         pets: details.pets,
         peopleOfDetermination: details.peopleOfDetermination,
         termsAccepted: details.termsAccepted,
-        
+
         // Store detailsText in comments field when peopleOfDetermination is true
         comments: details.peopleOfDetermination && details.detailsText ? details.detailsText : (rest.comments || null),
       };
@@ -737,7 +737,10 @@ export class MoveInService {
         .select([
           "am.id", "am.status", "am.createdAt", "am.moveInDate",
           "am.moveInRequestNo", "am.requestType",
-        ])
+          "u.id", "u.unitName", "u.unitNumber",
+          "t.id", "t.name",
+          "c.id", "c.name",
+          "mc.id", "mc.name"])
         .innerJoin("am.unit", "u", "u.isActive=1")
         .innerJoin("u.masterCommunity", "mc", "mc.isActive=1")
         .innerJoin("u.community", "c", "c.isActive=1")
@@ -746,9 +749,9 @@ export class MoveInService {
 
       getMoveInList = checkAdminPermission(getMoveInList, { towerId: 't.id', communityId: 'c.id', masterCommunityId: 'mc.id' }, user);
 
-      if (masterCommunityIds && masterCommunityIds.length) getMoveInList.andWhere(`am.masterCommunity IN (:...masterCommunityIds)`, { masterCommunityIds });
-      if (communityIds && communityIds.length) getMoveInList.andWhere(`am.community IN (:...communityIds)`, { communityIds });
-      if (towerIds && towerIds.length) getMoveInList.andWhere(`am.tower IN (:...towerIds)`, { towerIds });
+      if (masterCommunityIds && masterCommunityIds.length) getMoveInList.andWhere(`mc.id IN (:...masterCommunityIds)`, { masterCommunityIds });
+      if (communityIds && communityIds.length) getMoveInList.andWhere(`c.id IN (:...communityIds)`, { communityIds });
+      if (towerIds && towerIds.length) getMoveInList.andWhere(`t.id IN (:...towerIds)`, { towerIds });
       if (createdStartDate) getMoveInList.andWhere(`am.createdAt >= :createdStartDate`, { createdStartDate });
       if (createdEndDate) getMoveInList.andWhere(`am.createdAt <= :createdEndDate`, { createdEndDate });
       if (moveInStartDate) getMoveInList.andWhere(`am.moveInDate >= :moveInStartDate`, { moveInStartDate });
