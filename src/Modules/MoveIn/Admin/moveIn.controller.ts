@@ -145,4 +145,50 @@ export class MoveInController {
     return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
   }
 
+  // ==================== UPDATE METHODS ====================
+
+  /**
+   * Update owner move-in request (Admin)
+   */
+  async updateOwnerMoveInRequest(req: AuthenticatedRequest, res: Response) {
+    const { user, params, body } = req;
+    const { requestId } = params;
+    logger.debug(`MOVE-IN | UPDATE OWNER | ADMIN REQUEST | REQUEST ID: ${requestId} | USER: ${user?.id} | BODY: ${JSON.stringify(body)}`);
+    const result = await moveInService.updateOwnerMoveIn(Number(requestId), body, user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
+
+  /**
+   * Update tenant move-in request (Admin)
+   */
+  async updateTenantMoveInRequest(req: AuthenticatedRequest, res: Response) {
+    const { user, params, body } = req;
+    const { requestId } = params;
+    logger.debug(`MOVE-IN | UPDATE TENANT | ADMIN REQUEST | REQUEST ID: ${requestId} | USER: ${user?.id} | BODY: ${JSON.stringify(body)}`);
+    const result = await moveInService.updateTenantMoveIn(Number(requestId), body, user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
+
+  /**
+   * Update HHO unit move-in request (Admin)
+   */
+  async updateHhoOwnerMoveInRequest(req: AuthenticatedRequest, res: Response) {
+    const { user, params, body } = req;
+    const { requestId } = params;
+    logger.debug(`MOVE-IN | UPDATE HHO OWNER | ADMIN REQUEST | REQUEST ID: ${requestId} | USER: ${user?.id} | BODY: ${JSON.stringify(body)}`);
+    const result = await moveInService.updateHhoOwnerMoveIn(Number(requestId), body, user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
+
+  /**
+   * Update HHC company move-in request (Admin)
+   */
+  async updateHhcCompanyMoveInRequest(req: AuthenticatedRequest, res: Response) {
+    const { user, params, body } = req;
+    const { requestId } = params;
+    logger.debug(`MOVE-IN | UPDATE HHC COMPANY | ADMIN REQUEST | REQUEST ID: ${requestId} | USER: ${user?.id} | BODY: ${JSON.stringify(body)}`);
+    const result = await moveInService.updateHhcCompanyMoveIn(Number(requestId), body, user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
+
 }
