@@ -2016,6 +2016,9 @@ export class DocumentsService {
             }
         } catch (error: any) {
             logger.error(`Error in createEmailRecipients: ${JSON.stringify(error)}`);
+            if (error instanceof ApiError) {
+                throw error;
+            }
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
             throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
@@ -2122,15 +2125,31 @@ export class DocumentsService {
                 recipients.isActive = isActiveBoolean;
             }
 
-            // Update location fields if provided
+            // Update location fields if provided - validate entity existence first
             if (data.masterCommunityId !== undefined) {
-                recipients.masterCommunity = { id: data.masterCommunityId } as any;
+                const masterCommunity = await AppDataSource.getRepository(MasterCommunities).findOne({ where: { id: data.masterCommunityId } });
+                if (!masterCommunity) {
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.MASTER_COMMUNITY_NOT_FOUND.message, APICodes.MASTER_COMMUNITY_NOT_FOUND.code);
+                }
+                recipients.masterCommunity = masterCommunity;
             }
             if (data.communityId !== undefined) {
-                recipients.community = { id: data.communityId } as any;
+                const community = await AppDataSource.getRepository(Communities).findOne({ where: { id: data.communityId } });
+                if (!community) {
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.COMMUNITY_NOT_FOUND.message, APICodes.COMMUNITY_NOT_FOUND.code);
+                }
+                recipients.community = community;
             }
             if (data.towerId !== undefined) {
-                recipients.tower = data.towerId ? ({ id: data.towerId } as any) : null;
+                if (data.towerId) {
+                    const tower = await AppDataSource.getRepository(Towers).findOne({ where: { id: data.towerId } });
+                    if (!tower) {
+                        throw new ApiError(httpStatus.BAD_REQUEST, APICodes.TOWER_NOT_FOUND.message, APICodes.TOWER_NOT_FOUND.code);
+                    }
+                    recipients.tower = tower;
+                } else {
+                    recipients.tower = null as any;
+                }
             }
 
             recipients.updatedBy = userId;
@@ -2154,6 +2173,9 @@ export class DocumentsService {
             return updatedRecipients;
         } catch (error: any) {
             logger.error(`Error in updateEmailRecipients: ${JSON.stringify(error)}`);
+            if (error instanceof ApiError) {
+                throw error;
+            }
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
             throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
         }
