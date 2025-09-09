@@ -92,4 +92,15 @@ export class MoveInController {
     const result = await moveInService.uploadDocuments(Number(requestId), files, body, user);
     return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
   }
+
+  /**
+   * Cancel move-in request (Mobile)
+   */
+  async cancelMoveInRequest(req: Request, res: Response) {
+    const { user }: Record<string, any> = req;
+    const { requestId } = req.params as any;
+    logger.debug(`MOVE-IN | CANCEL REQUEST | MOBILE REQUEST | USER: ${user?.id} | REQUEST: ${requestId} | BODY: ${JSON.stringify(req.body)}`);
+    const result = await moveInService.cancelMoveInRequest(Number(requestId), req.body, user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
 }

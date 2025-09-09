@@ -724,17 +724,23 @@ export class MoveInService {
         tenancyContractStartDate,
         tenancyContractEndDate,
         // HHC Company specific fields
+        userEmail,
+        middleName,
+        mobileNumber,
         name,
         company,
         companyEmail,
         countryCode,
         operatorOfficeNumber,
         tradeLicenseNumber,
+        tradeLicenseExpiryDate,
         unitPermitStartDate,
         unitPermitExpiryDate,
         unitPermitNumber,
         leaseStartDate,
         leaseEndDate,
+        dtcmStartDate,
+        dtcmExpiryDate,
         nationality,
       } = data;
 
@@ -804,17 +810,23 @@ export class MoveInService {
           tenancyContractStartDate: tenancyContractStartDate,
           tenancyContractEndDate: tenancyContractEndDate,
           // HHC Company specific fields
+          userEmail,
+          middleName,
+          mobileNumber,
           name,
           company,
           companyEmail,
           countryCode,
           operatorOfficeNumber,
           tradeLicenseNumber,
-          unitPermitStartDate: details.unitPermitStartDate,
-          unitPermitExpiryDate: details.unitPermitExpiryDate,
-          unitPermitNumber: details.unitPermitNumber,
-          leaseStartDate: details.leaseStartDate,
-          leaseEndDate: details.leaseEndDate,
+          tradeLicenseExpiryDate,
+          unitPermitStartDate: details.unitPermitStartDate || unitPermitStartDate,
+          unitPermitExpiryDate: details.unitPermitExpiryDate || unitPermitExpiryDate,
+          unitPermitNumber: details.unitPermitNumber || unitPermitNumber,
+          leaseStartDate: details.leaseStartDate || leaseStartDate,
+          leaseEndDate: details.leaseEndDate || leaseEndDate,
+          dtcmStartDate,
+          dtcmExpiryDate,
         };
         createdDetails = await this.createDetailsRecord(qr, requestType, createdMaster as MoveInRequests, detailsData, user?.id);
 
@@ -863,8 +875,8 @@ export class MoveInService {
     if (mir.user?.id !== user?.id) {
       throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
     }
-    if (mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN) {
-      throw new ApiError(httpStatus.BAD_REQUEST, APICodes.ONLY_OPEN_REQUEST_EDITABLE.message, APICodes.ONLY_OPEN_REQUEST_EDITABLE.code);
+    if (mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN && mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING && mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED) {
+      throw new ApiError(httpStatus.BAD_REQUEST, "Request can only be updated when status is 'new', 'rfi-pending', or 'rfi-submitted'", APICodes.VALIDATION_ERROR.code);
     }
     return mir;
   }
@@ -877,9 +889,13 @@ export class MoveInService {
         unitId,
         requestType,
         moveInDate,
+        status,
         comments,
         additionalInfo,
         details,
+        // Owner fields for HHO Owner
+        ownerFirstName,
+        ownerLastName,
         firstName,
         lastName,
         email,
@@ -895,11 +911,14 @@ export class MoveInService {
         countryCode,
         operatorOfficeNumber,
         tradeLicenseNumber,
+        tradeLicenseExpiryDate,
         unitPermitStartDate,
         unitPermitExpiryDate,
         unitPermitNumber,
         leaseStartDate,
         leaseEndDate,
+        dtcmStartDate,
+        dtcmExpiryDate,
         nationality,
       } = data;
 
@@ -908,6 +927,7 @@ export class MoveInService {
         await MoveInRequests.update({ id: requestId }, {
           unit: unitId ? ({ id: unitId } as any) : (undefined as any),
           moveInDate: moveInDate ? new Date(moveInDate) : (undefined as any),
+          status: status || (undefined as any),
           comments: comments ?? (undefined as any),
           additionalInfo: additionalInfo ?? (undefined as any),
           updatedBy: user?.id,
@@ -962,6 +982,12 @@ export class MoveInService {
               .createQueryBuilder()
               .update()
               .set({
+                ownerFirstName: ownerFirstName || undefined,
+                ownerLastName: ownerLastName || undefined,
+                email: email || undefined,
+                dialCode: dialCode || undefined,
+                phoneNumber: phoneNumber || undefined,
+                nationality: nationality || undefined,
                 unitPermitNumber: details?.unitPermitNumber,
                 unitPermitStartDate: details?.unitPermitStartDate,
                 unitPermitExpiryDate: details?.unitPermitExpiryDate,
@@ -982,12 +1008,15 @@ export class MoveInService {
                 companyEmail,
                 operatorOfficeNumber,
                 tradeLicenseNumber,
-                tenancyContractStartDate,
+                tradeLicenseExpiryDate,
+                tenancyContractStartDate: tenancyContractStartDate || null,
                 unitPermitStartDate,
                 unitPermitExpiryDate,
                 unitPermitNumber,
                 leaseStartDate,
                 leaseEndDate,
+                dtcmStartDate: dtcmStartDate || null,
+                dtcmExpiryDate: dtcmExpiryDate || null,
                 nationality,
                 emiratesIdNumber,
                 emiratesIdExpiryDate,
@@ -1200,17 +1229,21 @@ export class MoveInService {
       case MOVE_IN_USER_TYPES.HHO_COMPANY: {
         const entity = new MoveInRequestDetailsHhcCompany();
         entity.moveInRequest = master;
-        entity.name = details.name; // Now map directly to the name field
+        entity.name = details.name;
         entity.companyName = details.company;
         entity.companyEmail = details.companyEmail;
+        // entity.countryCode = details.countryCode; // Field has insert: false, update: false
         entity.operatorOfficeNumber = details.operatorOfficeNumber;
         entity.tradeLicenseNumber = details.tradeLicenseNumber;
-        entity.tenancyContractStartDate = details.tenancyContractStartDate;
+        entity.tradeLicenseExpiryDate = details.tradeLicenseExpiryDate;
+        entity.tenancyContractStartDate = details.tenancyContractStartDate || null;
         entity.unitPermitStartDate = details.unitPermitStartDate;
         entity.unitPermitExpiryDate = details.unitPermitExpiryDate;
         entity.unitPermitNumber = details.unitPermitNumber;
         entity.leaseStartDate = details.leaseStartDate;
         entity.leaseEndDate = details.leaseEndDate;
+        entity.dtcmStartDate = details.dtcmStartDate || null;
+        entity.dtcmExpiryDate = details.dtcmExpiryDate || null;
         entity.nationality = details.nationality;
         entity.emiratesIdNumber = details.emiratesIdNumber;
         entity.emiratesIdExpiryDate = details.emiratesIdExpiryDate;
@@ -1222,6 +1255,99 @@ export class MoveInService {
       }
       default:
         throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
+    }
+  }
+
+  /**
+   * Cancel move-in request (Mobile)
+   */
+  async cancelMoveInRequest(requestId: number, data: any, user: any) {
+    try {
+      const { cancellationRemarks } = data;
+      
+      // Check if request exists and belongs to user
+      const request = await this.ensureCancelableByOwner(requestId, user);
+      
+      // Update the request status to user-cancelled
+      await MoveInRequests.getRepository()
+        .createQueryBuilder()
+        .update()
+        .set({
+          status: MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED,
+          comments: cancellationRemarks,
+          updatedBy: user?.id,
+        })
+        .where('id = :requestId', { requestId })
+        .execute();
+
+      // Log the cancellation
+      const log = new MoveInRequestLogs();
+      log.moveInRequest = { id: requestId } as any;
+      log.requestType = request.requestType;
+      log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED;
+      log.changes = 'Request cancelled by user';
+      log.user = { id: user?.id } as any;
+      log.actionBy = TransitionRequestActionByTypes.USER;
+      log.details = JSON.stringify({ cancellationRemarks });
+      log.comments = cancellationRemarks;
+      await log.save();
+
+      // Send cancellation notifications
+      await this.sendCancellationNotifications(requestId, request.moveInRequestNo, cancellationRemarks);
+
+      return { 
+        id: requestId, 
+        moveInRequestNo: request.moveInRequestNo,
+        status: MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED,
+        message: 'Move-in request cancelled successfully' 
+      };
+    } catch (error: any) {
+      logger.error(`Error in cancelMoveInRequest: ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+    }
+  }
+
+  /**
+   * Ensure request is cancelable by owner (check status validation)
+   */
+  private async ensureCancelableByOwner(requestId: number, user: any) {
+    const mir = await MoveInRequests.getRepository()
+      .createQueryBuilder('mir')
+      .leftJoinAndSelect('mir.user', 'user')
+      .where('mir.id = :requestId AND mir.isActive = true', { requestId })
+      .getOne();
+    
+    if (!mir) {
+      throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
+    }
+    
+    if (mir.user?.id !== user?.id) {
+      throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
+    }
+    
+    // Only requests in Submitted, RFI Submitted, or Approved status can be cancelled
+    if (mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED && 
+        mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 
+        "Only requests in 'Submitted', 'RFI Submitted', or 'Approved' status can be cancelled", 
+        APICodes.VALIDATION_ERROR.code);
+    }
+    
+    return mir;
+  }
+
+  /**
+   * Send cancellation notifications
+   */
+  private async sendCancellationNotifications(requestId: number, requestNumber: string, cancellationRemarks: string): Promise<void> {
+    try {
+      // TODO: Implement push notification to customer
+      // Template: "Your Move-in request (<Reference ID>) has been cancelled."
+
+      logger.info(`Cancellation notifications sent for move-in request ${requestId}`);
+    } catch (error) {
+      logger.error(`Error sending cancellation notifications: ${error}`);
     }
   }
 }

@@ -809,14 +809,17 @@ paths:
                 - mopRecipients
               properties:
                 masterCommunityId:
-                  type: string
+                  type: number
                   description: Master community ID
+                  example: 28
                 communityId:
-                  type: string
+                  type: number
                   description: Community ID
+                  example: 70
                 towerId:
-                  type: string
+                  type: number
                   description: Tower ID (optional)
+                  example: 142
                 mipRecipients:
                   type: string
                   description: MIP Email Recipients - Multiple email addresses separated by commas
@@ -826,9 +829,8 @@ paths:
                   description: MOP Email Recipients - Multiple email addresses separated by commas
                   example: "admin@community.com, manager@community.com"
                 isActive:
-                  type: string
-                  enum: ['true', 'false']
-                  default: 'true'
+                  type: boolean
+                  default: true
                   description: Active status of the recipients
       responses:
         '201':
@@ -876,14 +878,17 @@ paths:
               type: object
               properties:
                 masterCommunityId:
-                  type: string
+                  type: number
                   description: Master community ID (optional)
+                  example: 28
                 communityId:
-                  type: string
+                  type: number
                   description: Community ID (optional)
+                  example: 70
                 towerId:
-                  type: string
+                  type: number
                   description: Tower ID (optional, can be null)
+                  example: 142
                 mipRecipients:
                   type: string
                   description: MIP Email Recipients - Multiple email addresses separated by commas (optional)
@@ -893,8 +898,7 @@ paths:
                   description: MOP Email Recipients - Multiple email addresses separated by commas (optional)
                   example: "admin@community.com, manager@community.com"
                 isActive:
-                  type: string
-                  enum: ['true', 'false']
+                  type: boolean
                   description: Active status of the recipients (optional)
       responses:
         '200':
