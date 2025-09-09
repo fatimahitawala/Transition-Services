@@ -54,7 +54,7 @@ export class MoveInService {
         nationality,
       } = data;
 
-      // Admin can create move-in requests for any user
+      // Only admin users can create move-in requests
       if (!user?.isAdmin) {
         throw new ApiError(
           httpStatus.FORBIDDEN,
@@ -750,9 +750,20 @@ export class MoveInService {
         sortOrder = "DESC"
       } = query;
 
+      // Debug: Log the exact query parameters received
+      logger.debug(`=== ADMIN MOVE-IN REQUEST DEBUG ===`);
+      logger.debug(`Raw query object: ${JSON.stringify(query)}`);
+      logger.debug(`Query keys: ${Object.keys(query).join(', ')}`);
+      logger.debug(`requestType value: "${query.requestType}"`);
+      logger.debug(`requestType type: ${typeof query.requestType}`);
+      logger.debug(`User object: ${JSON.stringify(user)}`);
+      logger.debug(`User isAdmin: ${user?.isAdmin}`);
+      logger.debug(`=====================================`);
+
       masterCommunityIds = masterCommunityIds.split(",").filter((e: any) => e);
       communityIds = communityIds.split(",").filter((e: any) => e);
       towerIds = towerIds.split(",").filter((e: any) => e);
+      requestType = requestType.split(",").filter((e: any) => e);
 
       let getMoveInList = MoveInRequests.getRepository().createQueryBuilder("am")
         .select([
@@ -767,7 +778,10 @@ export class MoveInService {
         .innerJoin("u.tower", "t", "t.isActive=1")
         .where("am.isActive=1");
 
-      getMoveInList = checkAdminPermission(getMoveInList, { towerId: 't.id', communityId: 'c.id', masterCommunityId: 'mc.id' }, user);
+      // Only apply permission filtering for non-admin users
+      if (!user?.isAdmin) {
+        getMoveInList = checkAdminPermission(getMoveInList, { towerId: 't.id', communityId: 'c.id', masterCommunityId: 'mc.id' }, user);
+      }
 
       // Apply filters
       if (masterCommunityIds && masterCommunityIds.length) getMoveInList.andWhere(`mc.id IN (:...masterCommunityIds)`, { masterCommunityIds });
@@ -778,7 +792,7 @@ export class MoveInService {
       if (moveInStartDate) getMoveInList.andWhere(`am.moveInDate >= :moveInStartDate`, { moveInStartDate });
       if (moveInEndDate) getMoveInList.andWhere(`am.moveInDate <= :moveInEndDate`, { moveInEndDate });
       if (status) getMoveInList.andWhere(`am.status = :status`, { status });
-      if (requestType) getMoveInList.andWhere(`am.requestType = :requestType`, { requestType });
+      if (requestType && requestType.length > 0) getMoveInList.andWhere(`am.requestType IN (:...requestType)`, { requestType });
       
       // Search functionality
       if (search) {
@@ -820,9 +834,17 @@ export class MoveInService {
         .offset((page - 1) * per_page)
         .limit(per_page);
 
+      // Debug: Log the final query
+      logger.debug(`Final query: ${getMoveInList.getQuery()}`);
+      logger.debug(`Query parameters: ${JSON.stringify(getMoveInList.getParameters())}`);
+
       const list = await getMoveInList.getMany();
       const count = await getMoveInList.getCount();
       const pagination = getPaginationInfo(page, per_page, count);
+
+      // Debug: Log the results
+      logger.debug(`Total items found: ${count}, List length: ${list.length}`);
+      logger.debug(`First few items: ${JSON.stringify(list.slice(0, 2))}`);
 
       return { data: list, pagination };
 
@@ -1759,6 +1781,15 @@ export class MoveInService {
    * Ensure request is editable by admin (check status validation)
    */
   private async ensureEditableByAdmin(requestId: number, user: any) {
+    // Only admin users can edit move-in requests
+    if (!user?.isAdmin) {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        APICodes.INVALID_USER_ROLE.message,
+        APICodes.INVALID_USER_ROLE.code
+      );
+    }
+
     const request = await MoveInRequests.getRepository()
       .createQueryBuilder('mir')
       .where('mir.id = :requestId AND mir.isActive = true', { requestId })

@@ -12,9 +12,8 @@ const moveInValidation = new MoveInvalidation();
 const auth = new AuthMiddleware();
 
 const router = Router();
-// GET routes
+// GET routes - unitId is optional query parameter
 router.get("/request-list", auth.auth(), catchAsync(moveInController.getAllMoveInRequestList));
-router.get("/request/:unitId", auth.auth(), catchAsync(moveInController.getAllMoveInRequestList));
 
 // POST routes for different move-in request types
 router.post('/request/owner', auth.auth(), validate(moveInValidation.createOwnerMoveIn), catchAsync(moveInController.createOwnerMoveInRequest));
@@ -58,15 +57,78 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
 
 /**
  * @swagger
- * /move-in/request:
+ * /move-in/request-list:
  *   get:
  *     summary: Get move-in requests for authenticated user
+ *     description: Get all move-in requests for the authenticated user. Supports filtering by status, unitIds, and pagination.
  *     tags: [MoveIn]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *         example: 1
+ *       - in: query
+ *         name: per_page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Number of records per page
+ *         example: 20
+ *       - in: query
+ *         name: status
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
+ *         description: Filter by move-in request status
+ *         example: "new"
+ *       - in: query
+ *         name: unitIds
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Comma-separated list of unit IDs to filter by.
+ *         example: "123,456,789"
  *     responses:
  *       200:
  *         description: List of move-in requests
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         example: 123
+ *                       moveInRequestNo:
+ *                         type: string
+ *                         example: "MIN-UNIT-123-456"
+ *                       status:
+ *                         type: string
+ *                         enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
+ *                         example: "approved"
+ *                       requestType:
+ *                         type: string
+ *                         example: "OWNER"
+ *                       moveInDate:
+ *                         type: string
+ *                         format: date
+ *                         example: "2025-09-17"
  *       401:
  *         description: Unauthorized
  */
@@ -1457,26 +1519,6 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   example: "EC041"
  */
 
-/**
- * @swagger
- * /move-in/request/{unitId}:
- *   get:
- *     summary: Get move-in requests for a specific unit
- *     tags: [MoveIn]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: unitId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: List of move-in requests for unit
- *       401:
- *         description: Unauthorized
- */
 
 /**
  * @swagger
@@ -1630,65 +1672,6 @@ export default router;
 *     description: MoveIn management
 */
 
-/**
-* @swagger
-* /admin/move-in/request:
-*   get:
-*     summary: Close a move in request
-*     tags: [MoveIn]
-*     parameters:
-*       - in: query
-*         name: page
-*         schema:
-*           type: integer
-*           default: 1
-*       - in: query
-*         name: per_page
-*         schema:
-*           type: integer
-*           default: 20
-*       - in: query
-*         name: requestId
-*         schema:
-*           type: string
-*       - in: query
-*         name: moveOutType
-*         schema:
-*           type: string
-*       - in: query
-*         name: masterCommunity
-*         schema:
-*           type: string
-*       - in: query
-*         name: community
-*         schema:
-*           type: string
-*       - in: query
-*         name: tower
-*         schema:
-*           type: string
-*       - in: query
-*         name: unit
-*         schema:
-*           type: string
-*       - in: query
-*         name: createdDate
-*         schema:
-*           type: string
-*           format: date
-*       - in: query
-*         name: moveOutDate
-*         schema:
-*           type: string
-*           format: date
-*       - in: query
-*         name: requestStatus
-*         schema:
-*           type: string
-*     responses:
-*       200:
-*         description: A list of move in requests
-*/
 
 /**
 * @swagger

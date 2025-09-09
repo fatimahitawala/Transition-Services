@@ -1077,16 +1077,13 @@ export class MoveInService {
     }
   }
 
-  async getMobileMoveIn(query: any, unitId: number) {
-
-    if (!unitId) throw new ApiError(httpStatus.BAD_REQUEST, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
-    const unit = await this.getUnitById(unitId);
-    if (!unit) throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
+  async getMobileMoveIn(query: any) {
 
     try {
       let {
         page = 1,
         per_page = 20,
+        status = "",
         masterCommunityIds = "",
         communityIds = "",
         towerIds = "",
@@ -1106,13 +1103,16 @@ export class MoveInService {
       if (masterCommunityIds && masterCommunityIds.length) whereClause += ` AND am.masterCommunity IN (:...masterCommunityIds)`;
       if (communityIds && communityIds.length) whereClause += ` AND am.community IN (:...communityIds)`;
       if (towerIds && towerIds.length) whereClause += ` AND am.tower IN (:...towerIds)`;
+      if (status) whereClause += ` AND am.status = :status`;
       if (createdStartDate) whereClause += ` AND am.createdAt >= :createdStartDate`;
       if (createdEndDate) whereClause += ` AND am.createdAt <= :createdEndDate`;
       if (moveInStartDate) whereClause += ` AND am.moveInDate >= :moveInStartDate`;
       if (moveInEndDate) whereClause += ` AND am.moveInDate <= :moveInEndDate`;
       if (unitFilter) whereClause += ` AND am.unit = :unitId`;
-      if (unitIds && unitIds.length)
+      // Use unitIds for filtering by unit IDs
+      if (unitIds && unitIds.length) {
         whereClause += ` AND am.unit IN (:...units)`;
+      }
 
       let getMoveInList = MoveInRequests.getRepository()
         .createQueryBuilder("am")
@@ -1127,6 +1127,7 @@ export class MoveInService {
           masterCommunityIds,
           communityIds,
           towerIds,
+          status,
           unitId: Number(unitFilter) || undefined,
           units: unitIds.map((x: any) => Number(x)).filter((n: any) => !isNaN(n)),
           startDate: query.startDate,
@@ -1141,6 +1142,7 @@ export class MoveInService {
         masterCommunityIds,
         communityIds,
         towerIds,
+        status,
         unitId: Number(unitFilter) || undefined,
         units: unitIds.map((x: any) => Number(x)).filter((n: any) => !isNaN(n)),
       });
