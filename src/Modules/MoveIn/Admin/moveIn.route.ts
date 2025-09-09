@@ -14,7 +14,6 @@ const auth = new AuthMiddleware();
 const router = Router();
 
 // GET routes for admin move-in management
-router.get("/request", auth.auth(), validate(moveInValidation.getAdminMoveIn), catchAsync(moveInController.getAllMoveInRequestList));
 router.get("/request-list", auth.auth(), validate(moveInValidation.getAdminMoveIn), catchAsync(moveInController.getAllMoveInRequestList));
 router.get('/details/:requestId', auth.auth(), validate(moveInValidation.getAdminMoveInDetails), catchAsync(moveInController.getMoveInRequestDetailsWithId));
 
@@ -51,6 +50,249 @@ router.put('/owner/:requestId', auth.auth(), validate(moveInValidation.updateOwn
 router.put('/tenant/:requestId', auth.auth(), validate(moveInValidation.updateTenantMoveIn), catchAsync(moveInController.updateTenantMoveInRequest));
 router.put('/hho-unit/:requestId', auth.auth(), validate(moveInValidation.updateHhoOwnerMoveIn), catchAsync(moveInController.updateHhoOwnerMoveInRequest));
 router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.updateHhcCompanyMoveIn), catchAsync(moveInController.updateHhcCompanyMoveInRequest));
+
+/**
+ * @swagger
+ * /admin/move-in/request-list:
+ *   get:
+ *     summary: Get all move-in requests (Admin)
+ *     description: Get all move-in requests for admin users. Supports filtering by status, requestType, masterCommunity, community, tower, and pagination. This endpoint replaces the old /admin/move-in/request endpoint.
+ *     tags: [Admin MoveIn Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination
+ *         example: 1
+ *       - in: query
+ *         name: per_page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Number of records per page
+ *         example: 20
+ *       - in: query
+ *         name: status
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
+ *         description: Filter by move-in request status
+ *         example: "approved"
+ *       - in: query
+ *         name: requestType
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Comma-separated list of request types to filter by. This parameter replaces the old unitIds parameter from the previous /admin/move-in/request endpoint.
+ *         example: "123,456,789"
+ *       - in: query
+ *         name: masterCommunityIds
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Comma-separated list of master community IDs to filter by
+ *         example: "1,2,3"
+ *       - in: query
+ *         name: communityIds
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Comma-separated list of community IDs to filter by
+ *         example: "10,20,30"
+ *       - in: query
+ *         name: towerIds
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Comma-separated list of tower IDs to filter by
+ *         example: "100,200,300"
+ *       - in: query
+ *         name: createdStartDate
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by creation date start (YYYY-MM-DD)
+ *         example: "2025-01-01"
+ *       - in: query
+ *         name: createdEndDate
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by creation date end (YYYY-MM-DD)
+ *         example: "2025-12-31"
+ *       - in: query
+ *         name: moveInStartDate
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by move-in date start (YYYY-MM-DD)
+ *         example: "2025-06-01"
+ *       - in: query
+ *         name: moveInEndDate
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by move-in date end (YYYY-MM-DD)
+ *         example: "2025-12-31"
+ *       - in: query
+ *         name: search
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Search term for filtering requests
+ *         example: "John Doe"
+ *       - in: query
+ *         name: sortBy
+ *         required: false
+ *         schema:
+ *           type: string
+ *           default: "createdAt"
+ *         description: Field to sort by
+ *         example: "createdAt"
+ *       - in: query
+ *         name: sortOrder
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: ["ASC", "DESC"]
+ *           default: "DESC"
+ *         description: Sort order (ASC or DESC)
+ *         example: "DESC"
+ *     responses:
+ *       200:
+ *         description: List of all move-in requests. This endpoint replaces the old /admin/move-in/request endpoint with improved filtering capabilities.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         example: 123
+ *                       moveInRequestNo:
+ *                         type: string
+ *                         example: "MIN-UNIT-123-456"
+ *                       status:
+ *                         type: string
+ *                         enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
+ *                         example: "approved"
+ *                       requestType:
+ *                         type: string
+ *                         example: "OWNER"
+ *                       moveInDate:
+ *                         type: string
+ *                         format: date
+ *                         example: "2025-09-17"
+ *                       user:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                             example: 456
+ *                           firstName:
+ *                             type: string
+ *                             example: "John"
+ *                           lastName:
+ *                             type: string
+ *                             example: "Doe"
+ *                           email:
+ *                             type: string
+ *                             example: "john.doe@example.com"
+ *                       unit:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                             example: 789
+ *                           unitName:
+ *                             type: string
+ *                             example: "A-101"
+ *                           tower:
+ *                             type: object
+ *                             properties:
+ *                               name:
+ *                                 type: string
+ *                                 example: "Tower A"
+ *                               community:
+ *                                 type: object
+ *                                 properties:
+ *                                   name:
+ *                                     type: string
+ *                                     example: "Community Name"
+ *                                   masterCommunity:
+ *                                     type: object
+ *                                     properties:
+ *                                       name:
+ *                                         type: string
+ *                                         example: "Master Community Name"
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     currentPage:
+ *                       type: integer
+ *                       example: 1
+ *                     totalPages:
+ *                       type: integer
+ *                       example: 10
+ *                     totalItems:
+ *                       type: integer
+ *                       example: 200
+ *                     itemsPerPage:
+ *                       type: integer
+ *                       example: 20
+ *       401:
+ *         description: Unauthorized - authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Unauthorized access"
+ *                 code:
+ *                   type: string
+ *                   example: "EC001"
+ *       403:
+ *         description: Forbidden - admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Only admin users can access this endpoint"
+ *                 code:
+ *                   type: string
+ *                   example: "EC114"
+ */
+
 /**
  * @swagger
  * /admin/move-in/owner:
