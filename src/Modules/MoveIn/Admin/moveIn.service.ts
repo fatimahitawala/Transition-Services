@@ -474,7 +474,7 @@ export class MoveInService {
         emiratesIdExpiryDate: details.emiratesIdExpiryDate || rest.emiratesIdExpiryDate,
         tenancyContractStartDate: details.tenancyContractStartDate || rest.tenancyContractStartDate,
         tenancyContractEndDate: details.tenancyContractEndDate || rest.tenancyContractEndDate,
-        
+
         // Occupancy details
         adults: details.adults,
         children: details.children,
@@ -482,7 +482,7 @@ export class MoveInService {
         pets: details.pets,
         peopleOfDetermination: details.peopleOfDetermination,
         termsAccepted: details.termsAccepted,
-        
+
         // Store detailsText in comments field when peopleOfDetermination is true
         comments: details.peopleOfDetermination && details.detailsText ? details.detailsText : (rest.comments || null),
       };
