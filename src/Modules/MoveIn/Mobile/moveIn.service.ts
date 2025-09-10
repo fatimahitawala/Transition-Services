@@ -1084,31 +1084,15 @@ export class MoveInService {
         page = 1,
         per_page = 20,
         status = "",
-        masterCommunityIds = "",
-        communityIds = "",
-        towerIds = "",
-        createdStartDate = "",
-        createdEndDate = "",
-        moveInStartDate = "",
-        moveInEndDate = "",
-        unit: unitFilter = "",
         unitIds = "",
       } = query;
-      masterCommunityIds = masterCommunityIds.split(",").filter((e: any) => e);
-      communityIds = communityIds.split(",").filter((e: any) => e);
-      towerIds = towerIds.split(",").filter((e: any) => e);
+
+      // Debug logging
+      logger.debug(`getMobileMoveIn query params: ${JSON.stringify(query)}`);
       unitIds = unitIds.split(",").filter((e: any) => e);
       let whereClause = "am.isActive = true";
 
-      if (masterCommunityIds && masterCommunityIds.length) whereClause += ` AND am.masterCommunity IN (:...masterCommunityIds)`;
-      if (communityIds && communityIds.length) whereClause += ` AND am.community IN (:...communityIds)`;
-      if (towerIds && towerIds.length) whereClause += ` AND am.tower IN (:...towerIds)`;
       if (status) whereClause += ` AND am.status = :status`;
-      if (createdStartDate) whereClause += ` AND am.createdAt >= :createdStartDate`;
-      if (createdEndDate) whereClause += ` AND am.createdAt <= :createdEndDate`;
-      if (moveInStartDate) whereClause += ` AND am.moveInDate >= :moveInStartDate`;
-      if (moveInEndDate) whereClause += ` AND am.moveInDate <= :moveInEndDate`;
-      if (unitFilter) whereClause += ` AND am.unit = :unitId`;
       // Use unitIds for filtering by unit IDs
       if (unitIds && unitIds.length) {
         whereClause += ` AND am.unit IN (:...units)`;
@@ -1117,42 +1101,47 @@ export class MoveInService {
       let getMoveInList = MoveInRequests.getRepository()
         .createQueryBuilder("am")
         .select([
+          "am.id",
           "am.status",
           "am.createdAt",
           "am.moveInDate",
           "am.moveInRequestNo",
           "am.requestType",
+          "u.id as unitId",
+          "u.unitNumber",
+          "u.floorNumber",
+          "u.unitName",
+          "mc.id as masterCommunityId",
+          "mc.name as masterCommunityName",
+          "c.id as communityId",
+          "c.name as communityName",
+          "t.id as towerId",
+          "t.name as towerName"
         ])
         .where(whereClause, {
-          masterCommunityIds,
-          communityIds,
-          towerIds,
           status,
-          unitId: Number(unitFilter) || undefined,
           units: unitIds.map((x: any) => Number(x)).filter((n: any) => !isNaN(n)),
-          startDate: query.startDate,
-          endDate: query.endDate,
         });
 
-      getMoveInList.innerJoinAndSelect("am.unit", "u", "u.isActive=1");
-      getMoveInList.innerJoinAndSelect("u.masterCommunity", "mc", "mc.isActive=1");
-      getMoveInList.innerJoinAndSelect("u.community", "c", "c.isActive=1");
-      getMoveInList.innerJoinAndSelect("u.tower", "t", "t.isActive=1");
-      getMoveInList.where(whereClause, {
-        masterCommunityIds,
-        communityIds,
-        towerIds,
-        status,
-        unitId: Number(unitFilter) || undefined,
-        units: unitIds.map((x: any) => Number(x)).filter((n: any) => !isNaN(n)),
-      });
+      getMoveInList.innerJoin("am.unit", "u", "u.isActive=1");
+      getMoveInList.innerJoin("u.masterCommunity", "mc", "mc.isActive=1");
+      getMoveInList.innerJoin("u.community", "c", "c.isActive=1");
+      getMoveInList.innerJoin("u.tower", "t", "t.isActive=1");
 
       getMoveInList.orderBy("am.createdAt", "DESC")
         .offset((page - 1) * per_page)
         .limit(per_page);
 
+      // Debug logging
+      logger.debug(`Final query: ${getMoveInList.getQuery()}`);
+      logger.debug(`Query parameters: ${JSON.stringify(getMoveInList.getParameters())}`);
+
       const list = await getMoveInList.getMany();
+      logger.debug(`Query executed successfully, found ${list.length} records`);
+      
       const count = await getMoveInList.getCount();
+      logger.debug(`Total count: ${count}`);
+      
       const pagination = getPaginationInfo(page, per_page, count);
       return { data: list, pagination };
     } catch (error: any) {
@@ -1350,6 +1339,107 @@ export class MoveInService {
       logger.info(`Cancellation notifications sent for move-in request ${requestId}`);
     } catch (error) {
       logger.error(`Error sending cancellation notifications: ${error}`);
+    }
+  }
+
+  async getMobileMoveInRequestDetails(requestId: number, user: any) {
+    try {
+      logger.debug(`getMobileMoveInRequestDetails - requestId: ${requestId}, userId: ${user?.id}`);
+
+      // Get the main move-in request with basic details
+      let query = MoveInRequests.getRepository()
+        .createQueryBuilder("mv")
+        .select([
+          "mv.id",
+          "mv.moveInRequestNo",
+          "mv.requestType",
+          "mv.status",
+          "mv.moveInDate",
+          "mv.comments",
+          "mv.additionalInfo",
+          "mv.createdAt",
+          "mv.updatedAt",
+          "u.id as unitId",
+          "u.unitNumber",
+          "u.floorNumber",
+          "u.unitName",
+          "mc.id as masterCommunityId",
+          "mc.name as masterCommunityName",
+          "c.id as communityId",
+          "c.name as communityName",
+          "t.id as towerId",
+          "t.name as towerName",
+          "user.id as userId",
+          "user.firstName",
+          "user.middleName",
+          "user.lastName",
+          "user.email",
+          "user.mobile"
+        ])
+        .innerJoin("mv.user", "user", "user.isActive = true")
+        .innerJoin("mv.unit", "u", "u.isActive = true")
+        .innerJoin("u.masterCommunity", "mc", "mc.isActive = true")
+        .innerJoin("u.tower", "t", "t.isActive = true")
+        .innerJoin("u.community", "c", "c.isActive = true")
+        .where("mv.isActive = true AND mv.id = :requestId", { requestId });
+
+      let result: any = await query.getOne();
+
+      if (!result) {
+        logger.warn(`Move-in request not found - requestId: ${requestId}`);
+        return null;
+      }
+
+      // Get type-specific details based on request type
+      const detailsMap: Record<string, { repo: any; alias: string; key: string }> = {
+        [MOVE_IN_USER_TYPES.HHO_COMPANY]: {
+          repo: MoveInRequestDetailsHhcCompany,
+          alias: "moveInCompany",
+          key: "moveInCompanyDetails",
+        },
+        [MOVE_IN_USER_TYPES.HHO_OWNER]: {
+          repo: MoveInRequestDetailsHhoOwner,
+          alias: "moveInHHO",
+          key: "moveInHHOOwnerDetails",
+        },
+        [MOVE_IN_USER_TYPES.TENANT]: {
+          repo: MoveInRequestDetailsTenant,
+          alias: "moveInTenant",
+          key: "moveInTenantDetails",
+        },
+        [MOVE_IN_USER_TYPES.OWNER]: {
+          repo: MoveInRequestDetailsOwner,
+          alias: "moveInOwner",
+          key: "moveInOwnerDetails",
+        },
+      };
+
+      const typeConfig = detailsMap[result.requestType];
+      if (typeConfig) {
+        const details = await typeConfig.repo
+          .getRepository()
+          .createQueryBuilder(typeConfig.alias)
+          .where(`${typeConfig.alias}.moveInRequest.id = :id AND ${typeConfig.alias}.isActive = true`, { id: result.id })
+          .getOne();
+
+        result = { ...result, [typeConfig.key]: details };
+      }
+
+      // Get documents if any
+      const documents = await MoveInRequestDocuments.getRepository()
+        .createQueryBuilder("doc")
+        .where("doc.moveInRequest.id = :id AND doc.isActive = true", { id: result.id })
+        .getMany();
+
+      result.documents = documents;
+
+      logger.debug(`Successfully retrieved move-in request details for requestId: ${requestId}`);
+      return result;
+
+    } catch (error: any) {
+      logger.error(`Error in getMobileMoveInRequestDetails: ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
     }
   }
 }

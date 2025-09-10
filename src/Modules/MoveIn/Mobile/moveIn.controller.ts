@@ -3,6 +3,7 @@ import { MoveInService } from './moveIn.service';
 import {
   successResponseWithData,
   successResponseWithPaginationData,
+  notFoundResponse,
 } from '../../../Common/Utils/apiResponse';
 import { APICodes } from '../../../Common/Constants';
 import { logger } from '../../../Common/Utils/logger';
@@ -16,6 +17,21 @@ export class MoveInController {
     const moveInRequestList = await moveInService.getMobileMoveIn(query);
 
     return successResponseWithPaginationData(res, APICodes.LISTING_SUCCESS, moveInRequestList.data, moveInRequestList.pagination);
+  }
+
+  async getMoveInRequestDetails(req: Request, res: Response) {
+    const { user }: Record<string, any> = req;
+    const { requestId } = req.params as any;
+    
+    logger.debug(`MOVE-IN | GET DETAILS | MOBILE REQUEST | USER: ${user?.id} | REQUEST: ${requestId}`);
+    
+    const moveInRequestDetails = await moveInService.getMobileMoveInRequestDetails(Number(requestId), user);
+    
+    if (!moveInRequestDetails) {
+      return notFoundResponse(res, APICodes.REQUEST_NOT_FOUND);
+    }
+    
+    return successResponseWithData(res, APICodes.COMMON_SUCCESS, moveInRequestDetails);
   }
 
   // Removed generic createMoveInRequest in favor of type-specific endpoints
