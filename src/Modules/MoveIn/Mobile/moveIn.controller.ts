@@ -12,9 +12,8 @@ const moveInService = new MoveInService();
 export class MoveInController {
   async getAllMoveInRequestList(req: Request, res: Response) {
     const { query } = req;
-    const { unitId } = req.params;
 
-    const moveInRequestList = await moveInService.getMobileMoveIn(query, Number(unitId));
+    const moveInRequestList = await moveInService.getMobileMoveIn(query);
 
     return successResponseWithPaginationData(res, APICodes.LISTING_SUCCESS, moveInRequestList.data, moveInRequestList.pagination);
   }
