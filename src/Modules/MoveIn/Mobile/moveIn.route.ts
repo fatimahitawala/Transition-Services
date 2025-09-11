@@ -149,6 +149,18 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                         type: string
  *                         format: date-time
  *                         example: "2024-01-15T10:30:00.000Z"
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-01-15T10:30:00.000Z"
+ *                       createdBy:
+ *                         type: integer
+ *                         description: User ID who created the request
+ *                         example: 12345
+ *                       updatedBy:
+ *                         type: integer
+ *                         description: User ID who last updated the request
+ *                         example: 12345
  *                       unit:
  *                         type: object
  *                         properties:

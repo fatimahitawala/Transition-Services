@@ -1128,6 +1128,10 @@ export class MoveInService {
         .leftJoinAndSelect("u.masterCommunity", "mc")
         .leftJoinAndSelect("u.community", "c")
         .leftJoinAndSelect("u.tower", "t")
+        .addSelect("am.createdAt")
+        .addSelect("am.updatedAt")
+        .addSelect("am.createdBy")
+        .addSelect("am.updatedBy")
         .where(whereClause, {
           status,
           units: unitIds.map((x: any) => Number(x)).filter((n: any) => !isNaN(n)),
@@ -1154,6 +1158,9 @@ export class MoveInService {
         status: item.status,
         moveInDate: item.moveInDate,
         createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        createdBy: item.createdBy,
+        updatedBy: item.updatedBy,
         unit: item.unit ? {
           id: item.unit.id,
           unitNumber: item.unit.unitNumber,
