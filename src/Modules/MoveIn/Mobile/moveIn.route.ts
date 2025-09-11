@@ -97,6 +97,13 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *           type: string
  *         description: Comma-separated list of unit IDs to filter by.
  *         example: "123,456,789"
+ *       - in: query
+ *         name: requestId
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: Filter by specific move-in request ID.
+ *         example: 123
  *     responses:
  *       200:
  *         description: List of move-in requests
@@ -142,19 +149,22 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                         type: string
  *                         format: date-time
  *                         example: "2024-01-15T10:30:00.000Z"
- *                       unitId:
- *                         type: integer
- *                         description: Unit ID
- *                         example: 7
- *                       unitNumber:
- *                         type: string
- *                         example: "A-101"
- *                       floorNumber:
- *                         type: integer
- *                         example: 1
- *                       unitName:
- *                         type: string
- *                         example: "Apartment A-101"
+ *                       unit:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                             description: Unit ID
+ *                             example: 7
+ *                           unitNumber:
+ *                             type: string
+ *                             example: "A-101"
+ *                           floorNumber:
+ *                             type: string
+ *                             example: "0"
+ *                           unitName:
+ *                             type: string
+ *                             example: "T203"
  *                       masterCommunityId:
  *                         type: integer
  *                         example: 1
@@ -359,16 +369,49 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                           documentType:
  *                             type: string
  *                             example: "PASSPORT"
- *                           fileName:
+ *                           expiryDate:
  *                             type: string
- *                             example: "passport.pdf"
- *                           fileUrl:
- *                             type: string
- *                             example: "https://storage.blob.core.windows.net/documents/passport.pdf"
- *                           uploadedAt:
+ *                             format: date
+ *                             example: "2025-12-31"
+ *                           createdAt:
  *                             type: string
  *                             format: date-time
  *                             example: "2024-01-15T10:30:00.000Z"
+ *                           updatedAt:
+ *                             type: string
+ *                             format: date-time
+ *                             example: "2024-01-15T10:30:00.000Z"
+ *                           file:
+ *                             type: object
+ *                             properties:
+ *                               id:
+ *                                 type: integer
+ *                                 example: 1
+ *                               fileName:
+ *                                 type: string
+ *                                 example: "passport.pdf"
+ *                               filePath:
+ *                                 type: string
+ *                                 example: "/uploads/documents/passport.pdf"
+ *                               fileUrl:
+ *                                 type: string
+ *                                 example: "https://storageaccount.blob.core.windows.net/container/application/uploads/documents/passport.pdf"
+ *                               fileType:
+ *                                 type: string
+ *                                 example: "application/pdf"
+ *                               fileSize:
+ *                                 type: string
+ *                                 example: "1024"
+ *                               fileExtension:
+ *                                 type: string
+ *                                 example: ".pdf"
+ *                               fileOriginalName:
+ *                                 type: string
+ *                                 example: "passport_document.pdf"
+ *                               createdAt:
+ *                                 type: string
+ *                                 format: date-time
+ *                                 example: "2024-01-15T10:30:00.000Z"
  *       401:
  *         description: Unauthorized
  *       404:
@@ -835,7 +878,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *         application/json:
  *           schema:
  *             type: object
- *             required: [unitId, moveInDate, details]
+ *             required: [unitId, moveInDate, ownerFirstName, ownerLastName, email, dialCode, phoneNumber, nationality, details]
  *             properties:
  *               unitId:
  *                 type: integer
@@ -859,32 +902,38 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                 example: ""
  *               ownerFirstName:
  *                 type: string
- *                 description: Owner first name (optional; derived from auth user if omitted)
+ *                 maxLength: 100
+ *                 description: Owner first name (required)
  *                 example: "John"
  *               ownerLastName:
  *                 type: string
- *                 description: Owner last name (optional; derived from auth user if omitted)
+ *                 maxLength: 100
+ *                 description: Owner last name (required)
  *                 example: "Doe"
  *               email:
  *                 type: string
  *                 format: email
- *                 description: Owner email (optional; derived from auth user if omitted)
+ *                 maxLength: 255
+ *                 description: Owner email (required)
  *                 example: "john.doe@example.com"
  *               dialCode:
  *                 type: string
- *                 description: Dial code (optional; derived from auth user if omitted)
+ *                 maxLength: 10
+ *                 description: Dial code (required)
  *                 example: "+971"
  *               phoneNumber:
  *                 type: string
- *                 description: Phone number (optional; derived from auth user if omitted)
+ *                 maxLength: 20
+ *                 description: Phone number (required)
  *                 example: "501234567"
  *               nationality:
  *                 type: string
- *                 description: Nationality (optional; derived from auth user if omitted)
+ *                 maxLength: 100
+ *                 description: Nationality (required)
  *                 example: "UAE"
  *               details:
  *                 type: object
- *                 required: [unitPermitNumber, unitPermitStartDate, unitPermitExpiryDate, termsAccepted]
+ *                 required: [unitPermitNumber, unitPermitStartDate, unitPermitExpiryDate, peopleOfDetermination, termsAccepted]
  *                 properties:
  *                   unitPermitNumber:
  *                     type: string
@@ -900,11 +949,60 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                     format: date
  *                     description: Unit permit end/expiry date in ISO 8601 format (YYYY-MM-DD)
  *                     example: "2028-08-27"
+ *                   peopleOfDetermination:
+ *                     type: boolean
+ *                     default: false
+ *                     description: Whether any occupants have special needs
+ *                     example: false
+ *                   detailsText:
+ *                     type: string
+ *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
+ *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
  *                   termsAccepted:
  *                     type: boolean
  *                     enum: [true]
  *                     description: Must be true to accept terms and conditions
  *                     example: true
+ *           examples:
+ *             without_special_needs:
+ *               summary: HHO Unit move-in without special needs
+ *               value:
+ *                 unitId: 123
+ *                 moveInDate: "2025-12-20"
+ *                 comments: "Need early access for renovation"
+ *                 additionalInfo: ""
+ *                 ownerFirstName: "John"
+ *                 ownerLastName: "Doe"
+ *                 email: "john.doe@example.com"
+ *                 dialCode: "+971"
+ *                 phoneNumber: "501234567"
+ *                 nationality: "UAE"
+ *                 details:
+ *                   unitPermitNumber: "42388"
+ *                   unitPermitStartDate: "2027-08-27"
+ *                   unitPermitExpiryDate: "2028-08-27"
+ *                   peopleOfDetermination: false
+ *                   termsAccepted: true
+ *             with_special_needs:
+ *               summary: HHO Unit move-in with special needs
+ *               value:
+ *                 unitId: 123
+ *                 moveInDate: "2025-12-20"
+ *                 comments: "Need early access for renovation"
+ *                 additionalInfo: ""
+ *                 ownerFirstName: "John"
+ *                 ownerLastName: "Doe"
+ *                 email: "john.doe@example.com"
+ *                 dialCode: "+971"
+ *                 phoneNumber: "501234567"
+ *                 nationality: "UAE"
+ *                 details:
+ *                   unitPermitNumber: "42388"
+ *                   unitPermitStartDate: "2027-08-27"
+ *                   unitPermitExpiryDate: "2028-08-27"
+ *                   peopleOfDetermination: true
+ *                   detailsText: "Need wheelchair assistance for elderly or people of determination during move-in"
+ *                   termsAccepted: true
  *     responses:
  *       201:
  *         description: Move-in request created successfully
@@ -986,6 +1084,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   - children
  *                   - householdStaffs
  *                   - pets
+ *                   - peopleOfDetermination
  *                 properties:
  *                   adults:
  *                     type: integer
@@ -1017,8 +1116,8 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                     example: false
  *                   detailsText:
  *                     type: string
- *                     description: Additional details text
- *                     example: "Family with young children"
+ *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
+ *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
  *     responses:
  *       200:
  *         description: Updated successfully
@@ -1187,6 +1286,10 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                     type: boolean
  *                     description: Whether any household member is a person of determination
  *                     example: false
+ *                   detailsText:
+ *                     type: string
+ *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
+ *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
  *                   termsAccepted:
  *                     type: boolean
  *                     enum: [true]
@@ -1299,6 +1402,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   - unitPermitNumber
  *                   - unitPermitStartDate
  *                   - unitPermitExpiryDate
+ *                   - peopleOfDetermination
  *                   - termsAccepted
  *                 properties:
  *                   unitPermitNumber:
@@ -1315,6 +1419,15 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                     format: date
  *                     description: Unit permit expiry date in ISO 8601 format (YYYY-MM-DD). Must be after unitPermitStartDate.
  *                     example: "2026-09-01"
+ *                   peopleOfDetermination:
+ *                     type: boolean
+ *                     default: false
+ *                     description: Whether any occupants have special needs
+ *                     example: false
+ *                   detailsText:
+ *                     type: string
+ *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
+ *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
  *                   termsAccepted:
  *                     type: boolean
  *                     enum: [true]
@@ -1529,8 +1642,17 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                 example: ""
  *               details:
  *                 type: object
- *                 required: [termsAccepted]
+ *                 required: [peopleOfDetermination, termsAccepted]
  *                 properties:
+ *                   peopleOfDetermination:
+ *                     type: boolean
+ *                     default: false
+ *                     description: Whether any occupants have special needs
+ *                     example: false
+ *                   detailsText:
+ *                     type: string
+ *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
+ *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
  *                   termsAccepted:
  *                     type: boolean
  *                     enum: [true]
@@ -1541,6 +1663,66 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                 maxLength: 10
  *                 description: Country dial code
  *                 example: "+971"
+ *           examples:
+ *             without_special_needs:
+ *               summary: HHC Company move-in without special needs
+ *               value:
+ *                 unitId: 123
+ *                 moveInDate: "2025-09-20"
+ *                 userEmail: "yatin.singhal@techcorp.com"
+ *                 firstName: "Yatin"
+ *                 lastName: "Singhal"
+ *                 mobileNumber: "501234567"
+ *                 name: "Yatin Singhal"
+ *                 company: "TechCorp Solutions"
+ *                 companyEmail: "info@techcorp.com"
+ *                 operatorOfficeNumber: "501234567"
+ *                 tradeLicenseNumber: "TL-2024-001234"
+ *                 tradeLicenseExpiryDate: "2025-12-31"
+ *                 nationality: "UAE"
+ *                 emiratesIdNumber: "784-1985-1234567-8"
+ *                 emiratesIdExpiryDate: "2026-12-31"
+ *                 unitPermitStartDate: "2025-09-01"
+ *                 unitPermitExpiryDate: "2026-09-01"
+ *                 unitPermitNumber: "UP-2025-001"
+ *                 leaseStartDate: "2025-09-01"
+ *                 leaseEndDate: "2026-09-01"
+ *                 comments: "Need early access for company setup"
+ *                 additionalInfo: ""
+ *                 details:
+ *                   peopleOfDetermination: false
+ *                   termsAccepted: true
+ *                 countryCode: "+971"
+ *             with_special_needs:
+ *               summary: HHC Company move-in with special needs
+ *               value:
+ *                 unitId: 123
+ *                 moveInDate: "2025-09-20"
+ *                 userEmail: "yatin.singhal@techcorp.com"
+ *                 firstName: "Yatin"
+ *                 lastName: "Singhal"
+ *                 mobileNumber: "501234567"
+ *                 name: "Yatin Singhal"
+ *                 company: "TechCorp Solutions"
+ *                 companyEmail: "info@techcorp.com"
+ *                 operatorOfficeNumber: "501234567"
+ *                 tradeLicenseNumber: "TL-2024-001234"
+ *                 tradeLicenseExpiryDate: "2025-12-31"
+ *                 nationality: "UAE"
+ *                 emiratesIdNumber: "784-1985-1234567-8"
+ *                 emiratesIdExpiryDate: "2026-12-31"
+ *                 unitPermitStartDate: "2025-09-01"
+ *                 unitPermitExpiryDate: "2026-09-01"
+ *                 unitPermitNumber: "UP-2025-001"
+ *                 leaseStartDate: "2025-09-01"
+ *                 leaseEndDate: "2026-09-01"
+ *                 comments: "Need early access for company setup"
+ *                 additionalInfo: ""
+ *                 details:
+ *                   peopleOfDetermination: true
+ *                   detailsText: "Need wheelchair assistance for elderly or people of determination during move-in"
+ *                   termsAccepted: true
+ *                 countryCode: "+971"
  *     responses:
  *       201:
  *         description: Move-in request created successfully
@@ -1749,8 +1931,18 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *               details:
  *                 type: object
  *                 required:
+ *                   - peopleOfDetermination
  *                   - termsAccepted
  *                 properties:
+ *                   peopleOfDetermination:
+ *                     type: boolean
+ *                     default: false
+ *                     description: Whether any occupants have special needs
+ *                     example: false
+ *                   detailsText:
+ *                     type: string
+ *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
+ *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
  *                   termsAccepted:
  *                     type: boolean
  *                     enum: [true]
@@ -1837,7 +2029,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  * /move-in/request/{requestId}/cancel:
  *   put:
  *     summary: Cancel move-in request (Mobile)
- *     description: Cancel an existing move-in request. Only requests in 'Submitted', 'RFI Submitted', or 'Approved' status can be cancelled. Cancellation remarks are mandatory.
+ *     description: Cancel an existing move-in request. Only requests in 'new' status can be cancelled. Cancellation remarks are optional.
  *     tags: [MoveIn]
  *     security:
  *       - bearerAuth: []
@@ -1850,19 +2042,17 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *         description: ID of the move-in request to cancel
  *         example: 123
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - cancellationRemarks
  *             properties:
  *               cancellationRemarks:
  *                 type: string
  *                 minLength: 1
  *                 maxLength: 500
- *                 description: Mandatory cancellation remarks explaining the reason for cancellation
+ *                 description: Optional cancellation remarks explaining the reason for cancellation
  *                 example: "Change in plans, no longer need the unit"
  *     responses:
  *       200:
@@ -1908,7 +2098,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: "Only requests in 'Submitted', 'RFI Submitted', or 'Approved' status can be cancelled"
+ *                   example: "Only requests in 'new' status can be cancelled"
  *                 code:
  *                   type: string
  *                   example: "EC041"
