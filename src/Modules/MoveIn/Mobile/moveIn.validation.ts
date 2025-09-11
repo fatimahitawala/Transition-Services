@@ -75,8 +75,12 @@ export class MoveInvalidation {
             children: Joi.number().integer().min(0).max(6).required(),
             householdStaffs: Joi.number().integer().min(0).max(4).required(),
             pets: Joi.number().integer().min(0).max(6).required(),
-            peopleOfDetermination: Joi.boolean().default(false).optional(),
-            detailsText: Joi.string().allow('').optional(),
+            peopleOfDetermination: Joi.boolean().default(false).required(),
+            detailsText: Joi.when('peopleOfDetermination', {
+              is: true,
+              then: Joi.string().required(),
+              otherwise: Joi.string().allow('').optional(),
+            }),
           })
           .required(),
       })
@@ -124,15 +128,15 @@ export class MoveInvalidation {
       .keys({
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
-        // Owner identity (can come from UI; if omitted, will be derived from authenticated user)
-        ownerFirstName: Joi.string().max(100).optional(),
-        ownerLastName: Joi.string().max(100).optional(),
-        email: Joi.string().email().max(255).optional(),
-        dialCode: Joi.string().max(10).optional(),
-        phoneNumber: Joi.string().max(20).optional(),
-        nationality: Joi.string().max(100).optional(),
         comments: Joi.string().allow('').optional(),
         additionalInfo: Joi.string().allow('').optional(),
+        // Owner identity at root level (required fields)
+        ownerFirstName: Joi.string().max(100).required(),
+        ownerLastName: Joi.string().max(100).required(),
+        email: Joi.string().email().max(255).required(),
+        dialCode: Joi.string().max(10).required(),
+        phoneNumber: Joi.string().max(20).required(),
+        nationality: Joi.string().max(100).required(),
         details: Joi.object()
           .keys({
             unitPermitNumber: Joi.string().required(),
@@ -141,6 +145,12 @@ export class MoveInvalidation {
               .iso()
               .custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE))
               .required(),
+            peopleOfDetermination: Joi.boolean().default(false).required(),
+            detailsText: Joi.when('peopleOfDetermination', {
+              is: true,
+              then: Joi.string().required(),
+              otherwise: Joi.string().allow('').optional(),
+            }),
             termsAccepted: Joi.boolean().valid(true).required(),
           })
           .required(),
@@ -180,6 +190,12 @@ export class MoveInvalidation {
         additionalInfo: Joi.string().allow('').optional(),
         details: Joi.object()
           .keys({
+            peopleOfDetermination: Joi.boolean().default(false).required(),
+            detailsText: Joi.when('peopleOfDetermination', {
+              is: true,
+              then: Joi.string().required(),
+              otherwise: Joi.string().allow('').optional(),
+            }),
             termsAccepted: Joi.boolean().valid(true).required(),
           })
           .required(),
@@ -205,8 +221,12 @@ export class MoveInvalidation {
             children: Joi.number().integer().min(0).max(6).required(),
             householdStaffs: Joi.number().integer().min(0).max(4).required(),
             pets: Joi.number().integer().min(0).max(6).required(),
-            peopleOfDetermination: Joi.boolean().default(false).optional(),
-            detailsText: Joi.string().allow('').optional(),
+            peopleOfDetermination: Joi.boolean().default(false).required(),
+            detailsText: Joi.when('peopleOfDetermination', {
+              is: true,
+              then: Joi.string().required(),
+              otherwise: Joi.string().allow('').optional(),
+            }),
           })
           .required(),
       })
@@ -240,6 +260,11 @@ export class MoveInvalidation {
             pets: Joi.number().integer().min(0).max(6).required(),
             peopleOfDetermination: Joi.boolean().default(false).required(),
             termsAccepted: Joi.boolean().valid(true).required(),
+            detailsText: Joi.when('peopleOfDetermination', {
+              is: true,
+              then: Joi.string().required(),
+              otherwise: Joi.string().allow('').optional(),
+            }),
           })
           .required(),
       })
@@ -280,6 +305,12 @@ export class MoveInvalidation {
         additionalInfo: Joi.string().allow('').optional(),
         details: Joi.object()
           .keys({
+            peopleOfDetermination: Joi.boolean().default(false).required(),
+            detailsText: Joi.when('peopleOfDetermination', {
+              is: true,
+              then: Joi.string().required(),
+              otherwise: Joi.string().allow('').optional(),
+            }),
             termsAccepted: Joi.boolean().valid(true).required(),
           })
           .required(),
@@ -311,6 +342,12 @@ export class MoveInvalidation {
               .iso()
               .custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE))
               .required(),
+            peopleOfDetermination: Joi.boolean().default(false).required(),
+            detailsText: Joi.when('peopleOfDetermination', {
+              is: true,
+              then: Joi.string().required(),
+              otherwise: Joi.string().allow('').optional(),
+            }),
             termsAccepted: Joi.boolean().valid(true).required(),
           })
           .required(),
@@ -344,10 +381,9 @@ export class MoveInvalidation {
     params: Joi.object().keys({ requestId: Joi.number().required() }),
     body: Joi.object()
       .keys({
-        cancellationRemarks: Joi.string().min(1).max(500).required().messages({
-          'string.min': 'Cancellation remarks are mandatory and cannot be empty',
-          'string.max': 'Cancellation remarks cannot exceed 500 characters',
-          'any.required': 'Cancellation remarks are mandatory before confirming the cancellation'
+        cancellationRemarks: Joi.string().min(1).max(500).optional().messages({
+          'string.min': 'Cancellation remarks cannot be empty if provided',
+          'string.max': 'Cancellation remarks cannot exceed 500 characters'
         }),
       })
       .required(),
