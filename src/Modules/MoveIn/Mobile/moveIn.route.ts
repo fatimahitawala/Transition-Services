@@ -661,6 +661,9 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                         countryCode:
  *                           type: string
  *                           example: "+971"
+ *                         operatorCountryCode:
+ *                           type: string
+ *                           example: "+971"
  *                         operatorOfficeNumber:
  *                           type: string
  *                           example: "501234567"
@@ -1895,6 +1898,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *               - leaseEndDate
  *               - details
  *               - countryCode
+ *               - operatorCountryCode
  *             properties:
  *               unitId:
  *                 type: integer
@@ -2063,6 +2067,11 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                 maxLength: 10
  *                 description: Country dial code
  *                 example: "+971"
+ *               operatorCountryCode:
+ *                 type: string
+ *                 maxLength: 10
+ *                 description: Operator country dial code
+ *                 example: "+971"
  *           examples:
  *             without_special_needs:
  *               summary: HHC Company move-in without special needs
@@ -2093,6 +2102,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   peopleOfDetermination: false
  *                   termsAccepted: true
  *                 countryCode: "+971"
+ *                 operatorCountryCode: "+971"
  *             with_special_needs:
  *               summary: HHC Company move-in with special needs
  *               value:
@@ -2123,6 +2133,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   detailsText: "Need wheelchair assistance for elderly or people of determination during move-in"
  *                   termsAccepted: true
  *                 countryCode: "+971"
+ *                 operatorCountryCode: "+971"
  *     responses:
  *       201:
  *         description: Move-in request created successfully
@@ -2193,6 +2204,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *               - leaseEndDate
  *               - details
  *               - countryCode
+ *               - operatorCountryCode
  *             properties:
  *               unitId:
  *                 type: integer
@@ -2250,6 +2262,10 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *               countryCode:
  *                 type: string
  *                 description: Country dial code
+ *                 example: "+971"
+ *               operatorCountryCode:
+ *                 type: string
+ *                 description: Operator country dial code
  *                 example: "+971"
  *               operatorOfficeNumber:
  *                 type: string
@@ -2495,7 +2511,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   example: "Only requests in 'new' status can be cancelled"
  *                 code:
  *                   type: string
- *                   example: "EC041"
+ *                   example: "EC207"
  *       401:
  *         description: Unauthorized - authentication required
  *       403:
@@ -2613,6 +2629,7 @@ export default router;
  *               - leaseEndDate
  *               - details
  *               - countryCode
+ *               - operatorCountryCode
  *             properties:
  *               unitId:
  *                 type: integer
@@ -2764,6 +2781,10 @@ export default router;
  *                 type: string
  *                 description: Country dial code
  *                 example: "+971"
+ *               operatorCountryCode:
+ *                 type: string
+ *                 description: Operator country dial code
+ *                 example: "+971"
  *           examples:
  *             hhc_company_example:
  *               summary: HHC Company move-in request
@@ -2794,6 +2815,7 @@ export default router;
  *                 details:
  *                   termsAccepted: true
  *                 countryCode: "+971"
+ *                 operatorCountryCode: "+971"
  *     responses:
  *       201:
  *         description: Move-in request created successfully
