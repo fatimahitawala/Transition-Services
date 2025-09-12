@@ -895,7 +895,7 @@ export class MoveInService {
       throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
     }
     if (mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN && mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING && mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED) {
-      throw new ApiError(httpStatus.BAD_REQUEST, "Request can only be updated when status is 'new', 'rfi-pending', or 'rfi-submitted'", APICodes.VALIDATION_ERROR.code);
+      throw new ApiError(httpStatus.BAD_REQUEST, APICodes.CANNOT_UPDATE_MOBILE_STATUS.message, APICodes.CANNOT_UPDATE_MOBILE_STATUS.code);
     }
     return mir;
   }
@@ -928,6 +928,7 @@ export class MoveInService {
         company,
         companyEmail,
         countryCode,
+        operatorCountryCode,
         operatorOfficeNumber,
         tradeLicenseNumber,
         tradeLicenseExpiryDate,
@@ -1031,6 +1032,7 @@ export class MoveInService {
                 companyName: company,
                 companyEmail,
                 countryCode,
+                operatorCountryCode,
                 operatorOfficeNumber,
                 tradeLicenseNumber,
                 tradeLicenseExpiryDate,
@@ -1288,6 +1290,7 @@ export class MoveInService {
         entity.companyName = details.company;
         entity.companyEmail = details.companyEmail;
         entity.countryCode = details.countryCode;
+        entity.operatorCountryCode = details.operatorCountryCode;
         entity.operatorOfficeNumber = details.operatorOfficeNumber;
         entity.tradeLicenseNumber = details.tradeLicenseNumber;
         entity.tradeLicenseExpiryDate = details.tradeLicenseExpiryDate;
@@ -1408,8 +1411,8 @@ export class MoveInService {
     // Only requests in 'new' status can be cancelled by users
     if (mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN) {
       throw new ApiError(httpStatus.BAD_REQUEST, 
-        "Only requests in 'new' status can be cancelled", 
-        APICodes.VALIDATION_ERROR.code);
+        APICodes.CANNOT_CANCEL_MOBILE_STATUS.message, 
+        APICodes.CANNOT_CANCEL_MOBILE_STATUS.code);
     }
     
     return mir;
