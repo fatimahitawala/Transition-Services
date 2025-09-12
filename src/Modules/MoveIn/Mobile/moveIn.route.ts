@@ -149,6 +149,18 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                         type: string
  *                         format: date-time
  *                         example: "2024-01-15T10:30:00.000Z"
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-01-15T10:30:00.000Z"
+ *                       createdBy:
+ *                         type: integer
+ *                         description: User ID who created the request
+ *                         example: 12345
+ *                       updatedBy:
+ *                         type: integer
+ *                         description: User ID who last updated the request
+ *                         example: 12345
  *                       unit:
  *                         type: object
  *                         properties:
@@ -328,7 +340,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                       example: "+971501234567"
  *                     moveInOwnerDetails:
  *                       type: object
- *                       description: Owner-specific details (only present for OWNER requests)
+ *                       description: Owner-specific details (always present, empty object if not applicable)
  *                       properties:
  *                         adults:
  *                           type: integer
@@ -345,18 +357,409 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                         peopleOfDetermination:
  *                           type: boolean
  *                           example: false
- *                         detailsText:
+ *                         determination_text:
  *                           type: string
  *                           example: "Special assistance needed"
+ *                         emergencyContactDialCode:
+ *                           type: string
+ *                           example: "+971"
+ *                         emergencyContactNumber:
+ *                           type: string
+ *                           example: "501234567"
+ *                         emiratesIdNumber:
+ *                           type: string
+ *                           example: "784-1985-1234567-8"
+ *                         passportNumber:
+ *                           type: string
+ *                           example: "A1234567"
+ *                         visaNumber:
+ *                           type: string
+ *                           example: "V1234567"
+ *                         companyName:
+ *                           type: string
+ *                           example: "ABC Company"
+ *                         tradeLicenseNumber:
+ *                           type: string
+ *                           example: "TL123456"
+ *                         companyAddress:
+ *                           type: string
+ *                           example: "123 Business Street"
+ *                         companyPhone:
+ *                           type: string
+ *                           example: "+97141234567"
+ *                         companyEmail:
+ *                           type: string
+ *                           example: "info@abccompany.com"
+ *                         powerOfAttorneyNumber:
+ *                           type: string
+ *                           example: "POA123456"
+ *                         attorneyName:
+ *                           type: string
+ *                           example: "John Attorney"
+ *                         attorneyPhone:
+ *                           type: string
+ *                           example: "+971501234567"
+ *                         ejariNumber:
+ *                           type: string
+ *                           example: "EJ123456"
+ *                         dtcmPermitNumber:
+ *                           type: string
+ *                           example: "DTCM123456"
+ *                         emergencyContactName:
+ *                           type: string
+ *                           example: "Jane Emergency"
+ *                         relationship:
+ *                           type: string
+ *                           example: "Spouse"
+ *                         comments:
+ *                           type: string
+ *                           example: "Additional comments"
+ *                         monthlyRent:
+ *                           type: number
+ *                           example: 5000.00
+ *                         securityDeposit:
+ *                           type: number
+ *                           example: 10000.00
+ *                         maintenanceFee:
+ *                           type: number
+ *                           example: 500.00
+ *                         currency:
+ *                           type: string
+ *                           example: "AED"
  *                     moveInTenantDetails:
  *                       type: object
- *                       description: Tenant-specific details (only present for TENANT requests)
+ *                       description: Tenant-specific details (always present, empty object if not applicable)
+ *                       properties:
+ *                         firstName:
+ *                           type: string
+ *                           example: "John"
+ *                         lastName:
+ *                           type: string
+ *                           example: "Doe"
+ *                         email:
+ *                           type: string
+ *                           example: "john.doe@example.com"
+ *                         dialCode:
+ *                           type: string
+ *                           example: "+971"
+ *                         phoneNumber:
+ *                           type: string
+ *                           example: "501234567"
+ *                         nationality:
+ *                           type: string
+ *                           example: "UAE"
+ *                         dateOfBirth:
+ *                           type: string
+ *                           format: date
+ *                           example: "1990-01-01"
+ *                         emergencyContactDialCode:
+ *                           type: string
+ *                           example: "+971"
+ *                         emergencyContactNumber:
+ *                           type: string
+ *                           example: "501234567"
+ *                         adults:
+ *                           type: integer
+ *                           example: 2
+ *                         children:
+ *                           type: integer
+ *                           example: 1
+ *                         householdStaffs:
+ *                           type: integer
+ *                           example: 0
+ *                         pets:
+ *                           type: integer
+ *                           example: 1
+ *                         peopleOfDetermination:
+ *                           type: boolean
+ *                           example: false
+ *                         emiratesIdNumber:
+ *                           type: string
+ *                           example: "784-1985-1234567-8"
+ *                         emiratesIdExpiryDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2026-12-31"
+ *                         tenancyContractStartDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2025-09-01"
+ *                         tenancyContractEndDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2026-08-31"
+ *                         passportNumber:
+ *                           type: string
+ *                           example: "A1234567"
+ *                         visaNumber:
+ *                           type: string
+ *                           example: "V1234567"
+ *                         powerOfAttorneyNumber:
+ *                           type: string
+ *                           example: "POA123456"
+ *                         attorneyName:
+ *                           type: string
+ *                           example: "John Attorney"
+ *                         attorneyPhone:
+ *                           type: string
+ *                           example: "+971501234567"
+ *                         ejariNumber:
+ *                           type: string
+ *                           example: "EJ123456"
+ *                         dtcmPermitNumber:
+ *                           type: string
+ *                           example: "DTCM123456"
+ *                         emergencyContactName:
+ *                           type: string
+ *                           example: "Jane Emergency"
+ *                         relationship:
+ *                           type: string
+ *                           example: "Spouse"
+ *                         comments:
+ *                           type: string
+ *                           example: "Additional comments"
+ *                         determination_text:
+ *                           type: string
+ *                           example: "Special assistance needed"
+ *                         monthlyRent:
+ *                           type: number
+ *                           example: 5000.00
+ *                         securityDeposit:
+ *                           type: number
+ *                           example: 10000.00
+ *                         maintenanceFee:
+ *                           type: number
+ *                           example: 500.00
+ *                         currency:
+ *                           type: string
+ *                           example: "AED"
  *                     moveInHHOOwnerDetails:
  *                       type: object
- *                       description: HHO Owner-specific details (only present for HHO_OWNER requests)
+ *                       description: HHO Owner-specific details (always present, empty object if not applicable)
+ *                       properties:
+ *                         ownerFirstName:
+ *                           type: string
+ *                           example: "John"
+ *                         ownerLastName:
+ *                           type: string
+ *                           example: "Doe"
+ *                         attorneyFirstName:
+ *                           type: string
+ *                           example: "Jane"
+ *                         attorneyLastName:
+ *                           type: string
+ *                           example: "Attorney"
+ *                         email:
+ *                           type: string
+ *                           example: "john.doe@example.com"
+ *                         dialCode:
+ *                           type: string
+ *                           example: "+971"
+ *                         phoneNumber:
+ *                           type: string
+ *                           example: "501234567"
+ *                         nationality:
+ *                           type: string
+ *                           example: "UAE"
+ *                         dateOfBirth:
+ *                           type: string
+ *                           format: date
+ *                           example: "1990-01-01"
+ *                         emergencyContactDialCode:
+ *                           type: string
+ *                           example: "+971"
+ *                         emergencyContactNumber:
+ *                           type: string
+ *                           example: "501234567"
+ *                         adults:
+ *                           type: integer
+ *                           example: 2
+ *                         children:
+ *                           type: integer
+ *                           example: 1
+ *                         householdStaffs:
+ *                           type: integer
+ *                           example: 0
+ *                         pets:
+ *                           type: integer
+ *                           example: 1
+ *                         peopleOfDetermination:
+ *                           type: boolean
+ *                           example: false
+ *                         emiratesIdNumber:
+ *                           type: string
+ *                           example: "784-1985-1234567-8"
+ *                         passportNumber:
+ *                           type: string
+ *                           example: "A1234567"
+ *                         visaNumber:
+ *                           type: string
+ *                           example: "V1234567"
+ *                         powerOfAttorneyNumber:
+ *                           type: string
+ *                           example: "POA123456"
+ *                         attorneyName:
+ *                           type: string
+ *                           example: "John Attorney"
+ *                         attorneyPhone:
+ *                           type: string
+ *                           example: "+971501234567"
+ *                         ejariNumber:
+ *                           type: string
+ *                           example: "EJ123456"
+ *                         dtcmPermitNumber:
+ *                           type: string
+ *                           example: "DTCM123456"
+ *                         unitPermitNumber:
+ *                           type: string
+ *                           example: "UP123456"
+ *                         unitPermitStartDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2025-09-01"
+ *                         unitPermitExpiryDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2026-08-31"
+ *                         emergencyContactName:
+ *                           type: string
+ *                           example: "Jane Emergency"
+ *                         relationship:
+ *                           type: string
+ *                           example: "Spouse"
+ *                         comments:
+ *                           type: string
+ *                           example: "Additional comments"
+ *                         determination_text:
+ *                           type: string
+ *                           example: "Special assistance needed"
+ *                         monthlyRent:
+ *                           type: number
+ *                           example: 5000.00
+ *                         securityDeposit:
+ *                           type: number
+ *                           example: 10000.00
+ *                         maintenanceFee:
+ *                           type: number
+ *                           example: 500.00
+ *                         currency:
+ *                           type: string
+ *                           example: "AED"
  *                     moveInCompanyDetails:
  *                       type: object
- *                       description: HHO Company-specific details (only present for HHO_COMPANY requests)
+ *                       description: HHC Company-specific details (always present, empty object if not applicable)
+ *                       properties:
+ *                         name:
+ *                           type: string
+ *                           example: "John Doe"
+ *                         companyName:
+ *                           type: string
+ *                           example: "ABC Company"
+ *                         companyEmail:
+ *                           type: string
+ *                           example: "info@abccompany.com"
+ *                         countryCode:
+ *                           type: string
+ *                           example: "+971"
+ *                         operatorOfficeNumber:
+ *                           type: string
+ *                           example: "501234567"
+ *                         tradeLicenseNumber:
+ *                           type: string
+ *                           example: "TL123456"
+ *                         tradeLicenseExpiryDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2026-12-31"
+ *                         tenancyContractStartDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2025-09-01"
+ *                         unitPermitStartDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2025-09-01"
+ *                         unitPermitExpiryDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2026-08-31"
+ *                         unitPermitNumber:
+ *                           type: string
+ *                           example: "UP123456"
+ *                         leaseStartDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2025-09-01"
+ *                         leaseEndDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2026-08-31"
+ *                         dtcmStartDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2025-09-01"
+ *                         dtcmExpiryDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2026-08-31"
+ *                         nationality:
+ *                           type: string
+ *                           example: "UAE"
+ *                         emiratesIdNumber:
+ *                           type: string
+ *                           example: "784-1985-1234567-8"
+ *                         emiratesIdExpiryDate:
+ *                           type: string
+ *                           format: date
+ *                           example: "2026-12-31"
+ *                         peopleOfDetermination:
+ *                           type: boolean
+ *                           example: false
+ *                         companyAddress:
+ *                           type: string
+ *                           example: "123 Business Street"
+ *                         companyPhone:
+ *                           type: string
+ *                           example: "+97141234567"
+ *                         powerOfAttorneyNumber:
+ *                           type: string
+ *                           example: "POA123456"
+ *                         attorneyName:
+ *                           type: string
+ *                           example: "John Attorney"
+ *                         attorneyPhone:
+ *                           type: string
+ *                           example: "+971501234567"
+ *                         ejariNumber:
+ *                           type: string
+ *                           example: "EJ123456"
+ *                         dtcmPermitNumber:
+ *                           type: string
+ *                           example: "DTCM123456"
+ *                         emergencyContactName:
+ *                           type: string
+ *                           example: "Jane Emergency"
+ *                         relationship:
+ *                           type: string
+ *                           example: "Spouse"
+ *                         comments:
+ *                           type: string
+ *                           example: "Additional comments"
+ *                         determination_text:
+ *                           type: string
+ *                           example: "Special assistance needed"
+ *                         monthlyRent:
+ *                           type: number
+ *                           example: 5000.00
+ *                         securityDeposit:
+ *                           type: number
+ *                           example: 10000.00
+ *                         maintenanceFee:
+ *                           type: number
+ *                           example: 500.00
+ *                         currency:
+ *                           type: string
+ *                           example: "AED"
  *                     documents:
  *                       type: array
  *                       description: List of uploaded documents
@@ -368,11 +771,20 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                             example: 1
  *                           documentType:
  *                             type: string
- *                             example: "PASSPORT"
+ *                             enum: ["passport-front", "passport-back", "emirates-id-front", "emirates-id-back", "unit-permit", "company-trade-license", "ejari", "title-deed", "other"]
+ *                             example: "passport-front"
  *                           expiryDate:
  *                             type: string
  *                             format: date
  *                             example: "2025-12-31"
+ *                           userId:
+ *                             type: integer
+ *                             description: ID of the user who uploaded the document
+ *                             example: 12345
+ *                           fileId:
+ *                             type: integer
+ *                             description: ID of the associated file
+ *                             example: 67890
  *                           createdAt:
  *                             type: string
  *                             format: date-time
@@ -1256,7 +1668,6 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   - householdStaffs
  *                   - pets
  *                   - peopleOfDetermination
- *                   - termsAccepted
  *                 properties:
  *                   adults:
  *                     type: integer
@@ -1290,11 +1701,6 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                     type: string
  *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
  *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
- *                   termsAccepted:
- *                     type: boolean
- *                     enum: [true]
- *                     description: Must be true to accept terms and conditions
- *                     example: true
  *     responses:
  *       200:
  *         description: Updated successfully
@@ -1403,7 +1809,6 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   - unitPermitStartDate
  *                   - unitPermitExpiryDate
  *                   - peopleOfDetermination
- *                   - termsAccepted
  *                 properties:
  *                   unitPermitNumber:
  *                     type: string
@@ -1428,11 +1833,6 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                     type: string
  *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
  *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
- *                   termsAccepted:
- *                     type: boolean
- *                     enum: [true]
- *                     description: Must be true to accept terms and conditions
- *                     example: true
  *     responses:
  *       200:
  *         description: Updated successfully
@@ -1932,7 +2332,6 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                 type: object
  *                 required:
  *                   - peopleOfDetermination
- *                   - termsAccepted
  *                 properties:
  *                   peopleOfDetermination:
  *                     type: boolean
@@ -1943,11 +2342,6 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                     type: string
  *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
  *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
- *                   termsAccepted:
- *                     type: boolean
- *                     enum: [true]
- *                     description: Must be true to accept terms and conditions
- *                     example: true
  *     responses:
  *       200:
  *         description: Updated successfully

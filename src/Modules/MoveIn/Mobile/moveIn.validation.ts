@@ -111,7 +111,6 @@ export class MoveInvalidation {
             householdStaffs: Joi.number().integer().min(0).max(4).required(),
             pets: Joi.number().integer().min(0).max(6).required(),
             peopleOfDetermination: Joi.boolean().default(false).required(),
-            termsAccepted: Joi.boolean().valid(true).required(),
             detailsText: Joi.when('peopleOfDetermination', {
               is: true,
               then: Joi.string().required(),
@@ -151,7 +150,6 @@ export class MoveInvalidation {
               then: Joi.string().required(),
               otherwise: Joi.string().allow('').optional(),
             }),
-            termsAccepted: Joi.boolean().valid(true).required(),
           })
           .required(),
       })
@@ -196,7 +194,6 @@ export class MoveInvalidation {
               then: Joi.string().required(),
               otherwise: Joi.string().allow('').optional(),
             }),
-            termsAccepted: Joi.boolean().valid(true).required(),
           })
           .required(),
       })
@@ -259,7 +256,6 @@ export class MoveInvalidation {
             householdStaffs: Joi.number().integer().min(0).max(4).required(),
             pets: Joi.number().integer().min(0).max(6).required(),
             peopleOfDetermination: Joi.boolean().default(false).required(),
-            termsAccepted: Joi.boolean().valid(true).required(),
             detailsText: Joi.when('peopleOfDetermination', {
               is: true,
               then: Joi.string().required(),
@@ -311,7 +307,6 @@ export class MoveInvalidation {
               then: Joi.string().required(),
               otherwise: Joi.string().allow('').optional(),
             }),
-            termsAccepted: Joi.boolean().valid(true).required(),
           })
           .required(),
       })
@@ -348,7 +343,6 @@ export class MoveInvalidation {
               then: Joi.string().required(),
               otherwise: Joi.string().allow('').optional(),
             }),
-            termsAccepted: Joi.boolean().valid(true).required(),
           })
           .required(),
       })
