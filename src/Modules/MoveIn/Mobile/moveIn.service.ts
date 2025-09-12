@@ -1030,6 +1030,7 @@ export class MoveInService {
                 name,
                 companyName: company,
                 companyEmail,
+                countryCode,
                 operatorOfficeNumber,
                 tradeLicenseNumber,
                 tradeLicenseExpiryDate,
@@ -1286,7 +1287,7 @@ export class MoveInService {
         entity.name = details.name;
         entity.companyName = details.company;
         entity.companyEmail = details.companyEmail;
-        // entity.countryCode = details.countryCode; // Field has insert: false, update: false
+        entity.countryCode = details.countryCode;
         entity.operatorOfficeNumber = details.operatorOfficeNumber;
         entity.tradeLicenseNumber = details.tradeLicenseNumber;
         entity.tradeLicenseExpiryDate = details.tradeLicenseExpiryDate;
@@ -1476,7 +1477,7 @@ export class MoveInService {
         return null;
       }
 
-      // Get type-specific details based on request type
+      // Get all type-specific details (always include all types, even if empty)
       const detailsMap: Record<string, { repo: any; alias: string; key: string }> = {
         [MOVE_IN_USER_TYPES.HHO_COMPANY]: {
           repo: MoveInRequestDetailsHhcCompany,
@@ -1500,15 +1501,30 @@ export class MoveInService {
         },
       };
 
-      const typeConfig = detailsMap[result.requestType];
-      if (typeConfig) {
-        const details = await typeConfig.repo
-          .getRepository()
-          .createQueryBuilder(typeConfig.alias)
-          .where(`${typeConfig.alias}.moveInRequest.id = :id AND ${typeConfig.alias}.isActive = true`, { id: result.id })
-          .getOne();
+      // Initialize all detail types as empty objects
+      result.moveInOwnerDetails = {};
+      result.moveInTenantDetails = {};
+      result.moveInHHOOwnerDetails = {};
+      result.moveInCompanyDetails = {};
 
-        result = { ...result, [typeConfig.key]: details };
+      // Fetch details for all types
+      for (const [requestType, config] of Object.entries(detailsMap)) {
+        try {
+          const details = await config.repo
+            .getRepository()
+            .createQueryBuilder(config.alias)
+            .where(`${config.alias}.moveInRequest.id = :id AND ${config.alias}.isActive = true`, { id: result.id })
+            .getOne();
+
+          if (details) {
+            // Remove the moveInRequest relation and other metadata fields
+            const { moveInRequest, createdBy, updatedBy, isActive, createdAt, updatedAt, ...cleanDetails } = details;
+            result[config.key] = cleanDetails;
+          }
+        } catch (error) {
+          logger.warn(`Error fetching ${config.key} for requestId ${requestId}: ${error}`);
+          // Keep as empty object if there's an error
+        }
       }
 
       // Get documents if any
@@ -1518,6 +1534,8 @@ export class MoveInService {
           "doc.id",
           "doc.documentType",
           "doc.expiryDate",
+          "doc.userId",
+          "doc.fileId",
           "doc.createdAt",
           "doc.updatedAt",
           "file.id",
