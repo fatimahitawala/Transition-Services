@@ -1268,7 +1268,6 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   - householdStaffs
  *                   - pets
  *                   - peopleOfDetermination
- *                   - termsAccepted
  *                 properties:
  *                   adults:
  *                     type: integer
@@ -1302,11 +1301,6 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                     type: string
  *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
  *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
- *                   termsAccepted:
- *                     type: boolean
- *                     enum: [true]
- *                     description: Must be true to accept terms and conditions
- *                     example: true
  *     responses:
  *       200:
  *         description: Updated successfully
@@ -1415,7 +1409,6 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   - unitPermitStartDate
  *                   - unitPermitExpiryDate
  *                   - peopleOfDetermination
- *                   - termsAccepted
  *                 properties:
  *                   unitPermitNumber:
  *                     type: string
@@ -1440,11 +1433,6 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                     type: string
  *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
  *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
- *                   termsAccepted:
- *                     type: boolean
- *                     enum: [true]
- *                     description: Must be true to accept terms and conditions
- *                     example: true
  *     responses:
  *       200:
  *         description: Updated successfully
@@ -1944,7 +1932,6 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                 type: object
  *                 required:
  *                   - peopleOfDetermination
- *                   - termsAccepted
  *                 properties:
  *                   peopleOfDetermination:
  *                     type: boolean
@@ -1955,11 +1942,6 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                     type: string
  *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
  *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
- *                   termsAccepted:
- *                     type: boolean
- *                     enum: [true]
- *                     description: Must be true to accept terms and conditions
- *                     example: true
  *     responses:
  *       200:
  *         description: Updated successfully

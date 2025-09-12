@@ -970,13 +970,14 @@ export class MoveInService {
                 householdStaffs: details?.householdStaffs,
                 pets: details?.pets,
                 peopleOfDetermination: details?.peopleOfDetermination,
+                determination_text: details?.peopleOfDetermination && details?.detailsText ? details.detailsText : null,
                 emiratesIdNumber,
                 emiratesIdExpiryDate,
                 tenancyContractStartDate,
                 tenancyContractEndDate,
                 updatedBy: user?.id,
               })
-              .where('moveInRequestId = :requestId', { requestId })
+              .where('move_in_request_id = :requestId', { requestId })
               .execute();
             break;
           }
@@ -989,10 +990,12 @@ export class MoveInService {
                 children: details?.children,
                 householdStaffs: details?.householdStaffs,
                 pets: details?.pets,
-                comments: details?.detailsText ?? comments ?? null,
+                peopleOfDetermination: details?.peopleOfDetermination,
+                determination_text: details?.peopleOfDetermination && details?.detailsText ? details.detailsText : null,
+                comments: comments ?? null,
                 updatedBy: user?.id,
               })
-              .where('moveInRequestId = :requestId', { requestId })
+              .where('move_in_request_id = :requestId', { requestId })
               .execute();
             break;
           }
@@ -1010,10 +1013,12 @@ export class MoveInService {
                 unitPermitNumber: details?.unitPermitNumber,
                 unitPermitStartDate: details?.unitPermitStartDate,
                 unitPermitExpiryDate: details?.unitPermitExpiryDate,
+                peopleOfDetermination: details?.peopleOfDetermination,
+                determination_text: details?.peopleOfDetermination && details?.detailsText ? details.detailsText : null,
                 comments: comments ?? null,
                 updatedBy: user?.id,
               })
-              .where('moveInRequestId = :requestId', { requestId })
+              .where('move_in_request_id = :requestId', { requestId })
               .execute();
             break;
           }
@@ -1039,9 +1044,11 @@ export class MoveInService {
                 nationality,
                 emiratesIdNumber,
                 emiratesIdExpiryDate,
+                peopleOfDetermination: details?.peopleOfDetermination,
+                determination_text: details?.peopleOfDetermination && details?.detailsText ? details.detailsText : null,
                 updatedBy: user?.id,
               })
-              .where('moveInRequestId = :requestId', { requestId })
+              .where('move_in_request_id = :requestId', { requestId })
               .execute();
             break;
           }
