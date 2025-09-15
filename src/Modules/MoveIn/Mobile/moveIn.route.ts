@@ -1161,6 +1161,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   - householdStaffs
  *                   - pets
  *                   - peopleOfDetermination
+ *                   - termsAccepted
  *                 properties:
  *                   adults:
  *                     type: integer
@@ -1193,6 +1194,11 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                     type: boolean
  *                     description: Whether any occupants have special needs
  *                     example: false
+ *                   termsAccepted:
+ *                     type: boolean
+ *                     enum: [true]
+ *                     description: Must be true to accept terms and conditions
+ *                     example: true
  *                   detailsText:
  *                     type: string
  *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
@@ -1221,6 +1227,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   householdStaffs: 0
  *                   pets: 1
  *                   peopleOfDetermination: false
+ *                   termsAccepted: true
  *             with_special_needs:
  *               summary: Tenant move-in with special needs
  *               value:
@@ -1244,6 +1251,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   householdStaffs: 1
  *                   pets: 1
  *                   peopleOfDetermination: true
+ *                   termsAccepted: true
  *                   detailsText: "Need wheelchair assistance for elderly or people of determination during move-in"
  *     responses:
  *       201:
@@ -1340,7 +1348,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                 example: "UAE"
  *               details:
  *                 type: object
- *                 required: [unitPermitNumber, unitPermitStartDate, unitPermitExpiryDate, peopleOfDetermination]
+ *                 required: [unitPermitNumber, unitPermitStartDate, unitPermitExpiryDate, peopleOfDetermination, termsAccepted]
  *                 properties:
  *                   unitPermitNumber:
  *                     type: string
@@ -1365,6 +1373,11 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                     type: string
  *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
  *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
+ *                   termsAccepted:
+ *                     type: boolean
+ *                     enum: [true]
+ *                     description: Must be true to accept terms and conditions
+ *                     example: true
  *           examples:
  *             without_special_needs:
  *               summary: HHO Unit move-in without special needs
@@ -1384,6 +1397,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   unitPermitStartDate: "2027-08-27"
  *                   unitPermitExpiryDate: "2028-08-27"
  *                   peopleOfDetermination: false
+ *                   termsAccepted: true
  *             with_special_needs:
  *               summary: HHO Unit move-in with special needs
  *               value:
@@ -1403,6 +1417,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   unitPermitExpiryDate: "2028-08-27"
  *                   peopleOfDetermination: true
  *                   detailsText: "Need wheelchair assistance for elderly or people of determination during move-in"
+ *                   termsAccepted: true
  *     responses:
  *       201:
  *         description: Move-in request created successfully
@@ -2031,7 +2046,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                 example: ""
  *               details:
  *                 type: object
- *                 required: [peopleOfDetermination]
+ *                 required: [peopleOfDetermination, termsAccepted]
  *                 properties:
  *                   peopleOfDetermination:
  *                     type: boolean
@@ -2042,6 +2057,11 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                     type: string
  *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
  *                     example: "Need wheelchair assistance for elderly or people of determination during move-in"
+ *                   termsAccepted:
+ *                     type: boolean
+ *                     enum: [true]
+ *                     description: Must be true to accept terms and conditions
+ *                     example: true
  *               countryCode:
  *                 type: string
  *                 maxLength: 10
@@ -2080,6 +2100,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                 additionalInfo: ""
  *                 details:
  *                   peopleOfDetermination: false
+ *                   termsAccepted: true
  *                 countryCode: "+971"
  *                 operatorCountryCode: "+971"
  *             with_special_needs:
@@ -2110,6 +2131,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                 details:
  *                   peopleOfDetermination: true
  *                   detailsText: "Need wheelchair assistance for elderly or people of determination during move-in"
+ *                   termsAccepted: true
  *                 countryCode: "+971"
  *                 operatorCountryCode: "+971"
  *     responses:
@@ -2748,7 +2770,13 @@ export default router;
  *               details:
  *                 type: object
  *                 required:
+ *                   - termsAccepted
  *                 properties:
+ *                   termsAccepted:
+ *                     type: boolean
+ *                     enum: [true]
+ *                     description: Must be true to accept terms and conditions
+ *                     example: true
  *               countryCode:
  *                 type: string
  *                 description: Country dial code
@@ -2785,6 +2813,7 @@ export default router;
  *                 comments: "Need early access for company setup"
  *                 additionalInfo: ""
  *                 details:
+ *                   termsAccepted: true
  *                 countryCode: "+971"
  *                 operatorCountryCode: "+971"
  *     responses:
