@@ -3,6 +3,7 @@ import { MoveInService } from './moveIn.service';
 import {
   successResponseWithData,
   successResponseWithPaginationData,
+  notFoundResponse,
 } from '../../../Common/Utils/apiResponse';
 import { APICodes } from '../../../Common/Constants';
 import { logger } from '../../../Common/Utils/logger';
@@ -12,11 +13,25 @@ const moveInService = new MoveInService();
 export class MoveInController {
   async getAllMoveInRequestList(req: Request, res: Response) {
     const { query } = req;
-    const { unitId } = req.params;
 
-    const moveInRequestList = await moveInService.getMobileMoveIn(query, Number(unitId));
+    const moveInRequestList = await moveInService.getMobileMoveIn(query);
 
     return successResponseWithPaginationData(res, APICodes.LISTING_SUCCESS, moveInRequestList.data, moveInRequestList.pagination);
+  }
+
+  async getMoveInRequestDetails(req: Request, res: Response) {
+    const { user }: Record<string, any> = req;
+    const { requestId } = req.params as any;
+    
+    logger.debug(`MOVE-IN | GET DETAILS | MOBILE REQUEST | USER: ${user?.id} | REQUEST: ${requestId}`);
+    
+    const moveInRequestDetails = await moveInService.getMobileMoveInRequestDetails(Number(requestId), user);
+    
+    if (!moveInRequestDetails) {
+      return notFoundResponse(res, APICodes.REQUEST_NOT_FOUND);
+    }
+    
+    return successResponseWithData(res, APICodes.COMMON_SUCCESS, moveInRequestDetails);
   }
 
   // Removed generic createMoveInRequest in favor of type-specific endpoints
@@ -90,6 +105,17 @@ export class MoveInController {
     logger.debug(`MOVE-IN | UPLOAD DOCUMENTS | REQUEST ID: ${requestId} | USER: ${user?.id} | FILES: ${JSON.stringify(files)}`);
 
     const result = await moveInService.uploadDocuments(Number(requestId), files, body, user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
+
+  /**
+   * Cancel move-in request (Mobile)
+   */
+  async cancelMoveInRequest(req: Request, res: Response) {
+    const { user }: Record<string, any> = req;
+    const { requestId } = req.params as any;
+    logger.debug(`MOVE-IN | CANCEL REQUEST | MOBILE REQUEST | USER: ${user?.id} | REQUEST: ${requestId} | BODY: ${JSON.stringify(req.body)}`);
+    const result = await moveInService.cancelMoveInRequest(Number(requestId), req.body, user);
     return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
   }
 }

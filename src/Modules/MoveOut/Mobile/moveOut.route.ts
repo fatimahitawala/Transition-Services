@@ -14,6 +14,7 @@ router.get('/request-list', authMiddleware.auth(), catchAsync(moveOutController.
 router.put('/cancel/:requestId', authMiddleware.auth(), validate(moveOutValidation.cancelMoveOutRequestByUser), catchAsync(moveOutController.cancelMoveOutRequestByUser));
 router.post('/create-request', authMiddleware.auth(), validate(moveOutValidation.createMoveOutRequestByUser), catchAsync(moveOutController.createMoveOutRequestByUser));
 
+//export the router
 export default router;
 
 //write swagger documentation

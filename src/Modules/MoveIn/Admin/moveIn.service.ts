@@ -54,7 +54,7 @@ export class MoveInService {
         nationality,
       } = data;
 
-      // Admin can create move-in requests for any user
+      // Only admin users can create move-in requests
       if (!user?.isAdmin) {
         throw new ApiError(
           httpStatus.FORBIDDEN,
@@ -90,9 +90,9 @@ export class MoveInService {
 
       // Business Logic Validations for Owner, Tenant, HHO-Unit, and HHO-Company Move-in Requests
       if (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
-        // 1. Check if unit is vacant
-        const isUnitVacant = await this.checkUnitVacancy(Number(unitId));
-        if (!isUnitVacant) {
+        // 1. Allow multiple OPEN requests; block only if an APPROVED request already exists
+        const isUnitAvailableForNewRequest = await this.checkUnitAvailabilityForNewRequest(Number(unitId));
+        if (!isUnitAvailableForNewRequest) {
           throw new ApiError(
             httpStatus.CONFLICT,
             APICodes.UNIT_NOT_VACANT.message,
@@ -100,7 +100,7 @@ export class MoveInService {
           );
         }
 
-        // 2. Check for overlapping requests
+        // 2. Overlap: allow overlaps for OPEN/PENDING; only block if an APPROVED request exists
         const overlapCheck = await this.checkOverlappingRequests(Number(unitId), new Date(moveInDate));
         if (overlapCheck.hasOverlap) {
           throw new ApiError(
@@ -240,9 +240,14 @@ export class MoveInService {
         moveInPermitUrl: (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) ? await this.generateMoveInPermit(response.id) : null,
       };
     } catch (error: any) {
+      // Log full error and surface meaningful message/code when possible
       logger.error(`Error in createMoveInRequest Admin: ${JSON.stringify(error)}`);
-      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      const driverMsg = error?.driverError?.sqlMessage || error?.sqlMessage || error?.message || APICodes.UNKNOWN_ERROR.message;
+      const driverCode = error?.driverError?.code || error?.code || APICodes.UNKNOWN_ERROR.code;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, driverMsg, driverCode);
     }
   }
 
@@ -352,11 +357,16 @@ export class MoveInService {
         entity.nationality = details.nationality;
 
         // Details from request
-        entity.adults = details.adults;
-        entity.children = details.children;
-        entity.householdStaffs = details.householdStaffs;
-        entity.pets = details.pets;
+        entity.adults = details.adults ?? 0;
+        entity.children = details.children ?? 0;
+        entity.householdStaffs = details.householdStaffs ?? 0;
+        entity.pets = details.pets ?? 0;
         entity.comments = details.comments;
+
+        // Permit fields
+        entity.unitPermitNumber = details.unitPermitNumber ?? null;
+        entity.unitPermitStartDate = details.unitPermitStartDate ?? null;
+        entity.unitPermitExpiryDate = details.unitPermitExpiryDate ?? null;
 
         // Optional fields
         // entity.peopleOfDetermination = details.peopleOfDetermination;
@@ -372,16 +382,16 @@ export class MoveInService {
         entity.passportNumber = details.passportNumber || null;
         entity.visaNumber = details.visaNumber || null;
         entity.powerOfAttorneyNumber = details.powerOfAttorneyNumber || null;
-        entity.attorneyName = details.attorneyName || "";
-        entity.attorneyPhone = details.attorneyPhone || "";
-        entity.ejariNumber = details.ejariNumber || "";
-        entity.dtcmPermitNumber = details.dtcmPermitNumber || "";
-        entity.emergencyContactName = details.emergencyContactName || "";
-        entity.relationship = details.relationship || "";
-        entity.monthlyRent = details.monthlyRent || "";
-        entity.securityDeposit = details.securityDeposit || "";
-        entity.maintenanceFee = details.maintenanceFee || null;
-        entity.currency = details.currency || null;
+        entity.attorneyName = details.attorneyName ?? "";
+        entity.attorneyPhone = details.attorneyPhone ?? "";
+        entity.ejariNumber = details.ejariNumber ?? "";
+        entity.dtcmPermitNumber = details.dtcmPermitNumber ?? "";
+        entity.emergencyContactName = details.emergencyContactName ?? "";
+        entity.relationship = details.relationship ?? "";
+        entity.monthlyRent = details.monthlyRent ?? null;
+        entity.securityDeposit = details.securityDeposit ?? null;
+        entity.maintenanceFee = details.maintenanceFee ?? null;
+        entity.currency = details.currency ?? null;
 
         entity.createdBy = userId;
         entity.updatedBy = userId;
@@ -395,15 +405,17 @@ export class MoveInService {
         entity.name = details.name; // Now map directly to the name field
         entity.companyName = details.company;
         entity.companyEmail = details.companyEmail;
-        entity.countryCode = details.countryCode;
         entity.operatorOfficeNumber = details.operatorOfficeNumber;
         entity.tradeLicenseNumber = details.tradeLicenseNumber;
+        entity.tradeLicenseExpiryDate = details.tradeLicenseExpiryDate;
         entity.tenancyContractStartDate = details.tenancyContractStartDate;
         entity.unitPermitStartDate = details.unitPermitStartDate;
         entity.unitPermitExpiryDate = details.unitPermitExpiryDate;
         entity.unitPermitNumber = details.unitPermitNumber;
         entity.leaseStartDate = details.leaseStartDate;
         entity.leaseEndDate = details.leaseEndDate;
+        entity.dtcmStartDate = details.dtcmStartDate;
+        entity.dtcmExpiryDate = details.dtcmExpiryDate;
         entity.nationality = details.nationality;
         entity.emiratesIdNumber = details.emiratesIdNumber;
         entity.emiratesIdExpiryDate = details.emiratesIdExpiryDate;
@@ -433,10 +445,9 @@ export class MoveInService {
         children: details.children,
         householdStaffs: details.householdStaffs,
         pets: details.pets,
-        comments: details.detailsText || rest.comments || null,
-
-        // Optional toggles
         peopleOfDetermination: details.peopleOfDetermination,
+        // Store detailsText in comments field when peopleOfDetermination is true
+        comments: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
       };
 
       logger.debug(`Owner Details mapped: ${JSON.stringify(ownerDetails)}`);
@@ -449,7 +460,35 @@ export class MoveInService {
 
   async createTenantMoveIn(data: any, user: any) {
     try {
-      return this.createMoveInRequest({ ...data, requestType: MOVE_IN_USER_TYPES.TENANT }, user);
+      // Map tenant UI fields to details (user details come from Users table, not stored here)
+      const { details = {}, ...rest } = data || {};
+      const tenantDetails = {
+        // Personal details
+        firstName: details.firstName || rest.firstName,
+        lastName: details.lastName || rest.lastName,
+        email: details.email || rest.email,
+        dialCode: details.dialCode || rest.dialCode,
+        phoneNumber: details.phoneNumber || rest.phoneNumber,
+        nationality: details.nationality || rest.nationality,
+        emiratesIdNumber: details.emiratesIdNumber || rest.emiratesIdNumber,
+        emiratesIdExpiryDate: details.emiratesIdExpiryDate || rest.emiratesIdExpiryDate,
+        tenancyContractStartDate: details.tenancyContractStartDate || rest.tenancyContractStartDate,
+        tenancyContractEndDate: details.tenancyContractEndDate || rest.tenancyContractEndDate,
+
+        // Occupancy details
+        adults: details.adults,
+        children: details.children,
+        householdStaffs: details.householdStaffs,
+        pets: details.pets,
+        peopleOfDetermination: details.peopleOfDetermination,
+        termsAccepted: details.termsAccepted,
+
+        // Store detailsText in comments field when peopleOfDetermination is true
+        comments: details.peopleOfDetermination && details.detailsText ? details.detailsText : (rest.comments || null),
+      };
+
+      logger.debug(`Tenant Details mapped: ${JSON.stringify(tenantDetails)}`);
+      return this.createMoveInRequest({ ...rest, details: tenantDetails, requestType: MOVE_IN_USER_TYPES.TENANT }, user);
     } catch (error) {
       logger.error(`Error in createTenantMoveIn Admin: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
@@ -462,46 +501,22 @@ export class MoveInService {
       // Map HHO Owner UI fields to details
       const { details = {}, ...rest } = data || {};
       const hhoOwnerDetails = {
-        // Required fields - populate from user or provide defaults
-        ownerFirstName: user?.firstName || user?.name?.split(' ')[0] || 'Admin',
-        ownerLastName: user?.lastName || user?.name?.split(' ').slice(1).join(' ') || 'User',
-        email: user?.email || `admin${user?.id || 'user'}@onesobha.com`,
-        dialCode: user?.dialCode?.dialCode || user?.dialCode || '+971',
-        phoneNumber: user?.mobile || user?.phoneNumber || user?.phone || '000000000',
-        nationality: user?.nationality || 'UAE',
+        // Owner identity: use UI values if present, else fallback to admin user
+        ownerFirstName: rest.ownerFirstName || user?.firstName || user?.name?.split(' ')?.[0] || 'Admin',
+        ownerLastName: rest.ownerLastName || user?.lastName || user?.name?.split(' ')?.slice(1).join(' ') || 'User',
+        email: rest.email || user?.email || `admin${user?.id || 'user'}@onesobha.com`,
+        dialCode: rest.dialCode || user?.dialCode?.dialCode || user?.dialCode || '+971',
+        phoneNumber: rest.phoneNumber || user?.mobile || user?.phoneNumber || user?.phone || '000000000',
+        nationality: rest.nationality || user?.nationality || 'UAE',
 
-        // Details from request
-        adults: details.adults || 1,
-        children: details.children || 0,
-        householdStaffs: details.householdStaffs || 0,
-        pets: details.pets || 0,
+        // Comments
         comments: rest.comments || null,
 
-        // Optional fields with defaults
-        peopleOfDetermination: details.peopleOfDetermination || false,
-        termsAccepted: details.termsAccepted || false,
-
-        // Additional required fields with defaults
-        attorneyFirstName: null,
-        attorneyLastName: null,
-        dateOfBirth: null,
-        emergencyContactDialCode: null,
-        emergencyContactNumber: null,
-        emiratesIdNumber: null,
-        passportNumber: null,
-        visaNumber: null,
-        powerOfAttorneyNumber: null,
-        attorneyName: null,
-        attorneyPhone: null,
-        ejariNumber: null,
-        dtcmPermitNumber: null,
-        emergencyContactName: null,
-        relationship: null,
-        monthlyRent: null,
-        securityDeposit: null,
-        maintenanceFee: null,
-        currency: null
-      };
+        // Permit fields from request
+        unitPermitNumber: details.unitPermitNumber,
+        unitPermitStartDate: details.unitPermitStartDate,
+        unitPermitExpiryDate: details.unitPermitExpiryDate,
+      } as any;
 
       logger.debug(`HHO Owner Details mapped: ${JSON.stringify(hhoOwnerDetails)}`);
       return this.createMoveInRequest({ ...rest, details: hhoOwnerDetails, requestType: MOVE_IN_USER_TYPES.HHO_OWNER }, user);
@@ -514,7 +529,29 @@ export class MoveInService {
 
   async createHhcCompanyMoveIn(data: any, user: any) {
     try {
-      return this.createMoveInRequest({ ...data, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
+      const { details: _ignoredDetails = {}, ...rest } = data || {};
+      const hhcCompanyDetails = {
+        name: rest.name,
+        company: rest.company, // Keep as 'company' since createDetailsRecord expects this field name
+        companyEmail: rest.companyEmail,
+        operatorOfficeNumber: rest.operatorOfficeNumber,
+        tradeLicenseNumber: rest.tradeLicenseNumber,
+        tradeLicenseExpiryDate: rest.tradeLicenseExpiryDate,
+        tenancyContractStartDate: rest.tenancyContractStartDate,
+        unitPermitStartDate: rest.unitPermitStartDate,
+        unitPermitExpiryDate: rest.unitPermitExpiryDate,
+        unitPermitNumber: rest.unitPermitNumber,
+        leaseStartDate: rest.leaseStartDate,
+        leaseEndDate: rest.leaseEndDate,
+        dtcmStartDate: rest.dtcmStartDate,
+        dtcmExpiryDate: rest.dtcmExpiryDate,
+        nationality: rest.nationality,
+        emiratesIdNumber: rest.emiratesIdNumber,
+        emiratesIdExpiryDate: rest.emiratesIdExpiryDate,
+      } as any;
+
+      // Do not merge external details; ignore termsAccepted or any details from request body
+      return this.createMoveInRequest({ ...rest, details: { ...hhcCompanyDetails }, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
     } catch (error) {
       logger.error(`Error in createHhcCompanyMoveIn Admin: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
@@ -696,16 +733,44 @@ export class MoveInService {
   async getAllMoveInRequestList(query: any, user: any) {
     try {
       const isSecurity = await checkIsSecurity(user);
-      let { page = 1, per_page = 20, masterCommunityIds = "", communityIds = "", towerIds = "", createdStartDate = "", createdEndDate = "", moveInStartDate = "", moveInEndDate = "" } = query;
+      let { 
+        page = 1, 
+        per_page = 20, 
+        masterCommunityIds = "", 
+        communityIds = "", 
+        towerIds = "", 
+        createdStartDate = "", 
+        createdEndDate = "", 
+        moveInStartDate = "", 
+        moveInEndDate = "",
+        status = "",
+        requestType = "",
+        search = "",
+        sortBy = "createdAt",
+        sortOrder = "DESC"
+      } = query;
+
+      // Debug: Log the exact query parameters received
+      logger.debug(`=== ADMIN MOVE-IN REQUEST DEBUG ===`);
+      logger.debug(`Raw query object: ${JSON.stringify(query)}`);
+      logger.debug(`Query keys: ${Object.keys(query).join(', ')}`);
+      logger.debug(`requestType value: "${query.requestType}"`);
+      logger.debug(`requestType type: ${typeof query.requestType}`);
+      logger.debug(`User object: ${JSON.stringify(user)}`);
+      logger.debug(`User isAdmin: ${user?.isAdmin}`);
+      logger.debug(`=====================================`);
 
       masterCommunityIds = masterCommunityIds.split(",").filter((e: any) => e);
       communityIds = communityIds.split(",").filter((e: any) => e);
       towerIds = towerIds.split(",").filter((e: any) => e);
+      requestType = requestType.split(",").filter((e: any) => e);
 
       let getMoveInList = MoveInRequests.getRepository().createQueryBuilder("am")
         .select([
           "am.id", "am.status", "am.createdAt", "am.moveInDate",
-          "am.moveInRequestNo", "am.requestType",
+          "am.moveInRequestNo", "am.requestType", "am.comments", "am.additionalInfo",
+          "u.unitNumber", "u.floorNumber", "u.unitName",
+          "mc.name as masterCommunityName", "c.name as communityName", "t.name as towerName"
         ])
         .innerJoin("am.unit", "u", "u.isActive=1")
         .innerJoin("u.masterCommunity", "mc", "mc.isActive=1")
@@ -713,27 +778,73 @@ export class MoveInService {
         .innerJoin("u.tower", "t", "t.isActive=1")
         .where("am.isActive=1");
 
-      getMoveInList = checkAdminPermission(getMoveInList, { towerId: 't.id', communityId: 'c.id', masterCommunityId: 'mc.id' }, user);
+      // Only apply permission filtering for non-admin users
+      if (!user?.isAdmin) {
+        getMoveInList = checkAdminPermission(getMoveInList, { towerId: 't.id', communityId: 'c.id', masterCommunityId: 'mc.id' }, user);
+      }
 
-      if (masterCommunityIds && masterCommunityIds.length) getMoveInList.andWhere(`am.masterCommunity IN (:...masterCommunityIds)`, { masterCommunityIds });
-      if (communityIds && communityIds.length) getMoveInList.andWhere(`am.community IN (:...communityIds)`, { communityIds });
-      if (towerIds && towerIds.length) getMoveInList.andWhere(`am.tower IN (:...towerIds)`, { towerIds });
+      // Apply filters
+      if (masterCommunityIds && masterCommunityIds.length) getMoveInList.andWhere(`mc.id IN (:...masterCommunityIds)`, { masterCommunityIds });
+      if (communityIds && communityIds.length) getMoveInList.andWhere(`c.id IN (:...communityIds)`, { communityIds });
+      if (towerIds && towerIds.length) getMoveInList.andWhere(`t.id IN (:...towerIds)`, { towerIds });
       if (createdStartDate) getMoveInList.andWhere(`am.createdAt >= :createdStartDate`, { createdStartDate });
       if (createdEndDate) getMoveInList.andWhere(`am.createdAt <= :createdEndDate`, { createdEndDate });
       if (moveInStartDate) getMoveInList.andWhere(`am.moveInDate >= :moveInStartDate`, { moveInStartDate });
       if (moveInEndDate) getMoveInList.andWhere(`am.moveInDate <= :moveInEndDate`, { moveInEndDate });
+      if (status) getMoveInList.andWhere(`am.status = :status`, { status });
+      if (requestType && requestType.length > 0) getMoveInList.andWhere(`am.requestType IN (:...requestType)`, { requestType });
+      
+      // Search functionality
+      if (search) {
+        getMoveInList.andWhere(`(
+          am.moveInRequestNo LIKE :search OR 
+          u.unitNumber LIKE :search OR 
+          u.unitName LIKE :search OR 
+          mc.name LIKE :search OR 
+          c.name LIKE :search OR 
+          t.name LIKE :search
+        )`, { search: `%${search}%` });
+      }
 
       if (isSecurity) {
         getMoveInList.andWhere("am.status IN (:...allowedStatuses)", { allowedStatuses: [MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED, MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED] });
       }
 
-      getMoveInList.orderBy("am.createdAt", "DESC")
+      // Apply sorting
+      const validSortFields = {
+        'id': 'am.id',
+        'createdAt': 'am.createdAt',
+        'updatedAt': 'am.updatedAt',
+        'moveInDate': 'am.moveInDate',
+        'status': 'am.status',
+        'masterCommunityId': 'mc.id',
+        'communityId': 'c.id',
+        'towerId': 't.id',
+        'unitNumber': 'u.unitNumber',
+        'ownerName': 'am.moveInRequestNo', // Fallback to request number
+        'tenantName': 'am.moveInRequestNo', // Fallback to request number
+        'createdBy': 'am.createdBy',
+        'updatedBy': 'am.updatedBy'
+      } as const;
+
+      const sortField = (sortBy && sortBy in validSortFields) ? validSortFields[sortBy as keyof typeof validSortFields] : 'am.createdAt';
+      const sortDirection = (typeof sortOrder === 'string' && sortOrder.toUpperCase() === 'ASC') ? 'ASC' : 'DESC';
+
+      getMoveInList.orderBy(sortField, sortDirection)
         .offset((page - 1) * per_page)
         .limit(per_page);
+
+      // Debug: Log the final query
+      logger.debug(`Final query: ${getMoveInList.getQuery()}`);
+      logger.debug(`Query parameters: ${JSON.stringify(getMoveInList.getParameters())}`);
 
       const list = await getMoveInList.getMany();
       const count = await getMoveInList.getCount();
       const pagination = getPaginationInfo(page, per_page, count);
+
+      // Debug: Log the results
+      logger.debug(`Total items found: ${count}, List length: ${list.length}`);
+      logger.debug(`First few items: ${JSON.stringify(list.slice(0, 2))}`);
 
       return { data: list, pagination };
 
@@ -836,23 +947,18 @@ export class MoveInService {
 
 
 
-  // Check if unit is vacant (no active or pending move-in requests)
-  private async checkUnitVacancy(unitId: number): Promise<boolean> {
+  // Check if unit is available for a new move-in request (no APPROVED request exists)
+  private async checkUnitAvailabilityForNewRequest(unitId: number): Promise<boolean> {
     try {
-      const existingRequest = await MoveInRequests.getRepository()
+      const existingApprovedRequest = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
-        .andWhere("mir.status IN (:...statuses)", {
-          statuses: [
-            MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN,
-            MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
-            MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING
-          ]
-        })
+        .andWhere("mir.status = :approvedStatus", { approvedStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED })
         .andWhere("mir.isActive = 1")
         .getOne();
 
-      return !existingRequest; // Unit is vacant if no active request exists
+      // Unit is available if there is NO approved request
+      return !existingApprovedRequest;
     } catch (error) {
       logger.error(`Error checking unit vacancy: ${error}`);
       throw new ApiError(
@@ -869,12 +975,8 @@ export class MoveInService {
       const overlappingRequests = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
-        .andWhere("mir.status NOT IN (:...excludedStatuses)", {
-          excludedStatuses: [
-            MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED,
-            MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED
-          ]
-        })
+        // Only consider APPROVED requests as blocking for overlap purposes
+        .andWhere("mir.status = :approvedStatus", { approvedStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED })
         .andWhere("mir.isActive = 1")
         .getMany();
 
@@ -1444,6 +1546,288 @@ export class MoveInService {
       logger.info(`Cancellation notifications sent for move-in request ${requestId}`);
     } catch (error) {
       logger.error(`Error sending cancellation notifications: ${error}`);
+    }
+  }
+
+  // ==================== UPDATE METHODS ====================
+
+  /**
+   * Update owner move-in request (Admin)
+   */
+  async updateOwnerMoveIn(requestId: number, data: any, user: any) {
+    try {
+      // Check if request exists and is editable
+      const request = await this.ensureEditableByAdmin(requestId, user);
+      
+      // Update the main request
+      await MoveInRequests.getRepository()
+        .createQueryBuilder()
+        .update()
+        .set({
+          unit: data.unitId ? { id: data.unitId } : undefined,
+          moveInDate: data.moveInDate,
+          status: data.status,
+          comments: data.comments || null,
+          additionalInfo: data.additionalInfo || null,
+          updatedBy: user?.id,
+        })
+        .where('id = :requestId', { requestId })
+        .execute();
+
+      // Update owner details
+      await MoveInRequestDetailsOwner.getRepository()
+        .createQueryBuilder()
+        .update()
+        .set({
+          adults: data.details?.adults,
+          children: data.details?.children,
+          householdStaffs: data.details?.householdStaffs,
+          pets: data.details?.pets,
+          // peopleOfDetermination: data.details?.peopleOfDetermination || false, // Not available in Owner entity
+          comments: data.details?.detailsText ?? data.comments ?? null,
+          updatedBy: user?.id,
+        })
+        .where('moveInRequestId = :requestId', { requestId })
+        .execute();
+
+      // Log the update
+      await this.logMoveInRequestAction(requestId, 'UPDATE', 'Request updated by admin', user);
+
+      return { id: requestId, message: 'Owner move-in request updated successfully' };
+    } catch (error: any) {
+      logger.error(`Error in updateOwnerMoveIn: ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+    }
+  }
+
+  /**
+   * Update tenant move-in request (Admin)
+   */
+  async updateTenantMoveIn(requestId: number, data: any, user: any) {
+    try {
+      // Check if request exists and is editable
+      const request = await this.ensureEditableByAdmin(requestId, user);
+      
+      // Update the main request
+      await MoveInRequests.getRepository()
+        .createQueryBuilder()
+        .update()
+        .set({
+          unit: data.unitId ? { id: data.unitId } : undefined,
+          moveInDate: data.moveInDate,
+          status: data.status,
+          comments: data.comments || null,
+          additionalInfo: data.additionalInfo || null,
+          updatedBy: user?.id,
+        })
+        .where('id = :requestId', { requestId })
+        .execute();
+
+      // Update tenant details
+      await MoveInRequestDetailsTenant.getRepository()
+        .createQueryBuilder()
+        .update()
+        .set({
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          dialCode: data.dialCode,
+          phoneNumber: data.phoneNumber,
+          nationality: data.nationality,
+          emiratesIdNumber: data.emiratesIdNumber,
+          emiratesIdExpiryDate: data.emiratesIdExpiryDate,
+          tenancyContractStartDate: data.tenancyContractStartDate,
+          tenancyContractEndDate: data.tenancyContractEndDate,
+          adults: data.details?.adults,
+          children: data.details?.children,
+          householdStaffs: data.details?.householdStaffs,
+          pets: data.details?.pets,
+          peopleOfDetermination: data.details?.peopleOfDetermination || false,
+          comments: data.details?.detailsText ?? data.comments ?? null,
+          updatedBy: user?.id,
+        })
+        .where('moveInRequestId = :requestId', { requestId })
+        .execute();
+
+      // Log the update
+      await this.logMoveInRequestAction(requestId, 'UPDATE', 'Request updated by admin', user);
+
+      return { id: requestId, message: 'Tenant move-in request updated successfully' };
+    } catch (error: any) {
+      logger.error(`Error in updateTenantMoveIn: ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+    }
+  }
+
+  /**
+   * Update HHO unit move-in request (Admin)
+   */
+  async updateHhoOwnerMoveIn(requestId: number, data: any, user: any) {
+    try {
+      // Check if request exists and is editable
+      const request = await this.ensureEditableByAdmin(requestId, user);
+      
+      // Update the main request
+      await MoveInRequests.getRepository()
+        .createQueryBuilder()
+        .update()
+        .set({
+          unit: data.unitId ? { id: data.unitId } : undefined,
+          moveInDate: data.moveInDate,
+          status: data.status,
+          comments: data.comments || null,
+          additionalInfo: data.additionalInfo || null,
+          updatedBy: user?.id,
+        })
+        .where('id = :requestId', { requestId })
+        .execute();
+
+      // Update HHO owner details
+      await MoveInRequestDetailsHhoOwner.getRepository()
+        .createQueryBuilder()
+        .update()
+        .set({
+          ownerFirstName: data.ownerFirstName || undefined,
+          ownerLastName: data.ownerLastName || undefined,
+          email: data.email || undefined,
+          dialCode: data.dialCode || undefined,
+          phoneNumber: data.phoneNumber || undefined,
+          nationality: data.nationality || undefined,
+          unitPermitNumber: data.details?.unitPermitNumber,
+          unitPermitStartDate: data.details?.unitPermitStartDate,
+          unitPermitExpiryDate: data.details?.unitPermitExpiryDate,
+          comments: data.comments ?? null,
+          updatedBy: user?.id,
+        })
+        .where('moveInRequestId = :requestId', { requestId })
+        .execute();
+
+      // Log the update
+      await this.logMoveInRequestAction(requestId, 'UPDATE', 'Request updated by admin', user);
+
+      return { id: requestId, message: 'HHO unit move-in request updated successfully' };
+    } catch (error: any) {
+      logger.error(`Error in updateHhoOwnerMoveIn: ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+    }
+  }
+
+  /**
+   * Update HHC company move-in request (Admin)
+   */
+  async updateHhcCompanyMoveIn(requestId: number, data: any, user: any) {
+    try {
+      // Check if request exists and is editable
+      const request = await this.ensureEditableByAdmin(requestId, user);
+      
+      // Update the main request
+      await MoveInRequests.getRepository()
+        .createQueryBuilder()
+        .update()
+        .set({
+          unit: data.unitId ? { id: data.unitId } : undefined,
+          moveInDate: data.moveInDate,
+          status: data.status,
+          comments: data.comments || null,
+          additionalInfo: data.additionalInfo || null,
+          updatedBy: user?.id,
+        })
+        .where('id = :requestId', { requestId })
+        .execute();
+
+      // Update HHC company details
+      await MoveInRequestDetailsHhcCompany.getRepository()
+        .createQueryBuilder()
+        .update()
+        .set({
+          name: data.name,
+          companyName: data.company,
+          companyEmail: data.companyEmail,
+          operatorOfficeNumber: data.operatorOfficeNumber,
+          tradeLicenseNumber: data.tradeLicenseNumber,
+          tradeLicenseExpiryDate: data.tradeLicenseExpiryDate,
+          nationality: data.nationality,
+          emiratesIdNumber: data.emiratesIdNumber,
+          emiratesIdExpiryDate: data.emiratesIdExpiryDate,
+          tenancyContractStartDate: data.tenancyContractStartDate || null,
+          unitPermitStartDate: data.unitPermitStartDate,
+          unitPermitExpiryDate: data.unitPermitExpiryDate,
+          unitPermitNumber: data.unitPermitNumber,
+          leaseStartDate: data.leaseStartDate,
+          leaseEndDate: data.leaseEndDate,
+          dtcmStartDate: data.dtcmStartDate || null,
+          dtcmExpiryDate: data.dtcmExpiryDate || null,
+          comments: data.comments ?? null,
+          updatedBy: user?.id,
+        })
+        .where('moveInRequestId = :requestId', { requestId })
+        .execute();
+
+      // Log the update
+      await this.logMoveInRequestAction(requestId, 'UPDATE', 'Request updated by admin', user);
+
+      return { id: requestId, message: 'HHC company move-in request updated successfully' };
+    } catch (error: any) {
+      logger.error(`Error in updateHhcCompanyMoveIn: ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+    }
+  }
+
+  /**
+   * Ensure request is editable by admin (check status validation)
+   */
+  private async ensureEditableByAdmin(requestId: number, user: any) {
+    // Only admin users can edit move-in requests
+    if (!user?.isAdmin) {
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        APICodes.INVALID_USER_ROLE.message,
+        APICodes.INVALID_USER_ROLE.code
+      );
+    }
+
+    const request = await MoveInRequests.getRepository()
+      .createQueryBuilder('mir')
+      .where('mir.id = :requestId AND mir.isActive = true', { requestId })
+      .getOne();
+    
+    if (!request) {
+      throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
+    }
+
+    // Admin can edit requests in new, rfi-pending, or rfi-submitted status
+    if (request.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN && 
+        request.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING && 
+        request.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 
+        "Request can only be updated when status is 'new', 'rfi-pending', or 'rfi-submitted'", 
+        APICodes.VALIDATION_ERROR.code);
+    }
+
+    return request;
+  }
+
+  /**
+   * Log move-in request action
+   */
+  private async logMoveInRequestAction(requestId: number, action: string, remarks: string, user: any) {
+    try {
+      const log = new MoveInRequestLogs();
+      log.moveInRequest = { id: requestId } as any;
+      log.requestType = MOVE_IN_USER_TYPES.OWNER; // Use a valid enum value
+      log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN; // Use a valid enum value
+      log.changes = action;
+      log.user = { id: user?.id } as any;
+      log.actionBy = TransitionRequestActionByTypes.SUPER_ADMIN;
+      log.details = remarks;
+      log.comments = remarks;
+      await log.save();
+    } catch (error) {
+      logger.error(`Error logging move-in request action: ${error}`);
     }
   }
 }
