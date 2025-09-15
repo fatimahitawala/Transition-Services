@@ -750,6 +750,7 @@ export class MoveInService {
         company,
         companyEmail,
         countryCode,
+        operatorCountryCode,
         operatorOfficeNumber,
         tradeLicenseNumber,
         tradeLicenseExpiryDate,
@@ -1439,38 +1440,11 @@ export class MoveInService {
       // Get the main move-in request with basic details
       let query = MoveInRequests.getRepository()
         .createQueryBuilder("mv")
-        .select([
-          "mv.id",
-          "mv.moveInRequestNo",
-          "mv.requestType",
-          "mv.status",
-          "mv.moveInDate",
-          "mv.comments",
-          "mv.additionalInfo",
-          "mv.createdAt",
-          "mv.updatedAt",
-          "u.id as unitId",
-          "u.unitNumber",
-          "u.floorNumber",
-          "u.unitName",
-          "mc.id as masterCommunityId",
-          "mc.name as masterCommunityName",
-          "c.id as communityId",
-          "c.name as communityName",
-          "t.id as towerId",
-          "t.name as towerName",
-          "user.id as userId",
-          "user.firstName",
-          "user.middleName",
-          "user.lastName",
-          "user.email",
-          "user.mobile"
-        ])
-        .innerJoin("mv.user", "user", "user.isActive = true")
-        .innerJoin("mv.unit", "u", "u.isActive = true")
-        .innerJoin("u.masterCommunity", "mc", "mc.isActive = true")
-        .innerJoin("u.tower", "t", "t.isActive = true")
-        .innerJoin("u.community", "c", "c.isActive = true")
+        .leftJoinAndSelect("mv.user", "user", "user.isActive = true")
+        .leftJoinAndSelect("mv.unit", "u", "u.isActive = true")
+        .leftJoinAndSelect("u.masterCommunity", "mc", "mc.isActive = true")
+        .leftJoinAndSelect("u.tower", "t", "t.isActive = true")
+        .leftJoinAndSelect("u.community", "c", "c.isActive = true")
         .where("mv.isActive = true AND mv.id = :requestId", { requestId });
 
       let result: any = await query.getOne();
@@ -1564,6 +1538,26 @@ export class MoveInService {
           fileUrl: `https://${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/application/${doc.file.filePath}`
         } : null
       }));
+
+      // Construct unit object from joined data
+      result.unit = result.unit ? {
+        id: result.unit.id,
+        unitNumber: result.unit.unitNumber,
+        floorNumber: result.unit.floorNumber,
+        unitName: result.unit.unitName,
+        masterCommunity: result.unit.masterCommunity ? {
+          id: result.unit.masterCommunity.id,
+          name: result.unit.masterCommunity.name
+        } : null,
+        community: result.unit.community ? {
+          id: result.unit.community.id,
+          name: result.unit.community.name
+        } : null,
+        tower: result.unit.tower ? {
+          id: result.unit.tower.id,
+          name: result.unit.tower.name
+        } : null
+      } : {};
 
       logger.debug(`Successfully retrieved move-in request details for requestId: ${requestId}`);
       return result;
