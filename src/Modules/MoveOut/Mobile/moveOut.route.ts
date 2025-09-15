@@ -13,6 +13,7 @@ const authMiddleware = new AuthMiddleware();
 router.get('/request-list', authMiddleware.auth(), catchAsync(moveOutController.getMoveOutList));
 router.put('/cancel/:requestId', authMiddleware.auth(), validate(moveOutValidation.cancelMoveOutRequestByUser), catchAsync(moveOutController.cancelMoveOutRequestByUser));
 
+//export the router
 export default router;
 
 //write swagger documentation
