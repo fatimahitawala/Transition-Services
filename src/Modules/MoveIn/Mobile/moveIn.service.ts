@@ -837,6 +837,7 @@ export class MoveInService {
           company,
           companyEmail,
           countryCode,
+          operatorCountryCode,
           operatorOfficeNumber,
           tradeLicenseNumber,
           tradeLicenseExpiryDate,
