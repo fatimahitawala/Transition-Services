@@ -65,7 +65,7 @@ export class MoveInService {
         emiratesIdExpiryDate: details.emiratesIdExpiryDate || rest.emiratesIdExpiryDate,
         tenancyContractStartDate: details.tenancyContractStartDate || rest.tenancyContractStartDate,
         tenancyContractEndDate: details.tenancyContractEndDate || rest.tenancyContractEndDate,
-        
+
         // Occupancy details
         adults: details.adults,
         children: details.children,
@@ -73,7 +73,7 @@ export class MoveInService {
         pets: details.pets,
         peopleOfDetermination: details.peopleOfDetermination,
         termsAccepted: details.termsAccepted,
-        
+
         // Store detailsText in determination_text field when peopleOfDetermination is true
         determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
         comments: rest.comments || null,
@@ -108,7 +108,7 @@ export class MoveInService {
       peopleOfDetermination: details.peopleOfDetermination,
       determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
       termsAccepted: details.termsAccepted,
-      
+
       // Optional comment
       comments: rest.comments || null,
     };
@@ -127,7 +127,7 @@ export class MoveInService {
       // Spread other details after setting determination fields
       ...details,
     };
-    
+
     return this.createMoveIn({ ...rest, details: hhcDetails, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
   }
 
@@ -1161,7 +1161,7 @@ export class MoveInService {
       const list = await getMoveInList.getMany();
       logger.debug(`Query executed successfully, found ${list.length} records`);
       logger.debug(`First item raw data: ${JSON.stringify(list[0] || {})}`);
-      
+
       // Transform the response to include unit data
       const transformedList = list.map((item: any) => ({
         id: item.id,
@@ -1186,10 +1186,10 @@ export class MoveInService {
         towerId: item.unit?.tower?.id,
         towerName: item.unit?.tower?.name
       }));
-      
+
       const count = await getMoveInList.getCount();
       logger.debug(`Total count: ${count}`);
-      
+
       const pagination = getPaginationInfo(page, per_page, count);
       return { data: transformedList, pagination };
     } catch (error: any) {
@@ -1257,7 +1257,7 @@ export class MoveInService {
       }
       case MOVE_IN_USER_TYPES.HHO_OWNER: {
         const entity = new MoveInRequestDetailsHhoOwner();
-        
+
         // Explicitly set all required fields
         entity.ownerFirstName = details.ownerFirstName;
         entity.ownerLastName = details.ownerLastName;
@@ -1265,19 +1265,19 @@ export class MoveInService {
         entity.dialCode = details.dialCode;
         entity.phoneNumber = details.phoneNumber;
         entity.nationality = details.nationality;
-        
+
         // Set permit fields
         entity.unitPermitNumber = details.unitPermitNumber;
         entity.unitPermitStartDate = details.unitPermitStartDate;
         entity.unitPermitExpiryDate = details.unitPermitExpiryDate;
-        
+
         // Set determination fields
         entity.peopleOfDetermination = details.peopleOfDetermination;
         entity.determination_text = details.determination_text;
-        
+
         // Set other fields
         entity.comments = details.comments;
-        
+
         entity.moveInRequest = master;
         entity.createdBy = userId;
         entity.updatedBy = userId;
@@ -1324,21 +1324,21 @@ export class MoveInService {
   async cancelMoveInRequest(requestId: number, data: any, user: any) {
     try {
       const { cancellationRemarks } = data;
-      
+
       // Check if request exists and belongs to user
       const request = await this.ensureCancelableByOwner(requestId, user);
-      
+
       // Prepare update data
       const updateData: any = {
         status: MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED,
         updatedBy: user?.id,
       };
-      
+
       // Only update comments if cancellationRemarks is provided
       if (cancellationRemarks && cancellationRemarks.trim()) {
         updateData.comments = cancellationRemarks;
       }
-      
+
       // Update the request status to user-cancelled
       await MoveInRequests.getRepository()
         .createQueryBuilder()
@@ -1362,30 +1362,30 @@ export class MoveInService {
       // Send cancellation notifications
       await this.sendCancellationNotifications(requestId, request.moveInRequestNo, cancellationRemarks);
 
-      return { 
-        id: requestId, 
+      return {
+        id: requestId,
         moveInRequestNo: request.moveInRequestNo,
         status: MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED,
-        message: 'Move-in request cancelled successfully' 
+        message: 'Move-in request cancelled successfully'
       };
     } catch (error: any) {
       logger.error(`Error in cancelMoveInRequest: ${JSON.stringify(error)}`);
       logger.error(`Error stack: ${error.stack}`);
-      
+
       // If it's already an ApiError, re-throw it as is
       if (error instanceof ApiError) {
         throw error;
       }
-      
+
       // If it's a database error or other known error, handle appropriately
       if (error.code === 'EC004' || error.message?.includes('Record Not found')) {
         throw new ApiError(httpStatus.NOT_FOUND, APICodes.MOVE_IN_REQUEST_NOT_FOUND.message, APICodes.MOVE_IN_REQUEST_NOT_FOUND.code);
       }
-      
+
       if (error.code === 'EC041' || error.message?.includes('Only requests in')) {
         throw new ApiError(httpStatus.BAD_REQUEST, error.message, APICodes.VALIDATION_ERROR.code);
       }
-      
+
       // Otherwise, handle as unknown error
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
       throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
@@ -1401,22 +1401,22 @@ export class MoveInService {
       .leftJoinAndSelect('mir.user', 'user')
       .where('mir.id = :requestId AND mir.isActive = true', { requestId })
       .getOne();
-    
+
     if (!mir) {
       throw new ApiError(httpStatus.NOT_FOUND, APICodes.MOVE_IN_REQUEST_NOT_FOUND.message, APICodes.MOVE_IN_REQUEST_NOT_FOUND.code);
     }
-    
+
     if (mir.user?.id !== user?.id) {
       throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
     }
-    
+
     // Only requests in 'new' status can be cancelled by users
     if (mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 
-        APICodes.CANNOT_CANCEL_MOBILE_STATUS.message, 
+      throw new ApiError(httpStatus.BAD_REQUEST,
+        APICodes.CANNOT_CANCEL_MOBILE_STATUS.message,
         APICodes.CANNOT_CANCEL_MOBILE_STATUS.code);
     }
-    
+
     return mir;
   }
 
@@ -1530,7 +1530,7 @@ export class MoveInService {
         .getMany();
 
       logger.debug(`Found ${documents.length} documents for requestId: ${requestId}`);
-      
+
       // Add full file URL to each document
       result.documents = documents.map(doc => ({
         ...doc,
