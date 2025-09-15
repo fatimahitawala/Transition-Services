@@ -895,7 +895,7 @@ export class MoveInService {
       throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
     }
     if (mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN && mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING && mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED) {
-      throw new ApiError(httpStatus.BAD_REQUEST, "Request can only be updated when status is 'new', 'rfi-pending', or 'rfi-submitted'", APICodes.VALIDATION_ERROR.code);
+      throw new ApiError(httpStatus.BAD_REQUEST, APICodes.CANNOT_UPDATE_MOBILE_STATUS.message, APICodes.CANNOT_UPDATE_MOBILE_STATUS.code);
     }
     return mir;
   }
@@ -928,6 +928,7 @@ export class MoveInService {
         company,
         companyEmail,
         countryCode,
+        operatorCountryCode,
         operatorOfficeNumber,
         tradeLicenseNumber,
         tradeLicenseExpiryDate,
@@ -970,13 +971,14 @@ export class MoveInService {
                 householdStaffs: details?.householdStaffs,
                 pets: details?.pets,
                 peopleOfDetermination: details?.peopleOfDetermination,
+                determination_text: details?.peopleOfDetermination && details?.detailsText ? details.detailsText : null,
                 emiratesIdNumber,
                 emiratesIdExpiryDate,
                 tenancyContractStartDate,
                 tenancyContractEndDate,
                 updatedBy: user?.id,
               })
-              .where('moveInRequestId = :requestId', { requestId })
+              .where('move_in_request_id = :requestId', { requestId })
               .execute();
             break;
           }
@@ -989,10 +991,12 @@ export class MoveInService {
                 children: details?.children,
                 householdStaffs: details?.householdStaffs,
                 pets: details?.pets,
-                comments: details?.detailsText ?? comments ?? null,
+                peopleOfDetermination: details?.peopleOfDetermination,
+                determination_text: details?.peopleOfDetermination && details?.detailsText ? details.detailsText : null,
+                comments: comments ?? null,
                 updatedBy: user?.id,
               })
-              .where('moveInRequestId = :requestId', { requestId })
+              .where('move_in_request_id = :requestId', { requestId })
               .execute();
             break;
           }
@@ -1010,10 +1014,12 @@ export class MoveInService {
                 unitPermitNumber: details?.unitPermitNumber,
                 unitPermitStartDate: details?.unitPermitStartDate,
                 unitPermitExpiryDate: details?.unitPermitExpiryDate,
+                peopleOfDetermination: details?.peopleOfDetermination,
+                determination_text: details?.peopleOfDetermination && details?.detailsText ? details.detailsText : null,
                 comments: comments ?? null,
                 updatedBy: user?.id,
               })
-              .where('moveInRequestId = :requestId', { requestId })
+              .where('move_in_request_id = :requestId', { requestId })
               .execute();
             break;
           }
@@ -1025,6 +1031,8 @@ export class MoveInService {
                 name,
                 companyName: company,
                 companyEmail,
+                countryCode,
+                operatorCountryCode,
                 operatorOfficeNumber,
                 tradeLicenseNumber,
                 tradeLicenseExpiryDate,
@@ -1039,9 +1047,11 @@ export class MoveInService {
                 nationality,
                 emiratesIdNumber,
                 emiratesIdExpiryDate,
+                peopleOfDetermination: details?.peopleOfDetermination,
+                determination_text: details?.peopleOfDetermination && details?.detailsText ? details.detailsText : null,
                 updatedBy: user?.id,
               })
-              .where('moveInRequestId = :requestId', { requestId })
+              .where('move_in_request_id = :requestId', { requestId })
               .execute();
             break;
           }
@@ -1128,6 +1138,10 @@ export class MoveInService {
         .leftJoinAndSelect("u.masterCommunity", "mc")
         .leftJoinAndSelect("u.community", "c")
         .leftJoinAndSelect("u.tower", "t")
+        .addSelect("am.createdAt")
+        .addSelect("am.updatedAt")
+        .addSelect("am.createdBy")
+        .addSelect("am.updatedBy")
         .where(whereClause, {
           status,
           units: unitIds.map((x: any) => Number(x)).filter((n: any) => !isNaN(n)),
@@ -1154,6 +1168,9 @@ export class MoveInService {
         status: item.status,
         moveInDate: item.moveInDate,
         createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        createdBy: item.createdBy,
+        updatedBy: item.updatedBy,
         unit: item.unit ? {
           id: item.unit.id,
           unitNumber: item.unit.unitNumber,
@@ -1272,7 +1289,8 @@ export class MoveInService {
         entity.name = details.name;
         entity.companyName = details.company;
         entity.companyEmail = details.companyEmail;
-        // entity.countryCode = details.countryCode; // Field has insert: false, update: false
+        entity.countryCode = details.countryCode;
+        entity.operatorCountryCode = details.operatorCountryCode;
         entity.operatorOfficeNumber = details.operatorOfficeNumber;
         entity.tradeLicenseNumber = details.tradeLicenseNumber;
         entity.tradeLicenseExpiryDate = details.tradeLicenseExpiryDate;
@@ -1393,8 +1411,8 @@ export class MoveInService {
     // Only requests in 'new' status can be cancelled by users
     if (mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN) {
       throw new ApiError(httpStatus.BAD_REQUEST, 
-        "Only requests in 'new' status can be cancelled", 
-        APICodes.VALIDATION_ERROR.code);
+        APICodes.CANNOT_CANCEL_MOBILE_STATUS.message, 
+        APICodes.CANNOT_CANCEL_MOBILE_STATUS.code);
     }
     
     return mir;
@@ -1462,7 +1480,7 @@ export class MoveInService {
         return null;
       }
 
-      // Get type-specific details based on request type
+      // Get all type-specific details (always include all types, even if empty)
       const detailsMap: Record<string, { repo: any; alias: string; key: string }> = {
         [MOVE_IN_USER_TYPES.HHO_COMPANY]: {
           repo: MoveInRequestDetailsHhcCompany,
@@ -1486,15 +1504,30 @@ export class MoveInService {
         },
       };
 
-      const typeConfig = detailsMap[result.requestType];
-      if (typeConfig) {
-        const details = await typeConfig.repo
-          .getRepository()
-          .createQueryBuilder(typeConfig.alias)
-          .where(`${typeConfig.alias}.moveInRequest.id = :id AND ${typeConfig.alias}.isActive = true`, { id: result.id })
-          .getOne();
+      // Initialize all detail types as empty objects
+      result.moveInOwnerDetails = {};
+      result.moveInTenantDetails = {};
+      result.moveInHHOOwnerDetails = {};
+      result.moveInCompanyDetails = {};
 
-        result = { ...result, [typeConfig.key]: details };
+      // Fetch details for all types
+      for (const [requestType, config] of Object.entries(detailsMap)) {
+        try {
+          const details = await config.repo
+            .getRepository()
+            .createQueryBuilder(config.alias)
+            .where(`${config.alias}.moveInRequest.id = :id AND ${config.alias}.isActive = true`, { id: result.id })
+            .getOne();
+
+          if (details) {
+            // Remove the moveInRequest relation and other metadata fields
+            const { moveInRequest, createdBy, updatedBy, isActive, createdAt, updatedAt, ...cleanDetails } = details;
+            result[config.key] = cleanDetails;
+          }
+        } catch (error) {
+          logger.warn(`Error fetching ${config.key} for requestId ${requestId}: ${error}`);
+          // Keep as empty object if there's an error
+        }
       }
 
       // Get documents if any
@@ -1504,6 +1537,8 @@ export class MoveInService {
           "doc.id",
           "doc.documentType",
           "doc.expiryDate",
+          "doc.userId",
+          "doc.fileId",
           "doc.createdAt",
           "doc.updatedAt",
           "file.id",
