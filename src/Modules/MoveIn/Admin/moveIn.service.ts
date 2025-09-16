@@ -17,6 +17,7 @@ import { uploadFile } from "../../../Common/Utils/azureBlobStorage";
 import { executeInTransaction } from "../../../Common/Utils/transactionUtil";
 import { Units } from "../../../Entities/Units.entity";
 import { get } from "http";
+import config from "../../../Common/Config/config";
 
 export class MoveInService {
 
@@ -744,8 +745,8 @@ export class MoveInService {
         moveInStartDate = "", 
         moveInEndDate = "",
         status = "",
-        requestType = "",
         search = "",
+        requestId = "",
         sortBy = "createdAt",
         sortOrder = "DESC"
       } = query;
@@ -754,28 +755,23 @@ export class MoveInService {
       logger.debug(`=== ADMIN MOVE-IN REQUEST DEBUG ===`);
       logger.debug(`Raw query object: ${JSON.stringify(query)}`);
       logger.debug(`Query keys: ${Object.keys(query).join(', ')}`);
-      logger.debug(`requestType value: "${query.requestType}"`);
-      logger.debug(`requestType type: ${typeof query.requestType}`);
       logger.debug(`User object: ${JSON.stringify(user)}`);
       logger.debug(`User isAdmin: ${user?.isAdmin}`);
       logger.debug(`=====================================`);
 
-      masterCommunityIds = masterCommunityIds.split(",").filter((e: any) => e);
-      communityIds = communityIds.split(",").filter((e: any) => e);
-      towerIds = towerIds.split(",").filter((e: any) => e);
-      requestType = requestType.split(",").filter((e: any) => e);
+      masterCommunityIds = masterCommunityIds ? masterCommunityIds.split(",").filter((e: any) => e) : [];
+      communityIds = communityIds ? communityIds.split(",").filter((e: any) => e) : [];
+      towerIds = towerIds ? towerIds.split(",").filter((e: any) => e) : [];
 
       let getMoveInList = MoveInRequests.getRepository().createQueryBuilder("am")
-        .select([
-          "am.id", "am.status", "am.createdAt", "am.moveInDate",
-          "am.moveInRequestNo", "am.requestType", "am.comments", "am.additionalInfo",
-          "u.unitNumber", "u.floorNumber", "u.unitName",
-          "mc.name as masterCommunityName", "c.name as communityName", "t.name as towerName"
-        ])
-        .innerJoin("am.unit", "u", "u.isActive=1")
-        .innerJoin("u.masterCommunity", "mc", "mc.isActive=1")
-        .innerJoin("u.community", "c", "c.isActive=1")
-        .innerJoin("u.tower", "t", "t.isActive=1")
+        .leftJoinAndSelect("am.unit", "u", "u.isActive=1")
+        .leftJoinAndSelect("u.masterCommunity", "mc", "mc.isActive=1")
+        .leftJoinAndSelect("u.community", "c", "c.isActive=1")
+        .leftJoinAndSelect("u.tower", "t", "t.isActive=1")
+        .addSelect("am.createdAt")
+        .addSelect("am.updatedAt")
+        .addSelect("am.createdBy")
+        .addSelect("am.updatedBy")
         .where("am.isActive=1");
 
       // Only apply permission filtering for non-admin users
@@ -787,12 +783,35 @@ export class MoveInService {
       if (masterCommunityIds && masterCommunityIds.length) getMoveInList.andWhere(`mc.id IN (:...masterCommunityIds)`, { masterCommunityIds });
       if (communityIds && communityIds.length) getMoveInList.andWhere(`c.id IN (:...communityIds)`, { communityIds });
       if (towerIds && towerIds.length) getMoveInList.andWhere(`t.id IN (:...towerIds)`, { towerIds });
-      if (createdStartDate) getMoveInList.andWhere(`am.createdAt >= :createdStartDate`, { createdStartDate });
-      if (createdEndDate) getMoveInList.andWhere(`am.createdAt <= :createdEndDate`, { createdEndDate });
-      if (moveInStartDate) getMoveInList.andWhere(`am.moveInDate >= :moveInStartDate`, { moveInStartDate });
-      if (moveInEndDate) getMoveInList.andWhere(`am.moveInDate <= :moveInEndDate`, { moveInEndDate });
+      
+      // Date range filters - handle both start and end dates properly
+      if (createdStartDate) {
+        const startDate = new Date(createdStartDate);
+        startDate.setHours(0, 0, 0, 0); // Start of day
+        getMoveInList.andWhere(`am.createdAt >= :createdStartDate`, { createdStartDate: startDate });
+        logger.debug(`Created Start Date filter: ${createdStartDate} -> ${startDate.toISOString()}`);
+      }
+      if (createdEndDate) {
+        const endDate = new Date(createdEndDate);
+        endDate.setHours(23, 59, 59, 999); // End of day
+        getMoveInList.andWhere(`am.createdAt <= :createdEndDate`, { createdEndDate: endDate });
+        logger.debug(`Created End Date filter: ${createdEndDate} -> ${endDate.toISOString()}`);
+      }
+      if (moveInStartDate) {
+        const startDate = new Date(moveInStartDate);
+        startDate.setHours(0, 0, 0, 0); // Start of day
+        getMoveInList.andWhere(`am.moveInDate >= :moveInStartDate`, { moveInStartDate: startDate });
+        logger.debug(`Move-in Start Date filter: ${moveInStartDate} -> ${startDate.toISOString()}`);
+      }
+      if (moveInEndDate) {
+        const endDate = new Date(moveInEndDate);
+        endDate.setHours(23, 59, 59, 999); // End of day
+        getMoveInList.andWhere(`am.moveInDate <= :moveInEndDate`, { moveInEndDate: endDate });
+        logger.debug(`Move-in End Date filter: ${moveInEndDate} -> ${endDate.toISOString()}`);
+      }
+      
       if (status) getMoveInList.andWhere(`am.status = :status`, { status });
-      if (requestType && requestType.length > 0) getMoveInList.andWhere(`am.requestType IN (:...requestType)`, { requestType });
+      if (requestId) getMoveInList.andWhere(`am.moveInRequestNo = :requestId`, { requestId });
       
       // Search functionality
       if (search) {
@@ -845,8 +864,39 @@ export class MoveInService {
       // Debug: Log the results
       logger.debug(`Total items found: ${count}, List length: ${list.length}`);
       logger.debug(`First few items: ${JSON.stringify(list.slice(0, 2))}`);
+      
+      // Debug: Log unit data specifically
+      if (list.length > 0) {
+        const firstItem = list[0] as any;
+        logger.debug(`Unit data for first item: unitId=${firstItem.unit?.id}, unitNumber=${firstItem.unit?.unitNumber}, unitName=${firstItem.unit?.unitName}`);
+      }
 
-      return { data: list, pagination };
+      // Transform the response to match mobile format
+      const transformedList = list.map((item: any) => ({
+        id: item.id,
+        moveInRequestNo: item.moveInRequestNo,
+        requestType: item.requestType,
+        status: item.status,
+        moveInDate: item.moveInDate,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        createdBy: item.createdBy,
+        updatedBy: item.updatedBy,
+        unit: item.unit ? {
+          id: item.unit.id,
+          unitNumber: item.unit.unitNumber,
+          floorNumber: item.unit.floorNumber,
+          unitName: item.unit.unitName
+        } : {},
+        masterCommunityId: item.unit?.masterCommunity?.id,
+        masterCommunityName: item.unit?.masterCommunity?.name,
+        communityId: item.unit?.community?.id,
+        communityName: item.unit?.community?.name,
+        towerId: item.unit?.tower?.id,
+        towerName: item.unit?.tower?.name
+      }));
+
+      return { data: transformedList, pagination };
 
     } catch (error) {
       logger.error(`Error in getAdminMoveIn : ${JSON.stringify(error)}`);
@@ -857,38 +907,16 @@ export class MoveInService {
 
   async getMoveInRequestDetailsWithId(requestId: number, user: any) {
     try {
+      logger.debug(`getMoveInRequestDetailsWithId - requestId: ${requestId}, userId: ${user?.id}`);
+
+      // Get the main move-in request with basic details
       let query = MoveInRequests.getRepository()
         .createQueryBuilder("mv")
-        .select([
-          "mv.id",
-          "masterCommunity.name",
-          "community.name",
-          "tower.name",
-          "unit.unitName",
-          "unit.unitNumber",
-          "tower.id",
-          "community.id",
-          "masterCommunity.id",
-          "unit.id",
-          "user.firstName",
-          "user.middleName",
-          "user.lastName",
-          "user.email",
-          "user.mobile",
-          "mv.requestType",
-          "mv.moveInDate",
-          "mv.comments",
-          "mv.moveInRequestNo",
-          "mv.createdBy",
-          "mv.status",
-          "mv.createdAt",
-          "mv.updatedAt",
-        ])
-        .innerJoin("mv.user", "user", "user.isActive = true")
-        .innerJoin("mv.unit", "unit", "unit.isActive = true")
-        .innerJoin("unit.masterCommunity", "masterCommunity", "masterCommunity.isActive = true")
-        .innerJoin("unit.tower", "tower", "tower.isActive = true")
-        .innerJoin("unit.community", "community", "community.isActive = true")
+        .leftJoinAndSelect("mv.user", "user", "user.isActive = true")
+        .leftJoinAndSelect("mv.unit", "u", "u.isActive = true")
+        .leftJoinAndSelect("u.masterCommunity", "mc", "mc.isActive = true")
+        .leftJoinAndSelect("u.tower", "t", "t.isActive = true")
+        .leftJoinAndSelect("u.community", "c", "c.isActive = true")
         .where("mv.isActive = true AND mv.id = :requestId", { requestId });
 
       const isSecurity = await checkIsSecurity(user);
@@ -900,9 +928,11 @@ export class MoveInService {
       let result: any = await query.getOne();
 
       if (!result) {
+        logger.warn(`Move-in request not found - requestId: ${requestId}`);
         throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
       }
 
+      // Get all type-specific details (always include all types, even if empty)
       const detailsMap: Record<string, { repo: any; alias: string; key: string }> = {
         [MOVE_IN_USER_TYPES.HHO_COMPANY]: {
           repo: MoveInRequestDetailsHhcCompany,
@@ -926,22 +956,100 @@ export class MoveInService {
         },
       };
 
-      const typeConfig = detailsMap[result.requestType];
-      if (typeConfig) {
-        const details = await typeConfig.repo
-          .getRepository()
-          .createQueryBuilder(typeConfig.alias)
-          .where(`${typeConfig.alias}.moveInRequest.id = :id AND ${typeConfig.alias}.isActive = true`, { id: result.id })
-          .getOne();
+      // Initialize all detail types as empty objects
+      result.moveInOwnerDetails = {};
+      result.moveInTenantDetails = {};
+      result.moveInHHOOwnerDetails = {};
+      result.moveInCompanyDetails = {};
 
-        result = { ...result, [typeConfig.key]: details };
+      // Fetch details for all types
+      for (const [requestType, config] of Object.entries(detailsMap)) {
+        try {
+          const details = await config.repo
+            .getRepository()
+            .createQueryBuilder(config.alias)
+            .where(`${config.alias}.moveInRequest.id = :id AND ${config.alias}.isActive = true`, { id: result.id })
+            .getOne();
+
+          if (details) {
+            // Remove the moveInRequest relation and other metadata fields
+            const { moveInRequest, createdBy, updatedBy, isActive, createdAt, updatedAt, ...cleanDetails } = details;
+            result[config.key] = cleanDetails;
+          }
+        } catch (error) {
+          logger.warn(`Error fetching ${config.key} for requestId ${requestId}: ${error}`);
+          // Keep as empty object if there's an error
+        }
       }
 
+      // Get documents if any
+      const documents = await MoveInRequestDocuments.getRepository()
+        .createQueryBuilder("doc")
+        .select([
+          "doc.id",
+          "doc.documentType",
+          "doc.expiryDate",
+          "doc.userId",
+          "doc.fileId",
+          "doc.createdAt",
+          "doc.updatedAt",
+          "file.id",
+          "file.fileName",
+          "file.filePath",
+          "file.fileType",
+          "file.fileSize",
+          "file.fileExtension",
+          "file.fileOriginalName",
+          "file.createdAt"
+        ])
+        .leftJoin("doc.file", "file")
+        .where("doc.moveInRequestId = :id AND doc.isActive = true", { id: result.id })
+        .getMany();
+
+      logger.debug(`Found ${documents.length} documents for requestId: ${requestId}`);
+
+      // Add full file URL to each document
+      result.documents = documents.map(doc => ({
+        ...doc,
+        file: doc.file ? {
+          ...doc.file,
+          fileUrl: `https://${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/application/${doc.file.filePath}`
+        } : null
+      }));
+
+      // Construct unit object from joined data
+      result.unit = result.unit ? {
+        id: result.unit.id,
+        unitNumber: result.unit.unitNumber,
+        floorNumber: result.unit.floorNumber,
+        unitName: result.unit.unitName,
+        masterCommunity: result.unit.masterCommunity ? {
+          id: result.unit.masterCommunity.id,
+          name: result.unit.masterCommunity.name
+        } : null,
+        community: result.unit.community ? {
+          id: result.unit.community.id,
+          name: result.unit.community.name
+        } : null,
+        tower: result.unit.tower ? {
+          id: result.unit.tower.id,
+          name: result.unit.tower.name
+        } : null
+      } : {};
+
+      // Remove sensitive fields from user object
+      if (result.user) {
+        const { password, ...cleanUser } = result.user;
+        result.user = cleanUser;
+      }
+
+      logger.debug(`Successfully retrieved move-in request details for requestId: ${requestId}`);
       return result;
-    } catch (error) {
-      logger.error(`Error in MoveInRequestById : ${JSON.stringify(error)}`);
-      const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
+
+    } catch (error: any) {
+      logger.error(`Error in getMoveInRequestDetailsWithId: ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
     }
   }
 

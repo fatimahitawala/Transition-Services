@@ -15,7 +15,7 @@ const router = Router();
 
 // GET routes for admin move-in management
 router.get("/request-list", auth.auth(), validate(moveInValidation.getAdminMoveIn), catchAsync(moveInController.getAllMoveInRequestList));
-router.get('/details/:requestId', auth.auth(), validate(moveInValidation.getAdminMoveInDetails), catchAsync(moveInController.getMoveInRequestDetailsWithId));
+router.get('/request/:requestId', auth.auth(), validate(moveInValidation.getAdminMoveInDetails), catchAsync(moveInController.getMoveInRequestDetailsWithId));
 
 // POST routes for creating different types of move-in requests (Admin)
 router.post('/owner', auth.auth(), validate(moveInValidation.createOwnerMoveIn), catchAsync(moveInController.createOwnerMoveInRequest));
@@ -56,7 +56,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  * /admin/move-in/request-list:
  *   get:
  *     summary: Get all move-in requests (Admin)
- *     description: Get all move-in requests for admin users. Supports filtering by status, requestType, masterCommunity, community, tower, and pagination. This endpoint replaces the old /admin/move-in/request endpoint.
+ *     description: Get all move-in requests for admin users. Supports filtering by status, requestId, masterCommunity, community, tower, date ranges, search, and pagination. This endpoint replaces the old /admin/move-in/request endpoint.
  *     tags: [Admin MoveIn Management]
  *     security:
  *       - bearerAuth: []
@@ -86,12 +86,12 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *         description: Filter by move-in request status
  *         example: "approved"
  *       - in: query
- *         name: requestType
+ *         name: requestId
  *         required: false
  *         schema:
  *           type: string
- *         description: Comma-separated list of request types to filter by. This parameter replaces the old unitIds parameter from the previous /admin/move-in/request endpoint.
- *         example: "123,456,789"
+ *         description: Filter by specific move-in request number (e.g., MIN-Garden Avenue 17-120)
+ *         example: "MIN-Garden Avenue 17-120"
  *       - in: query
  *         name: masterCommunityIds
  *         required: false
@@ -157,6 +157,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *         required: false
  *         schema:
  *           type: string
+ *           enum: ["id", "createdAt", "updatedAt", "moveInDate", "status", "masterCommunityId", "communityId", "towerId", "unitNumber", "createdBy", "updatedBy"]
  *           default: "createdAt"
  *         description: Field to sort by
  *         example: "createdAt"
@@ -187,80 +188,135 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                     properties:
  *                       id:
  *                         type: integer
+ *                         description: Move-in request ID
  *                         example: 123
  *                       moveInRequestNo:
  *                         type: string
- *                         example: "MIN-UNIT-123-456"
+ *                         description: Move-in request number
+ *                         example: "MIN-Garden Avenue 17-120"
+ *                       requestType:
+ *                         type: string
+ *                         enum: ["OWNER", "TENANT", "HHO_OWNER", "HHO_COMPANY"]
+ *                         description: Type of move-in request
+ *                         example: "HHO_COMPANY"
  *                       status:
  *                         type: string
  *                         enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
- *                         example: "approved"
- *                       requestType:
- *                         type: string
- *                         example: "OWNER"
+ *                         description: Current status of the move-in request
+ *                         example: "new"
  *                       moveInDate:
  *                         type: string
  *                         format: date
- *                         example: "2025-09-17"
- *                       user:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: integer
- *                             example: 456
- *                           firstName:
- *                             type: string
- *                             example: "John"
- *                           lastName:
- *                             type: string
- *                             example: "Doe"
- *                           email:
- *                             type: string
- *                             example: "john.doe@example.com"
+ *                         description: Planned move-in date
+ *                         example: "2025-09-20"
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                         description: Request creation timestamp
+ *                         example: "2025-09-15T09:57:57.164Z"
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         description: Request last update timestamp
+ *                         example: "2025-09-15T09:58:44.000Z"
+ *                       createdBy:
+ *                         type: string
+ *                         description: User ID who created the request
+ *                         example: "40765"
+ *                       updatedBy:
+ *                         type: string
+ *                         description: User ID who last updated the request
+ *                         example: "40765"
  *                       unit:
  *                         type: object
+ *                         description: Unit information
  *                         properties:
  *                           id:
  *                             type: integer
- *                             example: 789
+ *                             description: Unit ID
+ *                             example: 7
+ *                           unitNumber:
+ *                             type: string
+ *                             description: Unit number
+ *                             example: "Garden Avenue 17"
+ *                           floorNumber:
+ *                             type: string
+ *                             description: Floor number
+ *                             example: "0"
  *                           unitName:
  *                             type: string
- *                             example: "A-101"
- *                           tower:
- *                             type: object
- *                             properties:
- *                               name:
- *                                 type: string
- *                                 example: "Tower A"
- *                               community:
- *                                 type: object
- *                                 properties:
- *                                   name:
- *                                     type: string
- *                                     example: "Community Name"
- *                                   masterCommunity:
- *                                     type: object
- *                                     properties:
- *                                       name:
- *                                         type: string
- *                                         example: "Master Community Name"
+ *                             description: Unit name
+ *                             example: "Garden Avenue 17"
+ *                       masterCommunityId:
+ *                         type: integer
+ *                         description: Master community ID
+ *                         example: 1
+ *                       masterCommunityName:
+ *                         type: string
+ *                         description: Master community name
+ *                         example: "Sobha Hartland"
+ *                       communityId:
+ *                         type: integer
+ *                         description: Community ID
+ *                         example: 2
+ *                       communityName:
+ *                         type: string
+ *                         description: Community name
+ *                         example: "Hartland Greens"
+ *                       towerId:
+ *                         type: integer
+ *                         description: Tower ID
+ *                         example: 3
+ *                       towerName:
+ *                         type: string
+ *                         description: Tower name
+ *                         example: "Tower A"
  *                 pagination:
  *                   type: object
+ *                   description: Pagination information
  *                   properties:
  *                     currentPage:
  *                       type: integer
+ *                       description: Current page number
  *                       example: 1
- *                     totalPages:
+ *                     perPage:
  *                       type: integer
- *                       example: 10
+ *                       description: Number of items per page
+ *                       example: 20
  *                     totalItems:
  *                       type: integer
- *                       example: 200
- *                     itemsPerPage:
+ *                       description: Total number of items
+ *                       example: 50
+ *                     totalPages:
  *                       type: integer
- *                       example: 20
+ *                       description: Total number of pages
+ *                       example: 3
+ *                     hasNextPage:
+ *                       type: boolean
+ *                       description: Whether there is a next page
+ *                       example: true
+ *                     hasPrevPage:
+ *                       type: boolean
+ *                       description: Whether there is a previous page
+ *                       example: false
+ *       400:
+ *         description: Bad Request - Invalid parameters
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Invalid request parameters"
+ *                 code:
+ *                   type: string
+ *                   example: "EC001"
  *       401:
- *         description: Unauthorized - authentication required
+ *         description: Unauthorized - Invalid or missing authentication token
  *         content:
  *           application/json:
  *             schema:
@@ -274,9 +330,9 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                   example: "Unauthorized access"
  *                 code:
  *                   type: string
- *                   example: "EC001"
- *       403:
- *         description: Forbidden - admin access required
+ *                   example: "EC002"
+ *       500:
+ *         description: Internal Server Error
  *         content:
  *           application/json:
  *             schema:
@@ -287,10 +343,275 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: "Only admin users can access this endpoint"
+ *                   example: "Internal server error"
  *                 code:
  *                   type: string
- *                   example: "EC114"
+ *                   example: "EC500"
+ */
+
+/**
+ * @swagger
+ * /admin/move-in/request/{requestId}:
+ *   get:
+ *     summary: Get move-in request details by ID (Admin)
+ *     description: Retrieves detailed information about a specific move-in request including all type-specific details, documents, and unit information
+ *     tags: [Admin MoveIn Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Move-in request ID
+ *         example: 120
+ *     responses:
+ *       200:
+ *         description: Move-in request details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Operation completed successfully"
+ *                 code:
+ *                   type: string
+ *                   example: "SC001"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       description: Move-in request ID
+ *                       example: 120
+ *                     moveInRequestNo:
+ *                       type: string
+ *                       description: Move-in request number
+ *                       example: "MIN-Garden Avenue 17-120"
+ *                     requestType:
+ *                       type: string
+ *                       enum: ["OWNER", "TENANT", "HHO_OWNER", "HHO_COMPANY"]
+ *                       description: Type of move-in request
+ *                       example: "HHO_COMPANY"
+ *                     status:
+ *                       type: string
+ *                       enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
+ *                       description: Current status of the request
+ *                       example: "new"
+ *                     moveInDate:
+ *                       type: string
+ *                       format: date
+ *                       description: Requested move-in date
+ *                       example: "2025-09-20"
+ *                     comments:
+ *                       type: string
+ *                       nullable: true
+ *                       description: Additional comments
+ *                       example: "Owner moving in after renovation"
+ *                     additionalInfo:
+ *                       type: string
+ *                       nullable: true
+ *                       description: Additional information
+ *                       example: "Renovation completed"
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                       description: Creation timestamp
+ *                       example: "2025-09-15T09:57:57.164Z"
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *                       description: Last update timestamp
+ *                       example: "2025-09-15T09:58:44.000Z"
+ *                     createdBy:
+ *                       type: string
+ *                       description: User ID who created the request
+ *                       example: "40765"
+ *                     updatedBy:
+ *                       type: string
+ *                       description: User ID who last updated the request
+ *                       example: "40765"
+ *                     user:
+ *                       type: object
+ *                       description: User information
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                           example: 4
+ *                         firstName:
+ *                           type: string
+ *                           example: "John"
+ *                         lastName:
+ *                           type: string
+ *                           example: "Doe"
+ *                         email:
+ *                           type: string
+ *                           example: "john.doe@example.com"
+ *                         mobile:
+ *                           type: string
+ *                           example: "+971501234567"
+ *                         alternativeEmail:
+ *                           type: string
+ *                           nullable: true
+ *                           example: "john.alternative@example.com"
+ *                         alternativeMobile:
+ *                           type: string
+ *                           nullable: true
+ *                           example: "+971501234568"
+ *                     unit:
+ *                       type: object
+ *                       description: Unit information with community hierarchy
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                           example: 123
+ *                         unitNumber:
+ *                           type: string
+ *                           example: "Garden Avenue 17"
+ *                         floorNumber:
+ *                           type: string
+ *                           example: "0"
+ *                         unitName:
+ *                           type: string
+ *                           example: "T203"
+ *                         masterCommunity:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: integer
+ *                               example: 1
+ *                             name:
+ *                               type: string
+ *                               example: "Sobha Hartland"
+ *                         community:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: integer
+ *                               example: 2
+ *                             name:
+ *                               type: string
+ *                               example: "Hartland Greens"
+ *                         tower:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: integer
+ *                               example: 3
+ *                             name:
+ *                               type: string
+ *                               example: "Tower A"
+ *                     moveInOwnerDetails:
+ *                       type: object
+ *                       description: Owner-specific details (if applicable)
+ *                       example: {}
+ *                     moveInTenantDetails:
+ *                       type: object
+ *                       description: Tenant-specific details (if applicable)
+ *                       example: {}
+ *                     moveInHHOOwnerDetails:
+ *                       type: object
+ *                       description: HHO Owner-specific details (if applicable)
+ *                       example: {}
+ *                     moveInCompanyDetails:
+ *                       type: object
+ *                       description: HHC Company-specific details (if applicable)
+ *                       example: {}
+ *                     documents:
+ *                       type: array
+ *                       description: List of uploaded documents
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                             example: 1
+ *                           documentType:
+ *                             type: string
+ *                             example: "emiratesIdFront"
+ *                           file:
+ *                             type: object
+ *                             properties:
+ *                               id:
+ *                                 type: integer
+ *                                 example: 1
+ *                               fileName:
+ *                                 type: string
+ *                                 example: "emirates_id_front.pdf"
+ *                               fileUrl:
+ *                                 type: string
+ *                                 example: "https://storage.blob.core.windows.net/documents/emirates_id_front.pdf"
+ *       400:
+ *         description: Bad request - validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Validation error"
+ *                 code:
+ *                   type: string
+ *                   example: "EC041"
+ *       401:
+ *         description: Unauthorized - authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Please authenticate"
+ *                 code:
+ *                   type: string
+ *                   example: "EC005"
+ *       404:
+ *         description: Request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Not Found"
+ *                 code:
+ *                   type: string
+ *                   example: "EC404"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Internal Server Error"
+ *                 code:
+ *                   type: string
+ *                   example: "EC002"
  */
 
 /**
@@ -803,6 +1124,167 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                   example: "EC006"
  */
 
+/**
+ * @swagger
+ * /admin/move-in/hho-unit:
+ *   post:
+ *     summary: Create HHO Unit move-in request (Admin)
+ *     description: Create a move-in request for an HHO Unit. All dates must be in ISO 8601 format (YYYY-MM-DD) and moveInDate must be at least 30 days in the future.
+ *     tags: [Admin MoveIn Management]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - unitId
+ *               - moveInDate
+ *             properties:
+ *               unitId:
+ *                 type: integer
+ *                 description: ID of the unit for move-in
+ *                 example: 7
+ *               moveInDate:
+ *                 type: string
+ *                 format: date
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be at least 30 days in the future.
+ *                 example: "2025-09-17"
+ *                 pattern: '^\d{4}-\d{2}-\d{2}$'
+ *               ownerFirstName:
+ *                 type: string
+ *                 maxLength: 100
+ *                 description: Owner's first name (optional, defaults to admin user's name)
+ *                 example: "John"
+ *               ownerLastName:
+ *                 type: string
+ *                 maxLength: 100
+ *                 description: Owner's last name (optional, defaults to admin user's name)
+ *                 example: "Doe"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 maxLength: 255
+ *                 description: Owner's email (optional, defaults to admin user's email)
+ *                 example: "john.doe@example.com"
+ *               dialCode:
+ *                 type: string
+ *                 maxLength: 10
+ *                 description: Phone dial code (optional, defaults to admin user's dial code)
+ *                 example: "+971"
+ *               phoneNumber:
+ *                 type: string
+ *                 maxLength: 20
+ *                 description: Phone number (optional, defaults to admin user's phone)
+ *                 example: "501234567"
+ *               nationality:
+ *                 type: string
+ *                 maxLength: 100
+ *                 description: Owner's nationality (optional, defaults to admin user's nationality)
+ *                 example: "UAE"
+ *               comments:
+ *                 type: string
+ *                 maxLength: 500
+ *                 description: Additional comments
+ *                 example: "Owner moving in after renovation"
+ *     responses:
+ *       201:
+ *         description: HHO Unit move-in request created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "HHO Unit move-in request created successfully"
+ *                 code:
+ *                   type: string
+ *                   example: "SC001"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       description: Created move-in request ID
+ *                       example: 123
+ *                     moveInRequestNo:
+ *                       type: string
+ *                       description: Generated move-in request number
+ *                       example: "MIN-UNIT-123-456"
+ *                     requestType:
+ *                       type: string
+ *                       enum: ["HHO_OWNER"]
+ *                       example: "HHO_OWNER"
+ *                     status:
+ *                       type: string
+ *                       enum: ["new"]
+ *                       example: "new"
+ *                     moveInDate:
+ *                       type: string
+ *                       format: date
+ *                       example: "2025-09-17"
+ *                     unitId:
+ *                       type: integer
+ *                       example: 7
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2024-01-15T10:30:00.000Z"
+ *       400:
+ *         description: Bad request - validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Validation error"
+ *                 code:
+ *                   type: string
+ *                   example: "EC041"
+ *       401:
+ *         description: Unauthorized - authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Please authenticate"
+ *                 code:
+ *                   type: string
+ *                   example: "EC005"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Unknown error occurred"
+ *                 code:
+ *                   type: string
+ *                   example: "EC006"
+ */
 
 /**
  * @swagger
