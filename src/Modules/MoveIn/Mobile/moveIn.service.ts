@@ -1108,7 +1108,7 @@ export class MoveInService {
     }
   }
 
-  async getMobileMoveIn(query: any) {
+  async getMobileMoveIn(query: any, user: any) {
 
     try {
       let {
@@ -1120,9 +1120,9 @@ export class MoveInService {
       } = query;
 
       // Debug logging
-      logger.debug(`getMobileMoveIn query params: ${JSON.stringify(query)}`);
+      logger.debug(`getMobileMoveIn query params: ${JSON.stringify(query)}, userId: ${user?.id}`);
       unitIds = unitIds.split(",").filter((e: any) => e);
-      let whereClause = "am.isActive = true";
+      let whereClause = "am.isActive = true AND am.user = :userId";
 
       if (status) whereClause += ` AND am.status = :status`;
       // Use unitIds for filtering by unit IDs
@@ -1145,6 +1145,7 @@ export class MoveInService {
         .addSelect("am.createdBy")
         .addSelect("am.updatedBy")
         .where(whereClause, {
+          userId: user?.id,
           status,
           units: unitIds.map((x: any) => Number(x)).filter((n: any) => !isNaN(n)),
           requestId: requestId ? Number(requestId) : undefined,
