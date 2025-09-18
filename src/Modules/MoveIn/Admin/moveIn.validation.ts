@@ -7,17 +7,17 @@ import { TRANSITION_DOCUMENT_TYPES } from "../../../Entities/EntityTypes/transit
 const moveInAtLeastDaysLater = (days: number) => (value: any, helpers: any) => {
   const inputDate = new Date(value);
   const now = new Date();
-  const maxDate = new Date();
-  maxDate.setDate(now.getDate() + days);
+  const minDate = new Date();
+  minDate.setDate(now.getDate() + days);
 
   // Check if date is in the future (not today or past)
   if (inputDate <= now) {
     return helpers.message(APICodes.MOVE_IN_DATE_FUTURE.message);
   }
 
-  // Check if date is within specified days from today (not beyond)
-  if (inputDate > maxDate) {
-    const message = APICodes.MOVE_IN_DATE_WITHIN_DAYS.message.replace('{days}', days.toString());
+  // Check if date is at least the specified days from today
+  if (inputDate < minDate) {
+    const message = `Move-in date must be at least ${days} days in the future`;
     return helpers.message(message);
   }
 
