@@ -2074,6 +2074,12 @@ export class MoveInService {
       // Log the update
       await this.logMoveInRequestAction(requestId, 'UPDATE', 'Request updated by admin', user);
 
+      // Send email notifications about the update
+      const updatedRequest = await MoveInRequests.findOne({ where: { id: requestId } });
+      if (updatedRequest) {
+        await this.sendNotifications(requestId, updatedRequest.moveInRequestNo);
+      }
+
       return { id: requestId, message: 'Owner move-in request updated successfully' };
     } catch (error: any) {
       logger.error(`Error in updateOwnerMoveIn: ${JSON.stringify(error)}`);
@@ -2134,6 +2140,12 @@ export class MoveInService {
       // Log the update
       await this.logMoveInRequestAction(requestId, 'UPDATE', 'Request updated by admin', user);
 
+      // Send email notifications about the update
+      const updatedRequest = await MoveInRequests.findOne({ where: { id: requestId } });
+      if (updatedRequest) {
+        await this.sendNotifications(requestId, updatedRequest.moveInRequestNo);
+      }
+
       return { id: requestId, message: 'Tenant move-in request updated successfully' };
     } catch (error: any) {
       logger.error(`Error in updateTenantMoveIn: ${JSON.stringify(error)}`);
@@ -2187,6 +2199,12 @@ export class MoveInService {
 
       // Log the update
       await this.logMoveInRequestAction(requestId, 'UPDATE', 'Request updated by admin', user);
+
+      // Send email notifications about the update
+      const updatedRequest = await MoveInRequests.findOne({ where: { id: requestId } });
+      if (updatedRequest) {
+        await this.sendNotifications(requestId, updatedRequest.moveInRequestNo);
+      }
 
       return { id: requestId, message: 'HHO unit move-in request updated successfully' };
     } catch (error: any) {
@@ -2249,6 +2267,12 @@ export class MoveInService {
 
       // Log the update
       await this.logMoveInRequestAction(requestId, 'UPDATE', 'Request updated by admin', user);
+
+      // Send email notifications about the update
+      const updatedRequest = await MoveInRequests.findOne({ where: { id: requestId } });
+      if (updatedRequest) {
+        await this.sendNotifications(requestId, updatedRequest.moveInRequestNo);
+      }
 
       return { id: requestId, message: 'HHC company move-in request updated successfully' };
     } catch (error: any) {
