@@ -23,6 +23,28 @@ const moveInAtLeastDaysLater = (days: number) => (value: any, helpers: any) => {
   return value;
 };
 
+// Custom validation function for edit operations - allows dates within 30 days from current date
+const moveInWithinDays = (days: number) => (value: any, helpers: any) => {
+  const inputDate = new Date(value);
+  const now = new Date();
+  const maxDate = new Date();
+  maxDate.setDate(now.getDate() + days);
+
+  // For edit operations, allow dates within the specified days from today
+  // This means: currentDate < moveInDate <= currentDate + days
+  if (inputDate <= now) {
+    return helpers.message(APICodes.MOVE_IN_DATE_FUTURE.message);
+  }
+
+  // Check if date is within specified days from today (not beyond)
+  if (inputDate > maxDate) {
+    const message = APICodes.MOVE_IN_DATE_WITHIN_DAYS.message.replace('{days}', days.toString());
+    return helpers.message(message);
+  }
+
+  return value;
+};
+
 const validateDateAfter = (fieldName: string, apicode: any) => (value: any, helpers: any) => {
   const { [fieldName]: startDate } = helpers.state.ancestors[0];
   if (startDate && new Date(value) <= new Date(startDate)) {
@@ -209,7 +231,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
         comments: Joi.string().allow('').optional(),
         additionalInfo: Joi.string().allow('').optional(),
@@ -236,7 +258,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
         firstName: Joi.string().max(100).required(),
         lastName: Joi.string().max(100).required(),
@@ -273,7 +295,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
         userEmail: Joi.string().email().max(255).required(),
         firstName: Joi.string().max(100).required(),
@@ -320,7 +342,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
         // Owner identity (optional - can come from UI; if omitted, will be derived from authenticated user)
         ownerFirstName: Joi.string().max(100).optional(),

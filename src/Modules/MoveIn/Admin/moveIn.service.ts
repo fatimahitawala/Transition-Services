@@ -2050,8 +2050,6 @@ export class MoveInService {
           unit: data.unitId ? { id: data.unitId } : undefined,
           moveInDate: data.moveInDate,
           status: data.status,
-          comments: data.comments || null,
-          additionalInfo: data.additionalInfo || null,
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
@@ -2067,10 +2065,10 @@ export class MoveInService {
           householdStaffs: data.details?.householdStaffs,
           pets: data.details?.pets,
           // peopleOfDetermination: data.details?.peopleOfDetermination || false, // Not available in Owner entity
-          comments: data.details?.detailsText ?? data.comments ?? null,
+          comments: data.details?.detailsText || null,
           updatedBy: user?.id,
         })
-        .where('moveInRequestId = :requestId', { requestId })
+        .where('move_in_request_id = :requestId', { requestId })
         .execute();
 
       // Log the update
@@ -2130,7 +2128,7 @@ export class MoveInService {
           comments: data.details?.detailsText ?? data.comments ?? null,
           updatedBy: user?.id,
         })
-        .where('moveInRequestId = :requestId', { requestId })
+        .where('move_in_request_id = :requestId', { requestId })
         .execute();
 
       // Log the update
@@ -2184,7 +2182,7 @@ export class MoveInService {
           comments: data.comments ?? null,
           updatedBy: user?.id,
         })
-        .where('moveInRequestId = :requestId', { requestId })
+        .where('move_in_request_id = :requestId', { requestId })
         .execute();
 
       // Log the update
@@ -2246,7 +2244,7 @@ export class MoveInService {
           comments: data.comments ?? null,
           updatedBy: user?.id,
         })
-        .where('moveInRequestId = :requestId', { requestId })
+        .where('move_in_request_id = :requestId', { requestId })
         .execute();
 
       // Log the update

@@ -7,17 +7,39 @@ import { TRANSITION_DOCUMENT_TYPES } from "../../../Entities/EntityTypes/transit
 const moveInAtLeastDaysLater = (days: number) => (value: any, helpers: any) => {
   const inputDate = new Date(value);
   const now = new Date();
-  const minDate = new Date();
-  minDate.setDate(now.getDate() + days);
+  const maxDate = new Date();
+  maxDate.setDate(now.getDate() + days);
 
   // Check if date is in the future (not today or past)
   if (inputDate <= now) {
     return helpers.message(APICodes.MOVE_IN_DATE_FUTURE.message);
   }
 
-  // Check if date is at least the specified days from today
-  if (inputDate < minDate) {
-    const message = `Move-in date must be at least ${days} days in the future`;
+  // Check if date is within specified days from today (not beyond)
+  if (inputDate > maxDate) {
+    const message = APICodes.MOVE_IN_DATE_WITHIN_DAYS.message.replace('{days}', days.toString());
+    return helpers.message(message);
+  }
+
+  return value;
+};
+
+// Custom validation function for edit operations - allows dates within 30 days from current date
+const moveInWithinDays = (days: number) => (value: any, helpers: any) => {
+  const inputDate = new Date(value);
+  const now = new Date();
+  const maxDate = new Date();
+  maxDate.setDate(now.getDate() + days);
+
+  // For edit operations, allow dates within the specified days from today
+  // This means: currentDate < moveInDate <= currentDate + days
+  if (inputDate <= now) {
+    return helpers.message(APICodes.MOVE_IN_DATE_FUTURE.message);
+  }
+
+  // Check if date is within specified days from today (not beyond)
+  if (inputDate > maxDate) {
+    const message = APICodes.MOVE_IN_DATE_WITHIN_DAYS.message.replace('{days}', days.toString());
     return helpers.message(message);
   }
 
@@ -295,18 +317,20 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
-        comments: Joi.string().allow('').optional(),
-        additionalInfo: Joi.string().allow('').optional(),
         details: Joi.object()
           .keys({
             adults: Joi.number().integer().min(1).max(6).required(),
             children: Joi.number().integer().min(0).max(6).required(),
             householdStaffs: Joi.number().integer().min(0).max(4).required(),
             pets: Joi.number().integer().min(0).max(6).required(),
-            peopleOfDetermination: Joi.boolean().default(false).optional(),
-            detailsText: Joi.string().allow('').optional(),
+            peopleOfDetermination: Joi.boolean().default(false).required(),
+            detailsText: Joi.string().allow('').when('peopleOfDetermination', {
+              is: true,
+              then: Joi.required(),
+              otherwise: Joi.optional()
+            }),
           })
           .required(),
       })
@@ -321,7 +345,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
         firstName: Joi.string().max(100).required(),
         lastName: Joi.string().max(100).required(),
@@ -362,9 +386,9 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
-        // Owner identity (optional - can come from UI; if omitted, will be derived from authenticated user)
+        // Optional owner identity fields - if omitted, derived from authenticated admin
         ownerFirstName: Joi.string().max(100).optional(),
         ownerLastName: Joi.string().max(100).optional(),
         email: Joi.string().email().max(255).optional(),
@@ -377,10 +401,7 @@ export class MoveInvalidation {
           .keys({
             unitPermitNumber: Joi.string().required(),
             unitPermitStartDate: Joi.date().iso().required(),
-            unitPermitExpiryDate: Joi.date()
-              .iso()
-              .custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE))
-              .required(),
+            unitPermitExpiryDate: Joi.date().iso().custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE)).required(),
             termsAccepted: Joi.boolean().valid(true).required(),
           })
           .required(),
@@ -396,7 +417,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
         userEmail: Joi.string().email().max(255).required(),
         firstName: Joi.string().max(100).required(),
@@ -419,15 +440,13 @@ export class MoveInvalidation {
         unitPermitNumber: Joi.string().required(),
         leaseStartDate: Joi.date().iso().required(),
         leaseEndDate: Joi.date().iso().custom(validateDateAfter('leaseStartDate', APICodes.LEASE_DATE_RANGE)).required(),
-        dtcmStartDate: Joi.date().iso().optional(),
-        dtcmExpiryDate: Joi.date().iso().optional(),
+        dtcmStartDate: Joi.date().iso().required(),
+        dtcmExpiryDate: Joi.date().iso().custom(validateDateAfter('dtcmStartDate', APICodes.LEASE_DATE_RANGE)).required(),
         comments: Joi.string().allow('').optional(),
         additionalInfo: Joi.string().allow('').optional(),
-        details: Joi.object()
-          .keys({
-            termsAccepted: Joi.boolean().valid(true).required(),
-          })
-          .required(),
+        // Do not require or persist termsAccepted for HHC company
+        // Accept and ignore any incoming details payload
+        details: Joi.any().optional(),
       })
       .required(),
   };

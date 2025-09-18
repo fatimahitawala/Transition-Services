@@ -641,7 +641,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be at least 30 days in the future.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
  *               details:
@@ -853,7 +853,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be at least 30 days in the future.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-12-20"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
  *               firstName:
@@ -1150,7 +1150,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be at least 30 days in the future.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
  *               ownerFirstName:
@@ -1480,21 +1480,13 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be at least 30 days in the future.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-09-20"
  *               status:
  *                 type: string
  *                 enum: ['new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed']
  *                 description: Status of the move-in request
  *                 example: "new"
- *               comments:
- *                 type: string
- *                 description: Additional comments
- *                 example: "Need early access for furniture delivery"
- *               additionalInfo:
- *                 type: string
- *                 description: Additional information
- *                 example: "Ground floor unit preferred"
  *               details:
  *                 type: object
  *                 required:
@@ -1502,6 +1494,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                   - children
  *                   - householdStaffs
  *                   - pets
+ *                   - peopleOfDetermination
  *                 properties:
  *                   adults:
  *                     type: integer
@@ -1533,7 +1526,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                     example: false
  *                   detailsText:
  *                     type: string
- *                     description: Additional details text
+ *                     description: Additional details text (required if peopleOfDetermination is true)
  *                     example: "Family with young children"
  *     responses:
  *       200:
@@ -1602,7 +1595,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be at least 30 days in the future.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-09-20"
  *               status:
  *                 type: string
@@ -1771,7 +1764,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be at least 30 days in the future.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-09-20"
  *               status:
  *                 type: string
@@ -1920,7 +1913,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be at least 30 days in the future.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-09-20"
  *               status:
  *                 type: string
