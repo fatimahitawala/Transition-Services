@@ -162,6 +162,11 @@ export class DocumentsValidation {
 
     updateTemplate = {
         params: Joi.object({
+            templateType: Joi.string().valid('move-in', 'move-out').required().messages({
+                'any.required': APICodes.TEMPLATE_TYPE_REQUIRED.message,
+                'string.empty': APICodes.TEMPLATE_TYPE_CANNOT_BE_EMPTY.message,
+                'any.only': APICodes.TEMPLATE_TYPE_INVALID.message
+            }),
             id: Joi.number().integer().required(),
         }),
         body: Joi.object({
