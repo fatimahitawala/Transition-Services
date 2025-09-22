@@ -82,6 +82,8 @@ export class MoveInvalidation {
       status: Joi.string().optional(),
       search: Joi.string().optional(),
       requestId: Joi.string().optional(),
+      unitNumber: Joi.string().optional(),
+      requestType: Joi.string().valid('OWNER', 'TENANT', 'HHO_OWNER', 'HHO_COMPANY').optional(),
       sortBy: Joi.string().valid('id', 'createdAt', 'updatedAt', 'moveInDate', 'status', 'masterCommunityId', 'communityId', 'towerId', 'unitNumber', 'createdBy', 'updatedBy').optional(),
       sortOrder: Joi.string().valid('ASC', 'DESC').optional(),
     }),
