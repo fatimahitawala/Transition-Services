@@ -784,6 +784,8 @@ export class MoveInService {
         status = "",
         search = "",
         requestId = "",
+        unitNumber = "",
+        requestType = "",
         sortBy = "createdAt",
         sortOrder = "DESC"
       } = query;
@@ -849,6 +851,8 @@ export class MoveInService {
       
       if (status) getMoveInList.andWhere(`am.status = :status`, { status });
       if (requestId) getMoveInList.andWhere(`am.moveInRequestNo = :requestId`, { requestId });
+      if (unitNumber) getMoveInList.andWhere(`u.unitNumber LIKE :unitNumber`, { unitNumber: `%${unitNumber}%` });
+      if (requestType) getMoveInList.andWhere(`am.requestType = :requestType`, { requestType });
       
       // Search functionality
       if (search) {
@@ -1269,6 +1273,18 @@ export class MoveInService {
         moveInDate: moveInRequest.moveInDate,
         comments: moveInRequest.comments || ''
       };
+
+      logger.info(`=== UNIT DETAILS FOR EMAIL ===`);
+      logger.info(`Unit ID: ${moveInRequest.unit?.id}`);
+      logger.info(`Unit Number: ${moveInRequest.unit?.unitNumber}`);
+      logger.info(`Unit Name: ${moveInRequest.unit?.unitName}`);
+      logger.info(`Master Community ID: ${moveInRequest.unit?.masterCommunity?.id}`);
+      logger.info(`Master Community Name: ${moveInRequest.unit?.masterCommunity?.name}`);
+      logger.info(`Community ID: ${moveInRequest.unit?.community?.id}`);
+      logger.info(`Community Name: ${moveInRequest.unit?.community?.name}`);
+      logger.info(`Tower ID: ${moveInRequest.unit?.tower?.id}`);
+      logger.info(`Tower Name: ${moveInRequest.unit?.tower?.name}`);
+      logger.info(`=== UNIT DETAILS END ===`);
 
       logger.info(`EMAIL PAYLOAD: ${JSON.stringify(emailData)}`);
 
