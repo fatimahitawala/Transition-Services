@@ -863,7 +863,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                       example: 123
  *                     moveInRequestNo:
  *                       type: string
- *                       example: "MIN-UNIT-123-456"
+ *                       example: "MIP-UNIT-123-456"
  *                     status:
  *                       type: string
  *                       example: "APPROVED"
@@ -1171,7 +1171,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                       example: 123
  *                     moveInRequestNo:
  *                       type: string
- *                       example: "MIN-UNIT-123-456"
+ *                       example: "MIP-UNIT-123-456"
  *                     status:
  *                       type: string
  *                       example: "APPROVED"
@@ -1346,7 +1346,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                     moveInRequestNo:
  *                       type: string
  *                       description: Generated move-in request number
- *                       example: "MIN-UNIT-123-456"
+ *                       example: "MIP-UNIT-123-456"
  *                     requestType:
  *                       type: string
  *                       enum: ["HHO_OWNER"]
