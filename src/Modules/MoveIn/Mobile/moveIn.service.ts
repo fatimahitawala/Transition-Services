@@ -1028,8 +1028,8 @@ export class MoveInService {
 
         const savedMaster = await master.save();
 
-        // Update request number to final format MIN-<unitNumber>-<id>
-        const finalRequestNumber = `MIN-${unit?.unitNumber}-${savedMaster.id}`;
+        // Update request number to final format MIP-<unitNumber>-<id>
+        const finalRequestNumber = `MIP-${unit?.unitNumber}-${savedMaster.id}`;
         await MoveInRequests.update({ id: savedMaster.id }, { moveInRequestNo: finalRequestNumber });
         savedMaster.moveInRequestNo = finalRequestNumber as any;
         createdMaster = savedMaster;
@@ -1449,7 +1449,7 @@ export class MoveInService {
 
   private generateRequestNumber(unitNumber?: string | number): string {
     const suffix = `${Date.now()}`;
-    return `MIN-${unitNumber ?? 'UNIT'}-${suffix}`;
+    return `MIP-${unitNumber ?? 'UNIT'}-${suffix}`;
   }
 
   private async createDetailsRecord(qr: any, requestType: MOVE_IN_USER_TYPES, master: MoveInRequests, details: any, userId: number) {
