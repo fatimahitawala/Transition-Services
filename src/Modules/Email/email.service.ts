@@ -906,7 +906,7 @@ export class EmailService {
             logger.info(`MIP template PDF generated successfully (${pdfBuffer.length} bytes)`);
             
             return {
-                filename: `MIP-${data.requestNumber}-${data.status}.pdf`,
+                filename: `${data.requestNumber}-${data.status}.pdf`,
                 content: pdfBuffer,
                 contentType: 'application/pdf'
             };
