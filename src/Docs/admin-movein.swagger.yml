@@ -926,11 +926,11 @@ paths:
             schema:
               type: object
               properties:
-                emirates-id-front:
+                emiratesIdFront:
                   type: string
                   format: binary
                   description: Emirates ID front side
-                emirates-id-back:
+                emiratesIdBack:
                   type: string
                   format: binary
                   description: Emirates ID back side
@@ -938,15 +938,15 @@ paths:
                   type: string
                   format: binary
                   description: Ejari contract document
-                unit-permit:
+                unitPermit:
                   type: string
                   format: binary
                   description: Unit permit document
-                company-trade-license:
+                companyTradeLicense:
                   type: string
                   format: binary
                   description: Company trade license
-                title-deed:
+                titleDeed:
                   type: string
                   format: binary
                   description: Title deed document
@@ -981,7 +981,7 @@ paths:
                           properties:
                             documentType:
                               type: string
-                              example: "emirates-id-front"
+                              example: "emiratesIdFront"
                             fileName:
                               type: string
                               example: "emirates_id_front.pdf"
@@ -1518,7 +1518,7 @@ components:
               documentType:
                 type: string
                 description: Type of document
-                example: "emirates-id-front"
+                example: "emiratesIdFront"
               fileName:
                 type: string
                 description: Name of the uploaded file

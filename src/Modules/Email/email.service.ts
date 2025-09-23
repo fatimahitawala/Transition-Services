@@ -81,15 +81,8 @@ export class EmailService {
             logger.info(`Subject: ${subject}`);
             logger.info(`From: ${config.email.from}`);
             logger.info(`Attachments: ${attachments.length} files`);
-            logger.info(`HTML content length: ${text.length} characters`);
-            logger.info(`HTML content preview: ${text.substring(0, 200)}...`);
             
-            const msg: any = { 
-                from: config.email.from, 
-                to, 
-                subject, 
-                html: text  // Plain UTF-8 string, NOT Base64
-            };
+            const msg: any = { from: config.email.from, to, subject, html: text };
             
             // Add CC if provided
             if (cc && cc.length > 0) {
@@ -115,17 +108,7 @@ export class EmailService {
             return result;
         } catch (error) {
             logger.error("******************Email Service Error******************");
-            logger.error(`Error sending email to: ${Array.isArray(to) ? to.join(', ') : to}`);
-            logger.error(`Subject: ${subject}`);
-            logger.error(`Error details: ${JSON.stringify(error)}`);
-            logger.error(`Error message: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
-            logger.error(`SMTP Config: ${JSON.stringify({
-                host: config.email.smtp.host,
-                port: config.email.smtp.port,
-                secure: config.email.smtp.secure,
-                hasAuth: !!(config.email.smtp.auth.user && config.email.smtp.auth.pass)
-            })}`);
+            logger.error(error);
             logger.error("******************Email Service Error******************");
             throw new ApiError(httpStatus.BAD_REQUEST, APICodes.EMAIL_ERROR?.message || 'Email error', APICodes.EMAIL_ERROR?.code || 'EMAIL_ERROR');
         }

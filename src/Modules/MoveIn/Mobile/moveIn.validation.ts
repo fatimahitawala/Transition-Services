@@ -53,14 +53,6 @@ const validateDateAfter = (fieldName: string, apicode: any) => (value: any, help
   return value;
 };
 
-const validateTenancyContractStartBeforeMoveIn = (value: any, helpers: any) => {
-  const { moveInDate } = helpers.state.ancestors[0];
-  if (moveInDate && new Date(value) >= new Date(moveInDate)) {
-    return helpers.message(APICodes.TENANCY_CONTRACT_START_BEFORE_MOVE_IN.message);
-  }
-  return value;
-};
-
 const validateEmiratesIdExpiry = (value: any, helpers: any) => {
   if (new Date(value) <= new Date()) {
     return helpers.message(APICodes.EMIRATES_ID_EXPIRY_FUTURE.message);
@@ -130,7 +122,7 @@ export class MoveInvalidation {
         nationality: Joi.string().max(100).required(),
         emiratesIdNumber: Joi.string().required(),
         emiratesIdExpiryDate: Joi.date().iso().custom(validateEmiratesIdExpiry).required(),
-        tenancyContractStartDate: Joi.date().iso().custom(validateTenancyContractStartBeforeMoveIn).required(),
+        tenancyContractStartDate: Joi.date().iso().required(),
         tenancyContractEndDate: Joi.date().iso().custom(validateDateAfter('tenancyContractStartDate', APICodes.TENANCY_CONTRACT_DATE_RANGE)).required(),
         comments: Joi.string().allow('').optional(),
         additionalInfo: Joi.string().allow('').optional(),
@@ -276,7 +268,7 @@ export class MoveInvalidation {
         nationality: Joi.string().max(100).required(),
         emiratesIdNumber: Joi.string().required(),
         emiratesIdExpiryDate: Joi.date().iso().custom(validateEmiratesIdExpiry).required(),
-        tenancyContractStartDate: Joi.date().iso().custom(validateTenancyContractStartBeforeMoveIn).required(),
+        tenancyContractStartDate: Joi.date().iso().required(),
         tenancyContractEndDate: Joi.date().iso().custom(validateDateAfter('tenancyContractStartDate', APICodes.TENANCY_CONTRACT_DATE_RANGE)).required(),
         comments: Joi.string().allow('').optional(),
         additionalInfo: Joi.string().allow('').optional(),
