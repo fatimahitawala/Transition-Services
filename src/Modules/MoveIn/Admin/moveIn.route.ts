@@ -39,6 +39,121 @@ router.post('/request/:requestId/documents',
 	catchAsync(moveInController.uploadDocuments)
 );
 
+/**
+ * @swagger
+ * /admin/move-in/request/{requestId}/documents:
+ *   post:
+ *     summary: Upload documents for move-in request (Admin)
+ *     description: Upload documents for a specific move-in request. Supports multiple document types including Emirates ID, Ejari, Unit Permit, Company Trade License, Title Deed, and other documents.
+ *     tags: [Admin MoveIn Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Move-in request ID
+ *         example: 172
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               emirates-id-front:
+ *                 type: string
+ *                 format: binary
+ *                 description: Emirates ID front side image/document
+ *               emirates-id-back:
+ *                 type: string
+ *                 format: binary
+ *                 description: Emirates ID back side image/document
+ *               ejari:
+ *                 type: string
+ *                 format: binary
+ *                 description: Ejari document
+ *               unit-permit:
+ *                 type: string
+ *                 format: binary
+ *                 description: Unit permit document (for HHO Owner and HHC Company requests)
+ *               company-trade-license:
+ *                 type: string
+ *                 format: binary
+ *                 description: Company trade license document (for HHC Company requests)
+ *               title-deed:
+ *                 type: string
+ *                 format: binary
+ *                 description: Title deed document (for Owner requests)
+ *               other:
+ *                 type: string
+ *                 format: binary
+ *                 description: Other supporting documents (max 4 files)
+ *     responses:
+ *       200:
+ *         description: Documents uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: "SC001"
+ *                 message:
+ *                   type: string
+ *                   example: "Documents uploaded successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     uploadedDocuments:
+ *                       type: array
+ *                       description: List of successfully uploaded documents
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           type:
+ *                             type: string
+ *                             description: Document type identifier
+ *                             example: "emiratesIdFront"
+ *                           documentType:
+ *                             type: string
+ *                             description: Document type from enum
+ *                             example: "emirates-id-front"
+ *                     requestId:
+ *                       type: integer
+ *                       description: Move-in request ID
+ *                       example: 172
+ *       400:
+ *         description: Bad request - validation error or file upload error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 code:
+ *                   type: string
+ *                   example: "EC001"
+ *                 message:
+ *                   type: string
+ *                   example: "Unexpected field"
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Move-in request not found
+ *       500:
+ *         description: Internal server error
+ */
+
 // Status management routes
 router.put('/request/:requestId/approve', auth.auth(), validate(moveInValidation.approveRequest), catchAsync(moveInController.approveMoveInRequest));
 router.put('/request/:requestId/rfi', auth.auth(), validate(moveInValidation.markRequestAsRFI), catchAsync(moveInController.markRequestAsRFI));
@@ -90,8 +205,8 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *         required: false
  *         schema:
  *           type: string
- *         description: Filter by specific move-in request number (e.g., MIN-Garden Avenue 17-120)
- *         example: "MIN-Garden Avenue 17-120"
+ *         description: Filter by specific move-in request number (e.g., MIP-Garden Avenue 17-120)
+ *         example: "MIP-Garden Avenue 17-120"
  *       - in: query
  *         name: masterCommunityIds
  *         required: false
@@ -208,7 +323,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                       moveInRequestNo:
  *                         type: string
  *                         description: Move-in request number
- *                         example: "MIN-Garden Avenue 17-120"
+ *                         example: "MIP-Garden Avenue 17-120"
  *                       requestType:
  *                         type: string
  *                         enum: ["OWNER", "TENANT", "HHO_OWNER", "HHO_COMPANY"]
@@ -409,7 +524,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                     moveInRequestNo:
  *                       type: string
  *                       description: Move-in request number
- *                       example: "MIN-Garden Avenue 17-120"
+ *                       example: "MIP-Garden Avenue 17-120"
  *                     requestType:
  *                       type: string
  *                       enum: ["OWNER", "TENANT", "HHO_OWNER", "HHO_COMPANY"]
@@ -748,7 +863,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                       example: 123
  *                     moveInRequestNo:
  *                       type: string
- *                       example: "MIN-UNIT-123-456"
+ *                       example: "MIP-UNIT-123-456"
  *                     status:
  *                       type: string
  *                       example: "APPROVED"
@@ -1056,7 +1171,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                       example: 123
  *                     moveInRequestNo:
  *                       type: string
- *                       example: "MIN-UNIT-123-456"
+ *                       example: "MIP-UNIT-123-456"
  *                     status:
  *                       type: string
  *                       example: "APPROVED"
@@ -1231,7 +1346,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                     moveInRequestNo:
  *                       type: string
  *                       description: Generated move-in request number
- *                       example: "MIN-UNIT-123-456"
+ *                       example: "MIP-UNIT-123-456"
  *                     requestType:
  *                       type: string
  *                       enum: ["HHO_OWNER"]
