@@ -56,7 +56,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  * /admin/move-in/request-list:
  *   get:
  *     summary: Get all move-in requests (Admin)
- *     description: Get all move-in requests for admin users. Supports filtering by status, requestId, masterCommunity, community, tower, date ranges, search, and pagination. This endpoint replaces the old /admin/move-in/request endpoint.
+ *     description: Get all move-in requests for admin users. Supports filtering by status, requestId, masterCommunity, community, tower, date ranges, search, unitNumber, requestType, and pagination. This endpoint replaces the old /admin/move-in/request endpoint.
  *     tags: [Admin MoveIn Management]
  *     security:
  *       - bearerAuth: []
@@ -152,6 +152,21 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *           type: string
  *         description: Search term for filtering requests
  *         example: "John Doe"
+ *       - in: query
+ *         name: unitNumber
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter by unit number (partial match)
+ *         example: "Garden Avenue 17"
+ *       - in: query
+ *         name: requestType
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: ["OWNER", "TENANT", "HHO_OWNER", "HHO_COMPANY"]
+ *         description: Filter by move-in request type
+ *         example: "OWNER"
  *       - in: query
  *         name: sortBy
  *         required: false
