@@ -81,15 +81,8 @@ export class EmailService {
             logger.info(`Subject: ${subject}`);
             logger.info(`From: ${config.email.from}`);
             logger.info(`Attachments: ${attachments.length} files`);
-            logger.info(`HTML content length: ${text.length} characters`);
-            logger.info(`HTML content preview: ${text.substring(0, 200)}...`);
             
-            const msg: any = { 
-                from: config.email.from, 
-                to, 
-                subject, 
-                html: text  // Plain UTF-8 string, NOT Base64
-            };
+            const msg: any = { from: config.email.from, to, subject, html: text };
             
             // Add CC if provided
             if (cc && cc.length > 0) {
@@ -115,17 +108,7 @@ export class EmailService {
             return result;
         } catch (error) {
             logger.error("******************Email Service Error******************");
-            logger.error(`Error sending email to: ${Array.isArray(to) ? to.join(', ') : to}`);
-            logger.error(`Subject: ${subject}`);
-            logger.error(`Error details: ${JSON.stringify(error)}`);
-            logger.error(`Error message: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
-            logger.error(`SMTP Config: ${JSON.stringify({
-                host: config.email.smtp.host,
-                port: config.email.smtp.port,
-                secure: config.email.smtp.secure,
-                hasAuth: !!(config.email.smtp.auth.user && config.email.smtp.auth.pass)
-            })}`);
+            logger.error(error);
             logger.error("******************Email Service Error******************");
             throw new ApiError(httpStatus.BAD_REQUEST, APICodes.EMAIL_ERROR?.message || 'Email error', APICodes.EMAIL_ERROR?.code || 'EMAIL_ERROR');
         }
@@ -648,24 +631,6 @@ export class EmailService {
             logger.info(`=== MOVE-IN APPROVAL EMAIL START ===`);
             logger.info(`Sending move-in approval email with welcome pack for request ${data.requestNumber} to ${data.userDetails.email}`);
             logger.info(`Community hierarchy: MC:${data.unitDetails.masterCommunityId}, C:${data.unitDetails.communityId}, T:${data.unitDetails.towerId}`);
-            
-            // Log SMTP configuration for debugging
-            logger.info(`SMTP Configuration: ${JSON.stringify({
-                host: config.email.smtp.host,
-                port: config.email.smtp.port,
-                secure: config.email.smtp.secure,
-                hasAuth: !!(config.email.smtp.auth.user && config.email.smtp.auth.pass),
-                from: config.email.from
-            })}`);
-
-            // Test SMTP connection first
-            try {
-                await transport.verify();
-                logger.info('SMTP connection verified successfully');
-            } catch (smtpError) {
-                logger.error('SMTP connection verification failed:', smtpError);
-                throw new Error(`SMTP connection failed: ${smtpError instanceof Error ? smtpError.message : 'Unknown SMTP error'}`);
-            }
 
             // Get custom MIP template from database (user-specific for approval)
             logger.info(`Fetching custom MIP approval template from database...`);
@@ -679,26 +644,18 @@ export class EmailService {
             // Fallback to default template if custom template not found
             if (!emailTemplate) {
                 emailTemplate = this.getDefaultEmailTemplate('approved', data);
-                logger.info(`Using default approval email template (length: ${emailTemplate.length})`);
+                logger.info(`Using default approval email template`);
             } else {
-                logger.info(`Using custom email template from database (length: ${emailTemplate.length})`);
+                logger.info(`Using custom email template from database`);
             }
 
             // Replace placeholders with actual data
             const processedTemplate = this.replaceTemplatePlaceholders(emailTemplate, data);
-            logger.info(`Email template processed successfully`);
 
             // Generate MIP template as PDF attachment
             logger.info(`Generating MIP template as PDF attachment...`);
             const mipTemplateHtml = this.getMIPTemplateHTML(data);
-            logger.info(`MIP template HTML generated (length: ${mipTemplateHtml.length})`);
-            
             const mipPdfAttachment = await this.generateMIPTemplatePDF(mipTemplateHtml, data);
-            if (mipPdfAttachment) {
-                logger.info(`MIP PDF generated successfully (${mipPdfAttachment.filename}, ${mipPdfAttachment.content?.length || 0} bytes)`);
-            } else {
-                logger.error(`MIP PDF generation failed - returned null`);
-            }
 
             // Get welcome pack attachment
             logger.info(`Fetching welcome pack for MC:${data.unitDetails.masterCommunityId}, C:${data.unitDetails.communityId}, T:${data.unitDetails.towerId}`);
@@ -727,14 +684,9 @@ export class EmailService {
 
             // Create detailed email body with header image and move-in permit content
             const emailBody = this.createDetailedApprovalEmailBody(data);
-            logger.info(`Email body created (length: ${emailBody.length})`);
 
             // Generate subject
             const subject = this.getEmailSubject('approved', data.requestNumber);
-            logger.info(`Email subject: ${subject}`);
-
-            // Log email details before sending
-            logger.info(`Email details: To: ${data.userDetails.email}, CC: ${data.ccEmails?.join(', ') || 'None'}, Subject: ${subject}, Attachments: ${attachments.length}`);
 
             // Send email with MIP template and welcome pack attachments (with CC if provided)
             await this.sendEmail(
@@ -745,14 +697,9 @@ export class EmailService {
                 data.ccEmails || [] // CC emails if provided
             );
 
-            logger.info(`=== MOVE-IN APPROVAL EMAIL SUCCESS ===`);
             logger.info(`Move-in approval email with welcome pack sent successfully for request ${data.requestNumber}`);
         } catch (error) {
-            logger.error(`=== MOVE-IN APPROVAL EMAIL ERROR ===`);
             logger.error(`Failed to send move-in approval email for request ${data.requestNumber}:`, error);
-            logger.error(`Error details: ${JSON.stringify(error)}`);
-            logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
-            logger.error(`=== MOVE-IN APPROVAL EMAIL ERROR END ===`);
             throw error;
         }
     }
@@ -909,38 +856,23 @@ export class EmailService {
      */
     private async generateMIPTemplatePDF(htmlContent: string, data: MoveInEmailData): Promise<EmailAttachment | null> {
         try {
-            logger.info(`=== MIP PDF GENERATION START ===`);
-            logger.info(`Generating MIP template PDF for request ${data.requestNumber}`);
-            logger.info(`HTML content length: ${htmlContent.length}`);
-            
-            // Validate HTML content
-            if (!htmlContent || htmlContent.trim().length === 0) {
-                logger.error('HTML content is empty or null');
-                return null;
-            }
-            
             // Import puppeteer dynamically to avoid build issues
             const puppeteer = require('puppeteer');
-            logger.info('Puppeteer imported successfully');
+            
+            logger.info(`Generating MIP template PDF for request ${data.requestNumber}`);
             
             // Launch Puppeteer
-            logger.info('Launching Puppeteer browser...');
             const browser = await puppeteer.launch({
                 headless: true,
-                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
             });
-            logger.info('Puppeteer browser launched successfully');
             
             const page = await browser.newPage();
-            logger.info('New page created');
             
             // Set content and wait for images to load
-            logger.info('Setting page content...');
             await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-            logger.info('Page content set successfully');
             
             // Generate PDF
-            logger.info('Generating PDF...');
             const pdfBuffer = await page.pdf({
                 format: 'A4',
                 printBackground: true,
@@ -951,27 +883,18 @@ export class EmailService {
                     left: '10mm'
                 }
             });
-            logger.info(`PDF generated successfully, size: ${pdfBuffer.length} bytes`);
             
             await browser.close();
-            logger.info('Browser closed');
             
-            const filename = `${data.requestNumber}-${data.status}.pdf`;
-            
-            logger.info(`=== MIP PDF GENERATION SUCCESS ===`);
-            logger.info(`MIP template PDF generated successfully: ${filename} (${pdfBuffer.length} bytes)`);
+            logger.info(`MIP template PDF generated successfully (${pdfBuffer.length} bytes)`);
             
             return {
-                filename,
+                filename: `MIP-${data.requestNumber}-${data.status}.pdf`,
                 content: pdfBuffer,
                 contentType: 'application/pdf'
             };
         } catch (error) {
-            logger.error(`=== MIP PDF GENERATION ERROR ===`);
-            logger.error(`Error generating MIP template PDF for request ${data.requestNumber}:`, error);
-            logger.error(`Error details: ${JSON.stringify(error)}`);
-            logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
-            logger.error(`=== MIP PDF GENERATION ERROR END ===`);
+            logger.error('Error generating MIP template PDF:', error);
             return null;
         }
     }

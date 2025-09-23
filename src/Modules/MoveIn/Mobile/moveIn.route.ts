@@ -132,7 +132,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                         example: 123
  *                       moveInRequestNo:
  *                         type: string
- *                         example: "MIP-UNIT-123-456"
+ *                         example: "MIN-UNIT-123-456"
  *                       status:
  *                         type: string
  *                         enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
@@ -263,7 +263,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                       example: 123
  *                     moveInRequestNo:
  *                       type: string
- *                       example: "MIP-UNIT-123-456"
+ *                       example: "MIN-UNIT-123-456"
  *                     requestType:
  *                       type: string
  *                       enum: ["OWNER", "TENANT", "HHO_OWNER", "HHO_COMPANY"]
@@ -968,7 +968,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                       example: 123
  *                     moveInRequestNo:
  *                       type: string
- *                       example: "MIP-UNIT-123-456"
+ *                       example: "MIN-UNIT-123-456"
  *                     status:
  *                       type: string
  *                       example: "APPROVED"
@@ -2812,7 +2812,7 @@ export default router;
  *                       example: 123
  *                     moveInRequestNo:
  *                       type: string
- *                       example: "MIP-UNIT-123-456"
+ *                       example: "MIN-UNIT-123-456"
  *                     status:
  *                       type: string
  *                       example: "APPROVED"
