@@ -154,7 +154,6 @@ router.post('/request/:requestId/documents',
  *         description: Internal server error
  */
 
-
 // Status management routes
 router.put('/request/:requestId/approve', auth.auth(), validate(moveInValidation.approveRequest), catchAsync(moveInController.approveMoveInRequest));
 router.put('/request/:requestId/rfi', auth.auth(), validate(moveInValidation.markRequestAsRFI), catchAsync(moveInController.markRequestAsRFI));
