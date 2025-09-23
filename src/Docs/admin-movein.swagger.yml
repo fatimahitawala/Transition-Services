@@ -981,7 +981,7 @@ paths:
                           properties:
                             documentType:
                               type: string
-                              example: "emiratesIdFront"
+                              example: "emirates-id-front"
                             fileName:
                               type: string
                               example: "emirates_id_front.pdf"
@@ -1518,7 +1518,7 @@ components:
               documentType:
                 type: string
                 description: Type of document
-                example: "emiratesIdFront"
+                example: "emirates-id-front"
               fileName:
                 type: string
                 description: Name of the uploaded file

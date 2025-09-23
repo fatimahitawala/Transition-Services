@@ -217,7 +217,7 @@ export class MoveInvalidation {
         nationality: Joi.string().required(),
         emiratesIdNumber: Joi.string().required(),
         emiratesIdExpiryDate: Joi.date().iso().required(),
-        tenancyContractStartDate: Joi.date().iso().required(),
+        tenancyContractStartDate: Joi.date().iso().custom(validateTenancyContractStartBeforeMoveIn).required(),
         unitPermitStartDate: Joi.date().iso().required(),
         unitPermitExpiryDate: Joi.date().iso().custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE)).required(),
         unitPermitNumber: Joi.string().required(),
