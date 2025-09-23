@@ -158,8 +158,8 @@ export class MoveInService {
 
         const savedMaster = await MoveInRequests.save(master);
 
-        // Update request number to final format MIP-<unitNumber>-<id>
-        const finalRequestNumber = `MIP-${unit?.unitNumber}-${savedMaster.id}`;
+        // Update request number to final format MIN-<unitNumber>-<id>
+        const finalRequestNumber = `MIN-${unit?.unitNumber}-${savedMaster.id}`;
         await MoveInRequests.update({ id: savedMaster.id }, { moveInRequestNo: finalRequestNumber });
         savedMaster.moveInRequestNo = finalRequestNumber as any;
         createdMaster = savedMaster;
@@ -298,7 +298,7 @@ export class MoveInService {
   // Helper method to generate request number
   private generateRequestNumber(unitNumber?: string | number): string {
     const suffix = `${Date.now()}`;
-    return `MIP-${unitNumber ?? 'UNIT'}-${suffix}`;
+    return `MIN-${unitNumber ?? 'UNIT'}-${suffix}`;
   }
 
   // Helper method to create details record based on request type
