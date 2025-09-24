@@ -16,9 +16,17 @@ import { TRANSITION_DOCUMENT_TYPES, TransitionRequestActionByTypes } from "../..
 import { uploadFile } from "../../../Common/Utils/azureBlobStorage";
 import { executeInTransaction } from "../../../Common/Utils/transactionUtil";
 import { Units } from "../../../Entities/Units.entity";
+import { UnitBookings } from "../../../Entities/UnitBookings.entity";
 import { get } from "http";
+import config from "../../../Common/Config/config";
+import { EmailService, MoveInEmailData } from "../../Email/email.service";
 
 export class MoveInService {
+  private emailService: EmailService;
+
+  constructor() {
+    this.emailService = new EmailService();
+  }
 
   async createMoveInRequest(data: any, user: any) {
     try {
@@ -150,8 +158,8 @@ export class MoveInService {
 
         const savedMaster = await MoveInRequests.save(master);
 
-        // Update request number to final format MIN-<unitNumber>-<id>
-        const finalRequestNumber = `MIN-${unit?.unitNumber}-${savedMaster.id}`;
+        // Update request number to final format MIP-<unitNumber>-<id>
+        const finalRequestNumber = `MIP-${unit?.unitNumber}-${savedMaster.id}`;
         await MoveInRequests.update({ id: savedMaster.id }, { moveInRequestNo: finalRequestNumber });
         savedMaster.moveInRequestNo = finalRequestNumber as any;
         createdMaster = savedMaster;
@@ -202,7 +210,14 @@ export class MoveInService {
 
         // Auto-approve owner, tenant, HHO-Unit, and HHO-Company move-in requests
         if (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
+          logger.info(`Auto-approving ${requestType} move-in request ${savedMaster.id}`);
           await this.autoApproveRequest(qr, savedMaster.id, user?.id);
+          
+          // Update the in-memory object to reflect the approved status
+          savedMaster.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
+          createdMaster = savedMaster;
+          
+          logger.info(`Move-in request ${savedMaster.id} auto-approved, status updated to: ${savedMaster.status}`);
         }
 
         // Create initial log
@@ -221,7 +236,16 @@ export class MoveInService {
 
       // Send notifications after successful creation
       if (createdMaster) {
+        logger.info(`=== TRIGGERING EMAIL NOTIFICATIONS ===`);
+        logger.info(`Request ID: ${createdMaster.id}, Request Number: ${createdMaster.moveInRequestNo}`);
+        logger.info(`Request Status: ${createdMaster.status}`);
+        logger.info(`Request Type: ${requestType}`);
+        logger.info(`Is Auto-approved: ${requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT}`);
+        
         await this.sendNotifications(createdMaster.id, createdMaster.moveInRequestNo);
+      } else {
+        logger.error(`=== EMAIL NOTIFICATION SKIPPED ===`);
+        logger.error(`createdMaster is null/undefined - no email will be sent`);
       }
 
       logger.info(`MOVE-IN CREATED BY ADMIN: ${createdMaster?.moveInRequestNo} for unit ${unitId} by admin ${user?.id}`);
@@ -274,7 +298,7 @@ export class MoveInService {
   // Helper method to generate request number
   private generateRequestNumber(unitNumber?: string | number): string {
     const suffix = `${Date.now()}`;
-    return `MIN-${unitNumber ?? 'UNIT'}-${suffix}`;
+    return `MIP-${unitNumber ?? 'UNIT'}-${suffix}`;
   }
 
   // Helper method to create details record based on request type
@@ -437,6 +461,10 @@ export class MoveInService {
   // New Admin-specific move-in request methods
   async createOwnerMoveIn(data: any, user: any) {
     try {
+      logger.info(`=== CREATE OWNER MOVE-IN START ===`);
+      logger.info(`Input data: ${JSON.stringify(data)}`);
+      logger.info(`User: ${JSON.stringify(user)}`);
+      
       // Map owner UI fields to details (user details come from Users table, not stored here)
       const { details = {}, ...rest } = data || {};
       const ownerDetails = {
@@ -450,10 +478,20 @@ export class MoveInService {
         comments: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
       };
 
-      logger.debug(`Owner Details mapped: ${JSON.stringify(ownerDetails)}`);
-      return this.createMoveInRequest({ ...rest, details: ownerDetails, requestType: MOVE_IN_USER_TYPES.OWNER }, user);
+      logger.info(`Owner Details mapped: ${JSON.stringify(ownerDetails)}`);
+      logger.info(`Calling createMoveInRequest with OWNER type...`);
+      
+      const result = await this.createMoveInRequest({ ...rest, details: ownerDetails, requestType: MOVE_IN_USER_TYPES.OWNER }, user);
+      
+      logger.info(`=== CREATE OWNER MOVE-IN SUCCESS ===`);
+      logger.info(`Created move-in request: ${JSON.stringify(result)}`);
+      
+      return result;
     } catch (error) {
+      logger.error(`=== CREATE OWNER MOVE-IN ERROR ===`);
       logger.error(`Error in createOwnerMoveIn Admin: ${JSON.stringify(error)}`);
+      logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
+      logger.error(`=== CREATE OWNER MOVE-IN ERROR END ===`);
       throw error;
     }
   }
@@ -744,8 +782,10 @@ export class MoveInService {
         moveInStartDate = "", 
         moveInEndDate = "",
         status = "",
-        requestType = "",
         search = "",
+        requestId = "",
+        unitNumber = "",
+        requestType = "",
         sortBy = "createdAt",
         sortOrder = "DESC"
       } = query;
@@ -754,28 +794,23 @@ export class MoveInService {
       logger.debug(`=== ADMIN MOVE-IN REQUEST DEBUG ===`);
       logger.debug(`Raw query object: ${JSON.stringify(query)}`);
       logger.debug(`Query keys: ${Object.keys(query).join(', ')}`);
-      logger.debug(`requestType value: "${query.requestType}"`);
-      logger.debug(`requestType type: ${typeof query.requestType}`);
       logger.debug(`User object: ${JSON.stringify(user)}`);
       logger.debug(`User isAdmin: ${user?.isAdmin}`);
       logger.debug(`=====================================`);
 
-      masterCommunityIds = masterCommunityIds.split(",").filter((e: any) => e);
-      communityIds = communityIds.split(",").filter((e: any) => e);
-      towerIds = towerIds.split(",").filter((e: any) => e);
-      requestType = requestType.split(",").filter((e: any) => e);
+      masterCommunityIds = masterCommunityIds ? masterCommunityIds.split(",").filter((e: any) => e) : [];
+      communityIds = communityIds ? communityIds.split(",").filter((e: any) => e) : [];
+      towerIds = towerIds ? towerIds.split(",").filter((e: any) => e) : [];
 
       let getMoveInList = MoveInRequests.getRepository().createQueryBuilder("am")
-        .select([
-          "am.id", "am.status", "am.createdAt", "am.moveInDate",
-          "am.moveInRequestNo", "am.requestType", "am.comments", "am.additionalInfo",
-          "u.unitNumber", "u.floorNumber", "u.unitName",
-          "mc.name as masterCommunityName", "c.name as communityName", "t.name as towerName"
-        ])
-        .innerJoin("am.unit", "u", "u.isActive=1")
-        .innerJoin("u.masterCommunity", "mc", "mc.isActive=1")
-        .innerJoin("u.community", "c", "c.isActive=1")
-        .innerJoin("u.tower", "t", "t.isActive=1")
+        .leftJoinAndSelect("am.unit", "u", "u.isActive=1")
+        .leftJoinAndSelect("u.masterCommunity", "mc", "mc.isActive=1")
+        .leftJoinAndSelect("u.community", "c", "c.isActive=1")
+        .leftJoinAndSelect("u.tower", "t", "t.isActive=1")
+        .addSelect("am.createdAt")
+        .addSelect("am.updatedAt")
+        .addSelect("am.createdBy")
+        .addSelect("am.updatedBy")
         .where("am.isActive=1");
 
       // Only apply permission filtering for non-admin users
@@ -787,12 +822,37 @@ export class MoveInService {
       if (masterCommunityIds && masterCommunityIds.length) getMoveInList.andWhere(`mc.id IN (:...masterCommunityIds)`, { masterCommunityIds });
       if (communityIds && communityIds.length) getMoveInList.andWhere(`c.id IN (:...communityIds)`, { communityIds });
       if (towerIds && towerIds.length) getMoveInList.andWhere(`t.id IN (:...towerIds)`, { towerIds });
-      if (createdStartDate) getMoveInList.andWhere(`am.createdAt >= :createdStartDate`, { createdStartDate });
-      if (createdEndDate) getMoveInList.andWhere(`am.createdAt <= :createdEndDate`, { createdEndDate });
-      if (moveInStartDate) getMoveInList.andWhere(`am.moveInDate >= :moveInStartDate`, { moveInStartDate });
-      if (moveInEndDate) getMoveInList.andWhere(`am.moveInDate <= :moveInEndDate`, { moveInEndDate });
+      
+      // Date range filters - handle both start and end dates properly
+      if (createdStartDate) {
+        const startDate = new Date(createdStartDate);
+        startDate.setHours(0, 0, 0, 0); // Start of day
+        getMoveInList.andWhere(`am.createdAt >= :createdStartDate`, { createdStartDate: startDate });
+        logger.debug(`Created Start Date filter: ${createdStartDate} -> ${startDate.toISOString()}`);
+      }
+      if (createdEndDate) {
+        const endDate = new Date(createdEndDate);
+        endDate.setHours(23, 59, 59, 999); // End of day
+        getMoveInList.andWhere(`am.createdAt <= :createdEndDate`, { createdEndDate: endDate });
+        logger.debug(`Created End Date filter: ${createdEndDate} -> ${endDate.toISOString()}`);
+      }
+      if (moveInStartDate) {
+        const startDate = new Date(moveInStartDate);
+        startDate.setHours(0, 0, 0, 0); // Start of day
+        getMoveInList.andWhere(`am.moveInDate >= :moveInStartDate`, { moveInStartDate: startDate });
+        logger.debug(`Move-in Start Date filter: ${moveInStartDate} -> ${startDate.toISOString()}`);
+      }
+      if (moveInEndDate) {
+        const endDate = new Date(moveInEndDate);
+        endDate.setHours(23, 59, 59, 999); // End of day
+        getMoveInList.andWhere(`am.moveInDate <= :moveInEndDate`, { moveInEndDate: endDate });
+        logger.debug(`Move-in End Date filter: ${moveInEndDate} -> ${endDate.toISOString()}`);
+      }
+      
       if (status) getMoveInList.andWhere(`am.status = :status`, { status });
-      if (requestType && requestType.length > 0) getMoveInList.andWhere(`am.requestType IN (:...requestType)`, { requestType });
+      if (requestId) getMoveInList.andWhere(`am.moveInRequestNo = :requestId`, { requestId });
+      if (unitNumber) getMoveInList.andWhere(`u.unitNumber LIKE :unitNumber`, { unitNumber: `%${unitNumber}%` });
+      if (requestType) getMoveInList.andWhere(`am.requestType = :requestType`, { requestType });
       
       // Search functionality
       if (search) {
@@ -845,8 +905,39 @@ export class MoveInService {
       // Debug: Log the results
       logger.debug(`Total items found: ${count}, List length: ${list.length}`);
       logger.debug(`First few items: ${JSON.stringify(list.slice(0, 2))}`);
+      
+      // Debug: Log unit data specifically
+      if (list.length > 0) {
+        const firstItem = list[0] as any;
+        logger.debug(`Unit data for first item: unitId=${firstItem.unit?.id}, unitNumber=${firstItem.unit?.unitNumber}, unitName=${firstItem.unit?.unitName}`);
+      }
 
-      return { data: list, pagination };
+      // Transform the response to match mobile format
+      const transformedList = list.map((item: any) => ({
+        id: item.id,
+        moveInRequestNo: item.moveInRequestNo,
+        requestType: item.requestType,
+        status: item.status,
+        moveInDate: item.moveInDate,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        createdBy: item.createdBy,
+        updatedBy: item.updatedBy,
+        unit: item.unit ? {
+          id: item.unit.id,
+          unitNumber: item.unit.unitNumber,
+          floorNumber: item.unit.floorNumber,
+          unitName: item.unit.unitName
+        } : {},
+        masterCommunityId: item.unit?.masterCommunity?.id,
+        masterCommunityName: item.unit?.masterCommunity?.name,
+        communityId: item.unit?.community?.id,
+        communityName: item.unit?.community?.name,
+        towerId: item.unit?.tower?.id,
+        towerName: item.unit?.tower?.name
+      }));
+
+      return { data: transformedList, pagination };
 
     } catch (error) {
       logger.error(`Error in getAdminMoveIn : ${JSON.stringify(error)}`);
@@ -857,38 +948,16 @@ export class MoveInService {
 
   async getMoveInRequestDetailsWithId(requestId: number, user: any) {
     try {
+      logger.debug(`getMoveInRequestDetailsWithId - requestId: ${requestId}, userId: ${user?.id}`);
+
+      // Get the main move-in request with basic details
       let query = MoveInRequests.getRepository()
         .createQueryBuilder("mv")
-        .select([
-          "mv.id",
-          "masterCommunity.name",
-          "community.name",
-          "tower.name",
-          "unit.unitName",
-          "unit.unitNumber",
-          "tower.id",
-          "community.id",
-          "masterCommunity.id",
-          "unit.id",
-          "user.firstName",
-          "user.middleName",
-          "user.lastName",
-          "user.email",
-          "user.mobile",
-          "mv.requestType",
-          "mv.moveInDate",
-          "mv.comments",
-          "mv.moveInRequestNo",
-          "mv.createdBy",
-          "mv.status",
-          "mv.createdAt",
-          "mv.updatedAt",
-        ])
-        .innerJoin("mv.user", "user", "user.isActive = true")
-        .innerJoin("mv.unit", "unit", "unit.isActive = true")
-        .innerJoin("unit.masterCommunity", "masterCommunity", "masterCommunity.isActive = true")
-        .innerJoin("unit.tower", "tower", "tower.isActive = true")
-        .innerJoin("unit.community", "community", "community.isActive = true")
+        .leftJoinAndSelect("mv.user", "user", "user.isActive = true")
+        .leftJoinAndSelect("mv.unit", "u", "u.isActive = true")
+        .leftJoinAndSelect("u.masterCommunity", "mc", "mc.isActive = true")
+        .leftJoinAndSelect("u.tower", "t", "t.isActive = true")
+        .leftJoinAndSelect("u.community", "c", "c.isActive = true")
         .where("mv.isActive = true AND mv.id = :requestId", { requestId });
 
       const isSecurity = await checkIsSecurity(user);
@@ -900,9 +969,11 @@ export class MoveInService {
       let result: any = await query.getOne();
 
       if (!result) {
+        logger.warn(`Move-in request not found - requestId: ${requestId}`);
         throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
       }
 
+      // Get all type-specific details (always include all types, even if empty)
       const detailsMap: Record<string, { repo: any; alias: string; key: string }> = {
         [MOVE_IN_USER_TYPES.HHO_COMPANY]: {
           repo: MoveInRequestDetailsHhcCompany,
@@ -926,22 +997,100 @@ export class MoveInService {
         },
       };
 
-      const typeConfig = detailsMap[result.requestType];
-      if (typeConfig) {
-        const details = await typeConfig.repo
-          .getRepository()
-          .createQueryBuilder(typeConfig.alias)
-          .where(`${typeConfig.alias}.moveInRequest.id = :id AND ${typeConfig.alias}.isActive = true`, { id: result.id })
-          .getOne();
+      // Initialize all detail types as empty objects
+      result.moveInOwnerDetails = {};
+      result.moveInTenantDetails = {};
+      result.moveInHHOOwnerDetails = {};
+      result.moveInCompanyDetails = {};
 
-        result = { ...result, [typeConfig.key]: details };
+      // Fetch details for all types
+      for (const [requestType, config] of Object.entries(detailsMap)) {
+        try {
+          const details = await config.repo
+            .getRepository()
+            .createQueryBuilder(config.alias)
+            .where(`${config.alias}.moveInRequest.id = :id AND ${config.alias}.isActive = true`, { id: result.id })
+            .getOne();
+
+          if (details) {
+            // Remove the moveInRequest relation and other metadata fields
+            const { moveInRequest, createdBy, updatedBy, isActive, createdAt, updatedAt, ...cleanDetails } = details;
+            result[config.key] = cleanDetails;
+          }
+        } catch (error) {
+          logger.warn(`Error fetching ${config.key} for requestId ${requestId}: ${error}`);
+          // Keep as empty object if there's an error
+        }
       }
 
+      // Get documents if any
+      const documents = await MoveInRequestDocuments.getRepository()
+        .createQueryBuilder("doc")
+        .select([
+          "doc.id",
+          "doc.documentType",
+          "doc.expiryDate",
+          "doc.userId",
+          "doc.fileId",
+          "doc.createdAt",
+          "doc.updatedAt",
+          "file.id",
+          "file.fileName",
+          "file.filePath",
+          "file.fileType",
+          "file.fileSize",
+          "file.fileExtension",
+          "file.fileOriginalName",
+          "file.createdAt"
+        ])
+        .leftJoin("doc.file", "file")
+        .where("doc.moveInRequestId = :id AND doc.isActive = true", { id: result.id })
+        .getMany();
+
+      logger.debug(`Found ${documents.length} documents for requestId: ${requestId}`);
+
+      // Add full file URL to each document
+      result.documents = documents.map(doc => ({
+        ...doc,
+        file: doc.file ? {
+          ...doc.file,
+          fileUrl: `https://${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/application/${doc.file.filePath}`
+        } : null
+      }));
+
+      // Construct unit object from joined data
+      result.unit = result.unit ? {
+        id: result.unit.id,
+        unitNumber: result.unit.unitNumber,
+        floorNumber: result.unit.floorNumber,
+        unitName: result.unit.unitName,
+        masterCommunity: result.unit.masterCommunity ? {
+          id: result.unit.masterCommunity.id,
+          name: result.unit.masterCommunity.name
+        } : null,
+        community: result.unit.community ? {
+          id: result.unit.community.id,
+          name: result.unit.community.name
+        } : null,
+        tower: result.unit.tower ? {
+          id: result.unit.tower.id,
+          name: result.unit.tower.name
+        } : null
+      } : {};
+
+      // Remove sensitive fields from user object
+      if (result.user) {
+        const { password, ...cleanUser } = result.user;
+        result.user = cleanUser;
+      }
+
+      logger.debug(`Successfully retrieved move-in request details for requestId: ${requestId}`);
       return result;
-    } catch (error) {
-      logger.error(`Error in MoveInRequestById : ${JSON.stringify(error)}`);
-      const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
+
+    } catch (error: any) {
+      logger.error(`Error in getMoveInRequestDetailsWithId: ${JSON.stringify(error)}`);
+      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
     }
   }
 
@@ -1065,17 +1214,97 @@ export class MoveInService {
   // Send notifications to owner/tenant and community recipients
   private async sendNotifications(requestId: number, requestNumber: string): Promise<void> {
     try {
-      // TODO: Implement push notification to owner/tenant
-      // For Owner: "A new move-in request (<Reference ID>) has been created and approved by Community Admin. Tap here to view your request."
-      // For Tenant: "A new move-in request (<Reference ID>) has been created and approved by Community Admin. Tap here to view your request."
+      logger.info(`=== EMAIL NOTIFICATION START ===`);
+      logger.info(`Sending notifications for move-in request ${requestId} (${requestNumber})`);
 
-      // TODO: Implement email notification to community recipients (as per Email Recipients configuration)
-      // TODO: Send notifications to both owner/tenant and relevant community team members
+      // Get move-in request details for email
+      const moveInRequest = await MoveInRequests.getRepository()
+        .createQueryBuilder("mir")
+        .leftJoinAndSelect("mir.user", "user")
+        .leftJoinAndSelect("mir.unit", "unit")
+        .leftJoinAndSelect("unit.masterCommunity", "masterCommunity")
+        .leftJoinAndSelect("unit.community", "community")
+        .leftJoinAndSelect("unit.tower", "tower")
+        .where("mir.id = :requestId", { requestId })
+        .getOne();
 
-      logger.info(`Notifications sent for move-in request ${requestId}`);
+      if (!moveInRequest) {
+        logger.error(`EMAIL ERROR: Move-in request not found for requestId: ${requestId}`);
+        return;
+      }
+
+      // Get the primary recipient and CC emails based on request type
+      const emailRecipients = await this.getEmailRecipients(moveInRequest);
+      
+      if (!emailRecipients || !emailRecipients.primary.email) {
+        logger.error(`EMAIL ERROR: No primary email recipient found for ${moveInRequest.requestType} request ${requestId}, unitId: ${moveInRequest.unit?.id}`);
+        return;
+      }
+
+      logger.info(`EMAIL DATA: Primary: ${emailRecipients.primary.firstName} ${emailRecipients.primary.lastName} (${emailRecipients.primary.email})`);
+      if (emailRecipients.cc && emailRecipients.cc.length > 0) {
+        logger.info(`EMAIL DATA: CC: ${emailRecipients.cc.join(', ')}`);
+      }
+      logger.info(`EMAIL DATA: Unit: ${moveInRequest.unit?.unitName} in ${moveInRequest.unit?.community?.name}`);
+      logger.info(`EMAIL DATA: Status: ${moveInRequest.status}`);
+
+      // Prepare email data
+      const emailData: MoveInEmailData = {
+        requestId: requestId,
+        requestNumber: requestNumber,
+        status: moveInRequest.status, // Use actual current status
+        requestType: moveInRequest.requestType,
+        userDetails: {
+          firstName: emailRecipients.primary.firstName,
+          lastName: emailRecipients.primary.lastName,
+          email: emailRecipients.primary.email
+        },
+        ccEmails: emailRecipients.cc,
+        unitDetails: {
+          unitNumber: moveInRequest.unit?.unitNumber || '',
+          unitName: moveInRequest.unit?.unitName || '',
+          masterCommunityId: moveInRequest.unit?.masterCommunity?.id || 0,
+          communityId: moveInRequest.unit?.community?.id || 0,
+          towerId: moveInRequest.unit?.tower?.id || undefined,
+          masterCommunityName: moveInRequest.unit?.masterCommunity?.name || '',
+          communityName: moveInRequest.unit?.community?.name || '',
+          towerName: moveInRequest.unit?.tower?.name || undefined
+        },
+        moveInDate: moveInRequest.moveInDate,
+        comments: moveInRequest.comments || ''
+      };
+
+      logger.info(`=== UNIT DETAILS FOR EMAIL ===`);
+      logger.info(`Unit ID: ${moveInRequest.unit?.id}`);
+      logger.info(`Unit Number: ${moveInRequest.unit?.unitNumber}`);
+      logger.info(`Unit Name: ${moveInRequest.unit?.unitName}`);
+      logger.info(`Master Community ID: ${moveInRequest.unit?.masterCommunity?.id}`);
+      logger.info(`Master Community Name: ${moveInRequest.unit?.masterCommunity?.name}`);
+      logger.info(`Community ID: ${moveInRequest.unit?.community?.id}`);
+      logger.info(`Community Name: ${moveInRequest.unit?.community?.name}`);
+      logger.info(`Tower ID: ${moveInRequest.unit?.tower?.id}`);
+      logger.info(`Tower Name: ${moveInRequest.unit?.tower?.name}`);
+      logger.info(`=== UNIT DETAILS END ===`);
+
+      logger.info(`EMAIL PAYLOAD: ${JSON.stringify(emailData)}`);
+
+      // Check if this is an auto-approved request (status should be 'approved')
+      if (moveInRequest.status === MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
+        logger.info(`SENDING APPROVAL EMAIL with welcome pack for auto-approved request`);
+        await this.emailService.sendMoveInApprovalEmail(emailData);
+      } else {
+        logger.info(`SENDING STATUS EMAIL for status: ${moveInRequest.status}`);
+        await this.emailService.sendMoveInStatusEmail(emailData);
+      }
+
+      logger.info(`=== EMAIL NOTIFICATION SUCCESS ===`);
+      logger.info(`Notifications sent successfully for move-in request ${requestId}`);
     } catch (error) {
-      logger.error(`Error sending notifications: ${error}`);
-      // Don't throw error for notification failures
+      logger.error(`=== EMAIL NOTIFICATION ERROR ===`);
+      logger.error(`Error sending notifications for request ${requestId}:`, error);
+      logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
+      logger.error(`=== EMAIL NOTIFICATION ERROR END ===`);
+      // Don't throw error for notification failures to avoid breaking the move-in process
     }
   }
 
@@ -1506,18 +1735,206 @@ export class MoveInService {
   // ==================== NOTIFICATION METHODS ====================
 
   /**
+   * Get email recipients (primary and CC) based on request type
+   */
+  private async getEmailRecipients(moveInRequest: any): Promise<{primary: {firstName: string, lastName: string, email: string}, cc: string[]} | null> {
+    try {
+      logger.info(`Getting email recipients for ${moveInRequest.requestType} request ${moveInRequest.id}, unitId: ${moveInRequest.unit?.id}`);
+
+      const unitId = moveInRequest.unit?.id;
+      let primary = null;
+      let cc: string[] = [];
+
+      // Get unit owner email from unit_bookings (always needed for CC in tenant requests)
+      const ownerInfo = await this.getUnitOwnerFromBookings(unitId);
+
+      switch (moveInRequest.requestType) {
+        case MOVE_IN_USER_TYPES.OWNER: {
+          // For owner requests: primary = owner, no CC
+          if (ownerInfo) {
+            primary = ownerInfo;
+            logger.info(`Owner request: Primary email set to owner from unit_bookings`);
+          }
+          break;
+        }
+        
+        case MOVE_IN_USER_TYPES.TENANT: {
+          // For tenant requests: primary = tenant, CC = owner
+          const tenantDetails = await MoveInRequestDetailsTenant.getRepository()
+            .createQueryBuilder("tenant")
+            .where("tenant.move_in_request_id = :requestId", { requestId: moveInRequest.id })
+            .andWhere("tenant.is_active = true")
+            .getOne();
+          
+          if (tenantDetails && tenantDetails.email) {
+            primary = {
+              firstName: tenantDetails.firstName || '',
+              lastName: tenantDetails.lastName || '',
+              email: tenantDetails.email
+            };
+            logger.info(`Tenant request: Primary email set to tenant (${tenantDetails.email})`);
+            
+            // Add owner as CC
+            if (ownerInfo && ownerInfo.email) {
+              cc.push(ownerInfo.email);
+              logger.info(`Tenant request: Owner email added to CC (${ownerInfo.email})`);
+            }
+          }
+          break;
+        }
+        
+        case MOVE_IN_USER_TYPES.HHO_OWNER: {
+          // For HHO owner requests: primary = HHO owner, CC = unit owner
+          const hhoDetails = await MoveInRequestDetailsHhoOwner.getRepository()
+            .createQueryBuilder("hho")
+            .where("hho.move_in_request_id = :requestId", { requestId: moveInRequest.id })
+            .andWhere("hho.is_active = true")
+            .getOne();
+          
+          if (hhoDetails && hhoDetails.email) {
+            primary = {
+              firstName: hhoDetails.ownerFirstName || '',
+              lastName: hhoDetails.ownerLastName || '',
+              email: hhoDetails.email
+            };
+            logger.info(`HHO Owner request: Primary email set to HHO owner (${hhoDetails.email})`);
+            
+            // Add unit owner as CC
+            if (ownerInfo && ownerInfo.email && ownerInfo.email !== hhoDetails.email) {
+              cc.push(ownerInfo.email);
+              logger.info(`HHO Owner request: Unit owner email added to CC (${ownerInfo.email})`);
+            }
+          }
+          break;
+        }
+        
+        case MOVE_IN_USER_TYPES.HHO_COMPANY: {
+          // For HHC company requests: primary = companyEmail, CC = unit owner
+          const companyDetails = await MoveInRequestDetailsHhcCompany.getRepository()
+            .createQueryBuilder("company")
+            .where("company.move_in_request_id = :requestId", { requestId: moveInRequest.id })
+            .andWhere("company.is_active = true")
+            .getOne();
+          
+          if (companyDetails && companyDetails.companyEmail) {
+            primary = {
+              firstName: companyDetails.name || '',
+              lastName: '',
+              email: companyDetails.companyEmail
+            };
+            logger.info(`HHC Company request: Primary email set to company (${companyDetails.companyEmail})`);
+            
+            // Add unit owner as CC
+            if (ownerInfo && ownerInfo.email) {
+              cc.push(ownerInfo.email);
+              logger.info(`HHC Company request: Unit owner email added to CC (${ownerInfo.email})`);
+            }
+          }
+          break;
+        }
+      }
+
+      if (!primary) {
+        logger.error(`No primary email recipient found for ${moveInRequest.requestType} request ${moveInRequest.id}`);
+        return null;
+      }
+
+      return { primary, cc };
+    } catch (error) {
+      logger.error(`Error getting email recipients for request ${moveInRequest.id}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get unit owner information from unit_bookings table
+   */
+  private async getUnitOwnerFromBookings(unitId: number): Promise<{firstName: string, lastName: string, email: string} | null> {
+    try {
+      logger.info(`Getting unit owner from unit_bookings for unitId: ${unitId}`);
+
+      const unitBooking = await UnitBookings.getRepository()
+        .createQueryBuilder("ub")
+        .where("ub.unit.id = :unitId", { unitId })
+        .andWhere("ub.isActive = true")
+        .orderBy("ub.createdAt", "DESC") // Get the latest booking
+        .getOne();
+
+      if (unitBooking && unitBooking.customerEmail) {
+        // Split customerName into firstName and lastName
+        const nameParts = (unitBooking.customerName || '').split(' ');
+        const firstName = nameParts[0] || 'Property';
+        const lastName = nameParts.slice(1).join(' ') || 'Owner';
+
+        logger.info(`Found unit owner from unit_bookings: ${firstName} ${lastName} (${unitBooking.customerEmail})`);
+        
+        return {
+          firstName: firstName,
+          lastName: lastName,
+          email: unitBooking.customerEmail
+        };
+      } else {
+        logger.warn(`No unit booking found for unitId: ${unitId} or customerEmail is missing`);
+        return null;
+      }
+    } catch (error) {
+      logger.error(`Error getting unit owner from unit_bookings for unitId ${unitId}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Send approval notifications
    */
   private async sendApprovalNotifications(requestId: number, requestNumber: string): Promise<void> {
     try {
-      // TODO: Implement push notification to customer
-      // Template: "Your Move-in request has been approved by admin."
+      // Get move-in request details for email
+      const moveInRequest = await MoveInRequests.getRepository()
+        .createQueryBuilder("mir")
+        .leftJoinAndSelect("mir.user", "user")
+        .leftJoinAndSelect("mir.unit", "unit")
+        .leftJoinAndSelect("unit.masterCommunity", "masterCommunity")
+        .leftJoinAndSelect("unit.community", "community")
+        .leftJoinAndSelect("unit.tower", "tower")
+        .where("mir.id = :requestId", { requestId })
+        .getOne();
 
-      // TODO: Implement email notification to community recipients
+      if (!moveInRequest || !moveInRequest.user) {
+        logger.error(`Move-in request or user not found for requestId: ${requestId}`);
+        return;
+      }
+
+      // Prepare email data
+      const emailData: MoveInEmailData = {
+        requestId: requestId,
+        requestNumber: requestNumber,
+        status: 'approved',
+        userDetails: {
+          firstName: moveInRequest.user.firstName || '',
+          lastName: moveInRequest.user.lastName || '',
+          email: moveInRequest.user.email || ''
+        },
+        unitDetails: {
+          unitNumber: moveInRequest.unit?.unitNumber || '',
+          unitName: moveInRequest.unit?.unitName || '',
+          masterCommunityId: moveInRequest.unit?.masterCommunity?.id || 0,
+          communityId: moveInRequest.unit?.community?.id || 0,
+          towerId: moveInRequest.unit?.tower?.id || undefined,
+          masterCommunityName: moveInRequest.unit?.masterCommunity?.name || '',
+          communityName: moveInRequest.unit?.community?.name || '',
+          towerName: moveInRequest.unit?.tower?.name || undefined
+        },
+        moveInDate: moveInRequest.moveInDate,
+        comments: moveInRequest.comments || ''
+      };
+
+      // Send approval email with welcome pack attachment
+      await this.emailService.sendMoveInApprovalEmail(emailData);
 
       logger.info(`Approval notifications sent for move-in request ${requestId}`);
     } catch (error) {
       logger.error(`Error sending approval notifications: ${error}`);
+      // Don't throw error to avoid breaking the approval process
     }
   }
 
@@ -1526,12 +1943,53 @@ export class MoveInService {
    */
   private async sendRFINotifications(requestId: number, requestNumber: string, comments: string): Promise<void> {
     try {
-      // TODO: Implement push notification to customer
-      // Template: "Your Move-in request (<Reference ID>) requires further information. Tap to view details."
+      // Get move-in request details for email
+      const moveInRequest = await MoveInRequests.getRepository()
+        .createQueryBuilder("mir")
+        .leftJoinAndSelect("mir.user", "user")
+        .leftJoinAndSelect("mir.unit", "unit")
+        .leftJoinAndSelect("unit.masterCommunity", "masterCommunity")
+        .leftJoinAndSelect("unit.community", "community")
+        .leftJoinAndSelect("unit.tower", "tower")
+        .where("mir.id = :requestId", { requestId })
+        .getOne();
+
+      if (!moveInRequest || !moveInRequest.user) {
+        logger.error(`Move-in request or user not found for requestId: ${requestId}`);
+        return;
+      }
+
+      // Prepare email data
+      const emailData: MoveInEmailData = {
+        requestId: requestId,
+        requestNumber: requestNumber,
+        status: 'rfi-pending',
+        userDetails: {
+          firstName: moveInRequest.user.firstName || '',
+          lastName: moveInRequest.user.lastName || '',
+          email: moveInRequest.user.email || ''
+        },
+        unitDetails: {
+          unitNumber: moveInRequest.unit?.unitNumber || '',
+          unitName: moveInRequest.unit?.unitName || '',
+          masterCommunityId: moveInRequest.unit?.masterCommunity?.id || 0,
+          communityId: moveInRequest.unit?.community?.id || 0,
+          towerId: moveInRequest.unit?.tower?.id || undefined,
+          masterCommunityName: moveInRequest.unit?.masterCommunity?.name || '',
+          communityName: moveInRequest.unit?.community?.name || '',
+          towerName: moveInRequest.unit?.tower?.name || undefined
+        },
+        moveInDate: moveInRequest.moveInDate,
+        comments: comments
+      };
+
+      // Send RFI email (without attachment)
+      await this.emailService.sendMoveInStatusEmail(emailData);
 
       logger.info(`RFI notifications sent for move-in request ${requestId}`);
     } catch (error) {
       logger.error(`Error sending RFI notifications: ${error}`);
+      // Don't throw error to avoid breaking the RFI process
     }
   }
 
@@ -1540,12 +1998,53 @@ export class MoveInService {
    */
   private async sendCancellationNotifications(requestId: number, requestNumber: string, cancellationRemarks: string): Promise<void> {
     try {
-      // TODO: Implement push notification to customer
-      // Template: "Your Move-in request (<Reference ID>) has been cancelled."
+      // Get move-in request details for email
+      const moveInRequest = await MoveInRequests.getRepository()
+        .createQueryBuilder("mir")
+        .leftJoinAndSelect("mir.user", "user")
+        .leftJoinAndSelect("mir.unit", "unit")
+        .leftJoinAndSelect("unit.masterCommunity", "masterCommunity")
+        .leftJoinAndSelect("unit.community", "community")
+        .leftJoinAndSelect("unit.tower", "tower")
+        .where("mir.id = :requestId", { requestId })
+        .getOne();
+
+      if (!moveInRequest || !moveInRequest.user) {
+        logger.error(`Move-in request or user not found for requestId: ${requestId}`);
+        return;
+      }
+
+      // Prepare email data
+      const emailData: MoveInEmailData = {
+        requestId: requestId,
+        requestNumber: requestNumber,
+        status: 'cancelled',
+        userDetails: {
+          firstName: moveInRequest.user.firstName || '',
+          lastName: moveInRequest.user.lastName || '',
+          email: moveInRequest.user.email || ''
+        },
+        unitDetails: {
+          unitNumber: moveInRequest.unit?.unitNumber || '',
+          unitName: moveInRequest.unit?.unitName || '',
+          masterCommunityId: moveInRequest.unit?.masterCommunity?.id || 0,
+          communityId: moveInRequest.unit?.community?.id || 0,
+          towerId: moveInRequest.unit?.tower?.id || undefined,
+          masterCommunityName: moveInRequest.unit?.masterCommunity?.name || '',
+          communityName: moveInRequest.unit?.community?.name || '',
+          towerName: moveInRequest.unit?.tower?.name || undefined
+        },
+        moveInDate: moveInRequest.moveInDate,
+        comments: cancellationRemarks
+      };
+
+      // Send cancellation email (without attachment)
+      await this.emailService.sendMoveInStatusEmail(emailData);
 
       logger.info(`Cancellation notifications sent for move-in request ${requestId}`);
     } catch (error) {
       logger.error(`Error sending cancellation notifications: ${error}`);
+      // Don't throw error to avoid breaking the cancellation process
     }
   }
 
@@ -1567,8 +2066,6 @@ export class MoveInService {
           unit: data.unitId ? { id: data.unitId } : undefined,
           moveInDate: data.moveInDate,
           status: data.status,
-          comments: data.comments || null,
-          additionalInfo: data.additionalInfo || null,
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
@@ -1584,14 +2081,20 @@ export class MoveInService {
           householdStaffs: data.details?.householdStaffs,
           pets: data.details?.pets,
           // peopleOfDetermination: data.details?.peopleOfDetermination || false, // Not available in Owner entity
-          comments: data.details?.detailsText ?? data.comments ?? null,
+          comments: data.details?.detailsText || null,
           updatedBy: user?.id,
         })
-        .where('moveInRequestId = :requestId', { requestId })
+        .where('move_in_request_id = :requestId', { requestId })
         .execute();
 
       // Log the update
       await this.logMoveInRequestAction(requestId, 'UPDATE', 'Request updated by admin', user);
+
+      // Send email notifications about the update
+      const updatedRequest = await MoveInRequests.findOne({ where: { id: requestId } });
+      if (updatedRequest) {
+        await this.sendNotifications(requestId, updatedRequest.moveInRequestNo);
+      }
 
       return { id: requestId, message: 'Owner move-in request updated successfully' };
     } catch (error: any) {
@@ -1647,11 +2150,17 @@ export class MoveInService {
           comments: data.details?.detailsText ?? data.comments ?? null,
           updatedBy: user?.id,
         })
-        .where('moveInRequestId = :requestId', { requestId })
+        .where('move_in_request_id = :requestId', { requestId })
         .execute();
 
       // Log the update
       await this.logMoveInRequestAction(requestId, 'UPDATE', 'Request updated by admin', user);
+
+      // Send email notifications about the update
+      const updatedRequest = await MoveInRequests.findOne({ where: { id: requestId } });
+      if (updatedRequest) {
+        await this.sendNotifications(requestId, updatedRequest.moveInRequestNo);
+      }
 
       return { id: requestId, message: 'Tenant move-in request updated successfully' };
     } catch (error: any) {
@@ -1701,11 +2210,17 @@ export class MoveInService {
           comments: data.comments ?? null,
           updatedBy: user?.id,
         })
-        .where('moveInRequestId = :requestId', { requestId })
+        .where('move_in_request_id = :requestId', { requestId })
         .execute();
 
       // Log the update
       await this.logMoveInRequestAction(requestId, 'UPDATE', 'Request updated by admin', user);
+
+      // Send email notifications about the update
+      const updatedRequest = await MoveInRequests.findOne({ where: { id: requestId } });
+      if (updatedRequest) {
+        await this.sendNotifications(requestId, updatedRequest.moveInRequestNo);
+      }
 
       return { id: requestId, message: 'HHO unit move-in request updated successfully' };
     } catch (error: any) {
@@ -1763,11 +2278,17 @@ export class MoveInService {
           comments: data.comments ?? null,
           updatedBy: user?.id,
         })
-        .where('moveInRequestId = :requestId', { requestId })
+        .where('move_in_request_id = :requestId', { requestId })
         .execute();
 
       // Log the update
       await this.logMoveInRequestAction(requestId, 'UPDATE', 'Request updated by admin', user);
+
+      // Send email notifications about the update
+      const updatedRequest = await MoveInRequests.findOne({ where: { id: requestId } });
+      if (updatedRequest) {
+        await this.sendNotifications(requestId, updatedRequest.moveInRequestNo);
+      }
 
       return { id: requestId, message: 'HHC company move-in request updated successfully' };
     } catch (error: any) {
