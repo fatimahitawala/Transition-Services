@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { notFoundResponse, successResponse, successResponseWithData, successResponseWithPaginationData } from '../../Common/Utils/apiResponse';
+import { notFoundResponse, successResponse, successResponseWithData, successResponseWithPaginationCountData, successResponseWithPaginationData } from '../../Common/Utils/apiResponse';
 import { MoveOutService } from './moveOut.service';
 import { APICodes } from '../../Common/Constants';
 
@@ -21,7 +21,13 @@ export class MoveOutController {
     async getAllMoveOutListAdmin(req: Request, res: Response) {
         const { user }: Record<string, any> = req;
         const getList = await moveOutService.getAllMoveOutListAdmin(req.query, user)
-        return successResponseWithPaginationData(res, APICodes.COMMON_SUCCESS, getList.allMoveOutRequests, getList.pagination)
+        return successResponseWithPaginationCountData(
+            res,
+            APICodes.COMMON_SUCCESS,
+            getList.allMoveOutRequests,
+            getList.pagination,
+            getList.counts,
+        )
     }
 
     async adminApproveOrCancelRequest(req: Request, res: Response) {
@@ -35,7 +41,8 @@ export class MoveOutController {
     }
 
     async getMoveOutList(req: Request, res: Response) {
-        const getList = await moveOutService.getMoveOutList(req.query)
+        const { user }: Record<string, any> = req;
+        const getList = await moveOutService.getMoveOutList(req.query, user)
         return successResponseWithPaginationData(res, APICodes.COMMON_SUCCESS, getList.moveOutList, getList.pagination)
     }
 
@@ -61,6 +68,13 @@ export class MoveOutController {
         const moveOutRequest = await moveOutService.closeMoveOutRequestBySecurity(body, Number(requestId), user);
         if (!moveOutRequest) return notFoundResponse(res, APICodes.NOT_FOUND)
         return successResponse(res, APICodes.UPDATE_SUCCESS);
+    }
+
+    async createMoveOutRequestByAdmin(req: Request, res: Response) {
+        const { user, body }: Record<string, any> = req;
+        const moveOutRequest = await moveOutService.createMoveOutRequestByAdmin(body, user);
+        if (!moveOutRequest) return notFoundResponse(res, APICodes.NOT_FOUND)
+        return successResponseWithData(res, APICodes.CREATE_SUCCESS, moveOutRequest);
     }
 
     async createMoveOutRequestByUser(req: Request, res: Response) {

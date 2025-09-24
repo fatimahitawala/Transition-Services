@@ -6,15 +6,17 @@ import { MoveOutRequests } from "../../Entities/MoveOutRequests.entity";
 import { getPaginationInfo } from "../../Common/Utils/paginationUtils";
 import { checkAdminPermission, checkIsSecurity } from "../../Common/Utils/adminAccess";
 import { Units } from "../../Entities/Units.entity";
-import { MOVE_IN_AND_OUT_REQUEST_STATUS } from "../../Entities/EntityTypes";
-import { addNotification } from "../../Common/Utils/notification";
+import { MOVE_IN_AND_OUT_REQUEST_STATUS, MOVE_IN_USER_TYPES, MOVE_REQUEST_STATUS } from "../../Entities/EntityTypes";
+import { addNotification, addAdminNotification } from "../../Common/Utils/notification";
 import { UserRoles } from "../../Entities/UserRoles.entity";
+import { MoveInRequests } from "../../Entities/MoveInRequests.entity";
+import { AccountRenewalRequests } from "../../Entities/AccountRenewalRequests.entity";
 
 export class MoveOutService {
 
     async getAllMoveOutListAdmin(query: any, user: any) {
         try {
-            const { page = 1, per_page = 20, requestId, moveOutType, masterCommunity, community, tower, unit, createdDate, moveOutDate, requestStatus } = query
+            const { page = 1, per_page = 20, requestId, moveOutType, masterCommunity, community, tower, unit, createdDate, createdStartDate, createdEndDate, moveOutDate, requestStatus, moveOutRequestNo } = query
             let qb = MoveOutRequests.getRepository().createQueryBuilder("mor")
                 .select([
                     "mor.id",
@@ -32,6 +34,8 @@ export class MoveOutService {
                     "mor.createdBy",
                     "mor.moveOutDate",
                     "mor.status",
+                    "mor.createdAt",
+                    "mor.updatedAt",
                 ])
                 .innerJoin("mor.user", "user", "user.isActive = true")
                 .innerJoin("mor.unit", "unit", "unit.isActive = true")
@@ -47,6 +51,9 @@ export class MoveOutService {
                 qb.andWhere("mor.status IN (:...allowedStatuses)", { allowedStatuses: [MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED, MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED] });
             }
 
+            // Clone a base query for counts (not affected by filter params)
+            const countBaseQb = qb.clone();
+
             if (requestId) qb.andWhere("mor.id = :requestId", { requestId });
             if (moveOutType) qb.andWhere("mor.requestType = :moveOutType", { moveOutType });
             if (masterCommunity) qb.andWhere("masterCommunity.id = :masterCommunity", { masterCommunity });
@@ -54,7 +61,10 @@ export class MoveOutService {
             if (tower) qb.andWhere("tower.id = :tower", { tower });
             if (unit) qb.andWhere("unit.id = :unit", { unit });
             if (requestStatus) qb.andWhere("mor.status = :requestStatus", { requestStatus });
+            if (moveOutRequestNo) qb.andWhere("mor.moveOutRequestNo = :moveOutRequestNo", { moveOutRequestNo });
             if (createdDate) qb.andWhere("DATE(mor.createdAt) = :createdDate", { createdDate });
+            if (createdStartDate) qb.andWhere("DATE(mor.createdAt) >= :createdStartDate", { createdStartDate });
+            if (createdEndDate) qb.andWhere("DATE(mor.createdAt) <= :createdEndDate", { createdEndDate });
             if (moveOutDate) qb.andWhere("DATE(mor.moveOutDate) = :moveOutDate", { moveOutDate });
 
             qb.orderBy("mor.createdAt", "DESC")
@@ -63,7 +73,12 @@ export class MoveOutService {
             const count = await qb.getCount();
             const list = await qb.getMany();
             const pagination = getPaginationInfo(page, per_page, count);
-            return { allMoveOutRequests: list, pagination };
+            // Counts not based on filters/params (but respecting permission scope)
+            const totalCount = await countBaseQb.getCount();
+            const approvedCount = await countBaseQb.clone().andWhere("mor.status = :approvedStatus", { approvedStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED }).getCount();
+            const closedCount = await countBaseQb.clone().andWhere("mor.status = :closedStatus", { closedStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED }).getCount();
+
+            return { allMoveOutRequests: list, pagination, counts: { totalCount, approvedCount, closedCount } };
         } catch (error) {
             logger.error('Error in getAllMoveOutListAdmin : ' + JSON.stringify(error));
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
@@ -80,6 +95,7 @@ export class MoveOutService {
                     "unit.id as unitId",
                     "mor.moveOutRequestNo as moveOutRequestNo",
                     "mor.moveOutDate as moveOutDate",
+                    "mor.status as status",
                     "unit.unitName as unitName",
                     "unit.unitNumber as unitNumber",
                     "user.firstName as firstName",
@@ -95,50 +111,89 @@ export class MoveOutService {
             moveOutRequest = checkAdminPermission(moveOutRequest, { towerId: 'tower.id', communityId: 'community.id', masterCommunityId: 'masterCommunity.id' }, user);
             const result = await moveOutRequest.getRawOne();
 
-            if (result) {
-
-                const updateData: any = {
-                    status: params?.action === 'approve' ? MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED : MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED,
-                    updatedBy: user.id,
-                    moveOutDate: body?.moveOutDate,
-                    comments: body?.reason
-                };
-
-                await MoveOutRequests.getRepository().update({ id: result.id }, updateData);
-
-                const userId = result?.userId
-                const unitId = result?.unitId
-
-                const userRole = UserRoles.getRepository()
-                    .createQueryBuilder("ur")
-                    .innerJoin("ur.user", "user", "user.isActive = true")
-                    .innerJoin("ur.unit", "unit", "unit.isActive = true")
-                    .innerJoinAndSelect("ur.role", "role", "role.isActive = true")
-                    .where("user.id = :userId", { userId })
-                    .andWhere("unit.id = :unitId", { unitId })
-                    .select(["role.slug as slug"]);
-
-                const userRoleResult = await userRole.getRawOne();
-
-                if (params?.action == 'approve') {
-
-                    const payload = {
-                        "<request_no>": result.moveOutRequestNo,
-                        "<user_type>": userRoleResult?.slug,
-                        "<property_details>": `${result.unitName}, ${result.unitNumber}`,
-                        "<occupant_name>": `${result?.firstName} ${result?.lastName}`,
-                        "<move_out_date>": result?.moveOutDate,
-                        "<end_date>": '',
-                        "<permit_date>": ''
-                    }
-                    addNotification(userId, 'move_out_request_approval_to_user', { "<request_no>": result.moveOutRequestNo })
-                    addNotification(userId, 'move_out_request_approval_to_user_mail', payload)
-                } else {
-                    addNotification(userId, 'move_out_request_cancel_to_user', { "<request_no>": result.moveOutRequestNo })
-                }
-
-                return result;
+            if (!result) {
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.REQUEST_NOT_FOUND.message, APICodes.REQUEST_NOT_FOUND.code);
             }
+
+            const action = params?.action;
+            if (!['approve', 'cancel'].includes(action)) {
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_ACTION_ERROR.message, APICodes.INVALID_ACTION_ERROR.code);
+            }
+
+            if (action === 'approve') {
+                if (result.status === MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
+                    throw new ApiError(httpStatus.CONFLICT, APICodes.ALREADY_APPROVED.message, APICodes.ALREADY_APPROVED.code);
+                }
+                if (result.status === MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED) {
+                    throw new ApiError(httpStatus.CONFLICT, APICodes.ALREADY_CLOSED_ERROR.message, APICodes.ALREADY_CLOSED_ERROR.code);
+                }
+                if (result.status === MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED || result.status === MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED) {
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.APPROVAL_NOT_POSSIBLE.message, APICodes.APPROVAL_NOT_POSSIBLE.code);
+                }
+            } else if (action === 'cancel') {
+                if (result.status === MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED) {
+                    throw new ApiError(httpStatus.CONFLICT, APICodes.ALREADY_CLOSED_ERROR.message, APICodes.ALREADY_CLOSED_ERROR.code);
+                }
+                if (result.status === MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED || result.status === MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED) {
+                    throw new ApiError(httpStatus.CONFLICT, APICodes.ALREADY_CANCELLED_ERROR.message, APICodes.ALREADY_CANCELLED_ERROR.code);
+                }
+                if (result.status === MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.CANCELATION_NOT_POSSIBLE.message, APICodes.CANCELATION_NOT_POSSIBLE.code);
+                }
+            }
+
+            const updateData: any = {
+                status: action === 'approve' ? MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED : MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED,
+                updatedBy: user.id,
+                moveOutDate: body?.moveOutDate,
+                comments: body?.reason
+            };
+
+            await MoveOutRequests.getRepository().update({ id: result.id }, updateData);
+
+            const userId = result?.userId
+            const unitId = result?.unitId
+
+            const userRole = UserRoles.getRepository()
+                .createQueryBuilder("ur")
+                .innerJoin("ur.user", "user", "user.isActive = true")
+                .innerJoin("ur.unit", "unit", "unit.isActive = true")
+                .innerJoinAndSelect("ur.role", "role", "role.isActive = true")
+                .where("user.id = :userId", { userId })
+                .andWhere("unit.id = :unitId", { unitId })
+                .select(["role.slug as slug"]);
+
+            const userRoleResult = await userRole.getRawOne();
+
+            if (action === 'approve') {
+
+                const payload = {
+                    "<request_no>": result.moveOutRequestNo,
+                    "<user_type>": userRoleResult?.slug,
+                    "<property_details>": `${result.unitName}, ${result.unitNumber}`,
+                    "<occupant_name>": `${result?.firstName} ${result?.lastName}`,
+                    "<move_out_date>": result?.moveOutDate,
+                    "<end_date>": '',
+                    "<permit_date>": ''
+                }
+                addNotification(userId, 'move_out_request_approval_to_user', { "<request_no>": result.moveOutRequestNo })
+                console.log("Sending move_out_request_approval_to_user_mail notification", userId, payload);
+
+                addNotification(userId, 'move_out_request_approval_to_user_mail', payload)
+                // Notify Security Team on approval (non-blocking)
+                try {
+                    await addAdminNotification(
+                        user.id,
+                        'move_out_request_approved_security',
+                        { "<request_no>": result.moveOutRequestNo, "<move_out_date>": result.moveOutDate },
+                        { unit_id: unitId }
+                    );
+                } catch (e) { }
+            } else {
+                addNotification(userId, 'move_out_request_cancel_to_user', { "<request_no>": result.moveOutRequestNo })
+            }
+
+            return result;
         } catch (error) {
             logger.error(`Error in adminApproveOrCancelRequest : ${JSON.stringify(error)}`);
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
@@ -146,7 +201,7 @@ export class MoveOutService {
         }
     }
 
-    async getMoveOutList(query: any) {
+    async getMoveOutList(query: any, user: any) {
         try {
             const { page = 1, per_page = 20, status, unitIds } = query
             let qb = MoveOutRequests.getRepository().createQueryBuilder("mor")
@@ -173,6 +228,11 @@ export class MoveOutService {
                 .innerJoin("unit.tower", "tower", "tower.isActive = true")
                 .innerJoin("unit.community", "community", "community.isActive = true")
                 .where("mor.isActive = true");
+
+            // Restrict to current user's requests for mobile listing
+            if (user?.id) {
+                qb.andWhere("user.id = :userId", { userId: Number(user.id) });
+            }
 
             if (status) qb.andWhere("mor.status = :status", { status });
             if (unitIds) qb.andWhere("unit.id IN (:...unitIds)", { unitIds: unitIds.split(',').filter((e: any) => e) });
@@ -230,6 +290,9 @@ export class MoveOutService {
             moveOutRequest = checkAdminPermission(moveOutRequest, { towerId: 'tower.id', communityId: 'community.id', masterCommunityId: 'masterCommunity.id' }, user);
             moveOutRequest.getOne();
             const result = await moveOutRequest.getOne();
+            if (!result) {
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.REQUEST_NOT_FOUND.message, APICodes.REQUEST_NOT_FOUND.code);
+            }
             return result;
         } catch (error) {
             logger.error(`Error in getMoveOutRequestById : ${JSON.stringify(error)}`);
@@ -243,13 +306,26 @@ export class MoveOutService {
             const moveOutRequest = await MoveOutRequests.getRepository().findOne({
                 where: { id: requestId, user: { id: userId } }
             });
-            if (moveOutRequest && moveOutRequest.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
-                moveOutRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED;
-                moveOutRequest.comments = body.reason;
-                moveOutRequest.updatedBy = userId;
-                await moveOutRequest.save();
-                return moveOutRequest;
+
+            if (!moveOutRequest) {
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.REQUEST_NOT_FOUND.message, APICodes.REQUEST_NOT_FOUND.code);
             }
+
+            if (moveOutRequest.status === MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.CANCELATION_NOT_POSSIBLE.message, APICodes.CANCELATION_NOT_POSSIBLE.code);
+            }
+            if (moveOutRequest.status === MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED) {
+                throw new ApiError(httpStatus.CONFLICT, APICodes.ALREADY_CLOSED_ERROR.message, APICodes.ALREADY_CLOSED_ERROR.code);
+            }
+            if (moveOutRequest.status === MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED || moveOutRequest.status === MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED) {
+                throw new ApiError(httpStatus.CONFLICT, APICodes.ALREADY_CANCELLED_ERROR.message, APICodes.ALREADY_CANCELLED_ERROR.code);
+            }
+
+            moveOutRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED;
+            moveOutRequest.comments = body.reason;
+            moveOutRequest.updatedBy = userId;
+            await moveOutRequest.save();
+            return moveOutRequest;
         } catch (error) {
             logger.error(`Error in cancelMoveOutRequestByUser : ${JSON.stringify(error)}`);
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
@@ -259,20 +335,34 @@ export class MoveOutService {
 
     async closeMoveOutRequestBySecurity(body: any, requestId: number, user: any) {
         try {
-            const moveOutRequest = await MoveOutRequests.getRepository().findOne({
-                where: { id: requestId, status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED }
-            });
             const isSecurity = await checkIsSecurity(user);
-
-            if (moveOutRequest && isSecurity) {
-                moveOutRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED;
-                moveOutRequest.moveOutDate = body.moveOutDate;
-                moveOutRequest.updatedBy = user.id;
-                await moveOutRequest.save();
-                const userId = moveOutRequest.user.id;
-                addNotification(userId, 'move_out_request_closure_to_user', { "<request_no>": moveOutRequest.moveOutRequestNo });
-                return moveOutRequest;
+            if (!isSecurity) {
+                throw new ApiError(httpStatus.FORBIDDEN, APICodes.INSUFFICIENT_USER_PRIVILEGE.message, APICodes.INSUFFICIENT_USER_PRIVILEGE.code);
             }
+
+            const moveOutRequest = await MoveOutRequests.getRepository().findOne({
+                where: { id: requestId }
+            });
+
+            if (!moveOutRequest) {
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.REQUEST_NOT_FOUND.message, APICodes.REQUEST_NOT_FOUND.code);
+            }
+
+            if (moveOutRequest.status === MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED) {
+                throw new ApiError(httpStatus.CONFLICT, APICodes.ALREADY_CLOSED_ERROR.message, APICodes.ALREADY_CLOSED_ERROR.code);
+            }
+
+            if (moveOutRequest.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.APPROVAL_NOT_POSSIBLE.message, APICodes.APPROVAL_NOT_POSSIBLE.code);
+            }
+
+            moveOutRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED;
+            moveOutRequest.moveOutDate = body.moveOutDate;
+            moveOutRequest.updatedBy = user.id;
+            await moveOutRequest.save();
+            const userId = moveOutRequest.user.id;
+            addNotification(userId, 'move_out_request_closure_to_user', { "<request_no>": moveOutRequest.moveOutRequestNo });
+            return moveOutRequest;
         } catch (error) {
             logger.error(`Error in closeMoveOutRequestBySecurity : ${JSON.stringify(error)}`);
             const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
@@ -310,33 +400,36 @@ export class MoveOutService {
     async createMoveOutRequestByUser(body: any, user: any): Promise<MoveOutRequests | null> {
         try {
 
-            // get user role id from user roles table
-            const userRole = UserRoles.getRepository()
-                .createQueryBuilder("ur")
-                .innerJoin("ur.user", "user", "user.isActive = true")
-                .innerJoin("ur.unit", "unit", "unit.isActive = true")
-                .innerJoinAndSelect("ur.role", "role", "role.isActive = true")
-                .where("user.id = :userId", { userId: user.id })
-                .andWhere("unit.id = :unitId", { unitId: body.unitId })
-                .select(["role.slug as slug"]);
+            const requestUserId = Number(user.id);
+            const targetUnitId = Number(body.unitId);
 
-            const userRoleResult = await userRole.getRawOne();
-
-            if (!userRoleResult) {
-                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.ROLE_NOT_FOUND.message, APICodes.ROLE_NOT_FOUND.code);
-            }
+            const userRoleSlug = await this.getUserRoleSlugForUnit(requestUserId, targetUnitId);
+            const { moveInRequest, accountRenewalRequest } = await this.getMoveInAndRenewalRequests(requestUserId, targetUnitId);
             const moveOutRequestNo = await this.generateMoveOutRequestNo();
             const moveOutRequest = new MoveOutRequests();
             moveOutRequest.moveOutRequestNo = moveOutRequestNo;
-            moveOutRequest.requestType = userRoleResult.slug;
+            moveOutRequest.requestType = userRoleSlug;
             moveOutRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
             moveOutRequest.moveOutDate = body.moveOutDate;
             moveOutRequest.comments = body.comments;
             moveOutRequest.createdBy = user.id;
             moveOutRequest.updatedBy = user.id;
-            moveOutRequest.user = { id: user.id } as any;
-            moveOutRequest.unit = { id: body.unitId } as any;
+            moveOutRequest.user = { id: requestUserId } as any;
+            moveOutRequest.unit = { id: targetUnitId } as any;
+            moveOutRequest.moveInRequest = { id: moveInRequest.id } as any;
+            if (accountRenewalRequest) {
+                moveOutRequest.accountRenewalRequest = { id: accountRenewalRequest.id } as any;
+            }
             await moveOutRequest.save();
+            // Notify Community Admins on submission (non-blocking)
+            try {
+                await addAdminNotification(
+                    user.id,
+                    'move_out_request_submission_admin',
+                    { "<request_no>": moveOutRequest.moveOutRequestNo },
+                    { unit_id: targetUnitId }
+                );
+            } catch (e) { }
             return moveOutRequest;
         } catch (error) {
             logger.error(`Error in createMoveOutRequestByUser : ${JSON.stringify(error)}`);
@@ -345,8 +438,106 @@ export class MoveOutService {
         }
     }
 
+    async createMoveOutRequestByAdmin(body: any, adminUser: any): Promise<MoveOutRequests | null> {
+        try {
+            if (!adminUser?.isAdmin) {
+                throw new ApiError(httpStatus.FORBIDDEN, APICodes.INVALID_USER_ROLE.message, APICodes.INVALID_USER_ROLE.code);
+            }
+
+            const { unitId, userId, moveOutDate, comments } = body;
+
+            if (!unitId || !userId || !moveOutDate) {
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
+            }
+
+            const occupantUserId = Number(userId);
+            const targetUnitId = Number(unitId);
+
+            const userRoleSlug = await this.getUserRoleSlugForUnit(occupantUserId, targetUnitId);
+            const { moveInRequest, accountRenewalRequest } = await this.getMoveInAndRenewalRequests(occupantUserId, targetUnitId);
+
+            const moveOutRequestNo = await this.generateMoveOutRequestNo();
+            const moveOutRequest = new MoveOutRequests();
+            moveOutRequest.moveOutRequestNo = moveOutRequestNo;
+            moveOutRequest.requestType = userRoleSlug;
+            moveOutRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
+            moveOutRequest.moveOutDate = moveOutDate;
+            moveOutRequest.comments = comments;
+            moveOutRequest.createdBy = adminUser.id;
+            moveOutRequest.updatedBy = adminUser.id;
+            moveOutRequest.user = { id: occupantUserId } as any;
+            moveOutRequest.unit = { id: targetUnitId } as any;
+            moveOutRequest.moveInRequest = { id: moveInRequest.id } as any;
+            if (accountRenewalRequest) {
+                moveOutRequest.accountRenewalRequest = { id: accountRenewalRequest.id } as any;
+            }
+
+            await moveOutRequest.save();
+            return moveOutRequest;
+        } catch (error) {
+            logger.error(`Error in createMoveOutRequestByAdmin : ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
+        }
+    }
+
     private async generateMoveOutRequestNo(): Promise<string> {
-        return `MOP-${Date.now()}`;
+        const repository = MoveOutRequests.getRepository();
+        const totalRequests = await repository.count();
+        const nextRequestNumber = totalRequests + 1;
+        return `MOP-${nextRequestNumber}`;
+    }
+
+    private async getUserRoleSlugForUnit(userId: number, unitId: number): Promise<MOVE_IN_USER_TYPES> {
+        const userRole = UserRoles.getRepository()
+            .createQueryBuilder("ur")
+            .innerJoin("ur.user", "user", "user.isActive = true")
+            .innerJoin("ur.unit", "unit", "unit.isActive = true")
+            .innerJoinAndSelect("ur.role", "role", "role.isActive = true")
+            .where("user.id = :userId", { userId })
+            .andWhere("unit.id = :unitId", { unitId })
+            .select(["role.slug as slug"]);
+
+        const userRoleResult = await userRole.getRawOne();
+
+        const allowedRoles = Object.values(MOVE_IN_USER_TYPES) as MOVE_IN_USER_TYPES[];
+
+        if (!userRoleResult?.slug || !allowedRoles.includes(userRoleResult.slug as MOVE_IN_USER_TYPES)) {
+            throw new ApiError(httpStatus.BAD_REQUEST, APICodes.ROLE_NOT_FOUND.message, APICodes.ROLE_NOT_FOUND.code);
+        }
+
+        return userRoleResult.slug as MOVE_IN_USER_TYPES;
+    }
+
+    private async getMoveInAndRenewalRequests(userId: number, unitId: number): Promise<{ moveInRequest: MoveInRequests, accountRenewalRequest: AccountRenewalRequests | null }> {
+        const moveInRequest = await MoveInRequests.getRepository()
+            .createQueryBuilder("mir")
+            .innerJoin("mir.user", "mirUser", "mirUser.isActive = true")
+            .innerJoin("mir.unit", "mirUnit", "mirUnit.isActive = true")
+            .where("mir.isActive = true")
+            .andWhere("mirUser.id = :userId", { userId })
+            .andWhere("mirUnit.id = :unitId", { unitId })
+            .andWhere("mir.status IN (:...allowedStatuses)", { allowedStatuses: [MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED] })
+            .orderBy("mir.updatedAt", "DESC")
+            .getOne();
+
+        if (!moveInRequest) {
+            throw new ApiError(httpStatus.BAD_REQUEST, APICodes.MOVE_IN_REQUEST_NOT_FOUND.message, APICodes.MOVE_IN_REQUEST_NOT_FOUND.code);
+        }
+
+        const accountRenewalRequest = await AccountRenewalRequests.getRepository()
+            .createQueryBuilder("arr")
+            .innerJoin("arr.user", "arrUser", "arrUser.isActive = true")
+            .innerJoin("arr.unit", "arrUnit", "arrUnit.isActive = true")
+            .where("arr.isActive = true")
+            .andWhere("arrUser.id = :userId", { userId })
+            .andWhere("arrUnit.id = :unitId", { unitId })
+            .andWhere("arr.moveInRequest = :moveInRequestId", { moveInRequestId: moveInRequest.id })
+            .andWhere("arr.status = :status", { status: MOVE_REQUEST_STATUS.APPROVED })
+            .orderBy("arr.updatedAt", "DESC")
+            .getOne();
+
+        return { moveInRequest, accountRenewalRequest };
     }
 
 }

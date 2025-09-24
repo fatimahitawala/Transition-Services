@@ -12,7 +12,7 @@ const authMiddleware = new AuthMiddleware();
 
 router.get('/request-list', authMiddleware.auth(), catchAsync(moveOutController.getAllMoveOutListAdmin));
 router.get('/request-details/:requestId', authMiddleware.auth(), validate(moveOutValidation.getMoveOutRequestById), catchAsync(moveOutController.getMoveOutRequestById));
-// router.post('/createRequest', authMiddleware.auth(), catchAsync(moveOutController.createMoveOutRequest));
+router.post('/create-request', authMiddleware.auth(), validate(moveOutValidation.createMoveOutRequestByAdmin), catchAsync(moveOutController.createMoveOutRequestByAdmin));
 router.put('/update-status/:action/:requestId', authMiddleware.auth(), validate(moveOutValidation.adminApproveOrCancelRequest), catchAsync(moveOutController.adminApproveOrCancelRequest));
 router.put('/close-request/:requestId', authMiddleware.auth(), validate(moveOutValidation.closeMoveOutRequestBySecurity), catchAsync(moveOutController.closeMoveOutRequestBySecurity));
 
@@ -73,6 +73,16 @@ export default router;
  *           type: string
  *           format: date
  *       - in: query
+ *         name: createdStartDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: createdEndDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
  *         name: moveOutDate
  *         schema:
  *           type: string
@@ -81,9 +91,13 @@ export default router;
  *         name: requestStatus
  *         schema:
  *           type: string
+ *       - in: query
+ *         name: moveOutRequestNo
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: A list of move out requests
+ *         description: A list of move out requests with counts
  */
 
 /**
