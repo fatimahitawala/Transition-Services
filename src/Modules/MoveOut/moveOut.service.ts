@@ -358,6 +358,7 @@ export class MoveOutService {
 
             moveOutRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED;
             moveOutRequest.moveOutDate = body.moveOutDate;
+            moveOutRequest.comments = body?.reason;
             moveOutRequest.updatedBy = user.id;
             await moveOutRequest.save();
             const userId = moveOutRequest.user.id;
