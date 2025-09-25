@@ -180,6 +180,9 @@ export default router;
  *               moveOutDate:
  *                 type: string
  *                 format: date
+ *               reason:
+ *                 type: string
+ *                 description: Closure remarks by security
  *     responses:
  *       200:
  *         description: Move out request closed
