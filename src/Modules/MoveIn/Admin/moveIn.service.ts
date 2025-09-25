@@ -212,11 +212,11 @@ export class MoveInService {
         if (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
           logger.info(`Auto-approving ${requestType} move-in request ${savedMaster.id}`);
           await this.autoApproveRequest(qr, savedMaster.id, user?.id);
-          
+
           // Update the in-memory object to reflect the approved status
           savedMaster.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
           createdMaster = savedMaster;
-          
+
           logger.info(`Move-in request ${savedMaster.id} auto-approved, status updated to: ${savedMaster.status}`);
         }
 
@@ -241,8 +241,68 @@ export class MoveInService {
         logger.info(`Request Status: ${createdMaster.status}`);
         logger.info(`Request Type: ${requestType}`);
         logger.info(`Is Auto-approved: ${requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT}`);
-        
+
         await this.sendNotifications(createdMaster.id, createdMaster.moveInRequestNo);
+
+        // In-app notifications for auto-approved creation (Admin + Customer)
+        try {
+          if (createdMaster.status === MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
+            const fullRequest = await MoveInRequests.getRepository()
+              .createQueryBuilder('mir')
+              .leftJoinAndSelect('mir.unit', 'unit')
+              .leftJoinAndSelect('unit.masterCommunity', 'masterCommunity')
+              .leftJoinAndSelect('unit.community', 'community')
+              .leftJoinAndSelect('unit.tower', 'tower')
+              .leftJoinAndSelect('mir.user', 'user')
+              .where('mir.id = :id', { id: createdMaster.id })
+              .getOne();
+
+            if (fullRequest) {
+              const moveInDateStr = fullRequest.moveInDate
+                ? new Date(fullRequest.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' })
+                : '';
+              const residentType =
+                fullRequest.requestType === MOVE_IN_USER_TYPES.OWNER ? 'Owner' :
+                fullRequest.requestType === MOVE_IN_USER_TYPES.TENANT ? 'Tenant' :
+                fullRequest.requestType === MOVE_IN_USER_TYPES.HHO_OWNER ? 'HHO Owner' :
+                fullRequest.requestType === MOVE_IN_USER_TYPES.HHO_COMPANY ? 'HHO Company' : String(fullRequest.requestType);
+
+              const templateData: any = {
+                '<request_id>': fullRequest.moveInRequestNo,
+                '<request_ID>': fullRequest.moveInRequestNo,
+                '<move_in_date>': moveInDateStr,
+                '<resident_type>': residentType,
+                '<unit_number>': fullRequest.unit?.unitNumber || '',
+                '<tower_name>': fullRequest.unit?.tower?.name || '',
+                '<community_name>': fullRequest.unit?.community?.name || '',
+                '<master_community_name>': fullRequest.unit?.masterCommunity?.name || '',
+              };
+
+              const payload: any = {
+                user_id: fullRequest.user?.id,
+                unit_id: fullRequest.unit?.id,
+                status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
+                slug: 'move-in',
+                request_id: fullRequest.moveInRequestNo,
+              };
+
+              const { addNotification, addAdminNotification } = await import('../../../Common/Utils/notification');
+
+              // Admin in-app: auto-approved created
+              await addAdminNotification(user?.id || 0, 'move_in_auto_approved_created_to_admin', templateData, payload);
+              logger.info(`Admin auto-approved creation notification queued for ${fullRequest.moveInRequestNo}`);
+
+              // Customer in-app: auto-approved (owner vs tenant style)
+              const userTemplateSlug = [MOVE_IN_USER_TYPES.OWNER, MOVE_IN_USER_TYPES.HHO_OWNER].includes(fullRequest.requestType as any)
+                ? 'move_in_auto_approved_to_user_owner'
+                : 'move_in_auto_approved_to_user_tenant';
+              await addNotification(fullRequest.user.id, userTemplateSlug, templateData, payload);
+              logger.info(`User auto-approved notification queued (${userTemplateSlug}) for ${fullRequest.moveInRequestNo}`);
+            }
+          }
+        } catch (notifyErr) {
+          logger.error(`Failed creating auto-approved in-app notifications for ${createdMaster.moveInRequestNo}: ${notifyErr}`);
+        }
       } else {
         logger.error(`=== EMAIL NOTIFICATION SKIPPED ===`);
         logger.error(`createdMaster is null/undefined - no email will be sent`);
@@ -464,7 +524,7 @@ export class MoveInService {
       logger.info(`=== CREATE OWNER MOVE-IN START ===`);
       logger.info(`Input data: ${JSON.stringify(data)}`);
       logger.info(`User: ${JSON.stringify(user)}`);
-      
+
       // Map owner UI fields to details (user details come from Users table, not stored here)
       const { details = {}, ...rest } = data || {};
       const ownerDetails = {
@@ -480,12 +540,12 @@ export class MoveInService {
 
       logger.info(`Owner Details mapped: ${JSON.stringify(ownerDetails)}`);
       logger.info(`Calling createMoveInRequest with OWNER type...`);
-      
+
       const result = await this.createMoveInRequest({ ...rest, details: ownerDetails, requestType: MOVE_IN_USER_TYPES.OWNER }, user);
-      
+
       logger.info(`=== CREATE OWNER MOVE-IN SUCCESS ===`);
       logger.info(`Created move-in request: ${JSON.stringify(result)}`);
-      
+
       return result;
     } catch (error) {
       logger.error(`=== CREATE OWNER MOVE-IN ERROR ===`);
@@ -771,15 +831,15 @@ export class MoveInService {
   async getAllMoveInRequestList(query: any, user: any) {
     try {
       const isSecurity = await checkIsSecurity(user);
-      let { 
-        page = 1, 
-        per_page = 20, 
-        masterCommunityIds = "", 
-        communityIds = "", 
-        towerIds = "", 
-        createdStartDate = "", 
-        createdEndDate = "", 
-        moveInStartDate = "", 
+      let {
+        page = 1,
+        per_page = 20,
+        masterCommunityIds = "",
+        communityIds = "",
+        towerIds = "",
+        createdStartDate = "",
+        createdEndDate = "",
+        moveInStartDate = "",
         moveInEndDate = "",
         status = "",
         search = "",
@@ -822,7 +882,7 @@ export class MoveInService {
       if (masterCommunityIds && masterCommunityIds.length) getMoveInList.andWhere(`mc.id IN (:...masterCommunityIds)`, { masterCommunityIds });
       if (communityIds && communityIds.length) getMoveInList.andWhere(`c.id IN (:...communityIds)`, { communityIds });
       if (towerIds && towerIds.length) getMoveInList.andWhere(`t.id IN (:...towerIds)`, { towerIds });
-      
+
       // Date range filters - handle both start and end dates properly
       if (createdStartDate) {
         const startDate = new Date(createdStartDate);
@@ -848,12 +908,12 @@ export class MoveInService {
         getMoveInList.andWhere(`am.moveInDate <= :moveInEndDate`, { moveInEndDate: endDate });
         logger.debug(`Move-in End Date filter: ${moveInEndDate} -> ${endDate.toISOString()}`);
       }
-      
+
       if (status) getMoveInList.andWhere(`am.status = :status`, { status });
       if (requestId) getMoveInList.andWhere(`am.moveInRequestNo = :requestId`, { requestId });
       if (unitNumber) getMoveInList.andWhere(`u.unitNumber LIKE :unitNumber`, { unitNumber: `%${unitNumber}%` });
       if (requestType) getMoveInList.andWhere(`am.requestType = :requestType`, { requestType });
-      
+
       // Search functionality
       if (search) {
         getMoveInList.andWhere(`(
@@ -905,7 +965,7 @@ export class MoveInService {
       // Debug: Log the results
       logger.debug(`Total items found: ${count}, List length: ${list.length}`);
       logger.debug(`First few items: ${JSON.stringify(list.slice(0, 2))}`);
-      
+
       // Debug: Log unit data specifically
       if (list.length > 0) {
         const firstItem = list[0] as any;
@@ -1235,7 +1295,7 @@ export class MoveInService {
 
       // Get the primary recipient and CC emails based on request type
       const emailRecipients = await this.getEmailRecipients(moveInRequest);
-      
+
       if (!emailRecipients || !emailRecipients.primary.email) {
         logger.error(`EMAIL ERROR: No primary email recipient found for ${moveInRequest.requestType} request ${requestId}, unitId: ${moveInRequest.unit?.id}`);
         return;
@@ -1417,7 +1477,50 @@ export class MoveInService {
         //});
       });
 
-      // Send approval notifications
+      // Send in-app notification to requester (owner/tenant/company)
+      try {
+        const templateSlug = [MOVE_IN_USER_TYPES.OWNER, MOVE_IN_USER_TYPES.HHO_OWNER].includes(moveInRequest.requestType)
+          ? 'move_in_request_approval_to_owner'
+          : 'move_in_request_approval_to_tenant';
+
+        const residentType =
+          moveInRequest.requestType === MOVE_IN_USER_TYPES.OWNER ? 'Owner' :
+          moveInRequest.requestType === MOVE_IN_USER_TYPES.TENANT ? 'Tenant' :
+          moveInRequest.requestType === MOVE_IN_USER_TYPES.HHO_OWNER ? 'HHO Owner' :
+          moveInRequest.requestType === MOVE_IN_USER_TYPES.HHO_COMPANY ? 'HHO Company' : String(moveInRequest.requestType);
+
+        const moveInDateStr = moveInRequest.moveInDate
+          ? new Date(moveInRequest.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' })
+          : '';
+
+        const templateData: any = {
+          '<request_id>': moveInRequest.moveInRequestNo,
+          '<request_ID>': moveInRequest.moveInRequestNo, // support either placeholder variant
+          '<move_in_date>': moveInDateStr,
+          '<resident_type>': residentType,
+          '<unit_number>': moveInRequest.unit?.unitNumber || '',
+          '<tower_name>': moveInRequest.unit?.tower?.name || '',
+          '<community_name>': moveInRequest.unit?.community?.name || '',
+          '<master_community_name>': moveInRequest.unit?.masterCommunity?.name || '',
+        };
+
+        const payload: any = {
+          user_id: moveInRequest.user.id,
+          unit_id: moveInRequest.unit?.id,
+          status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
+          slug: 'move-in',
+          request_id: moveInRequest.moveInRequestNo,
+        };
+
+        // Lazy import to avoid circular deps at top
+        const { addNotification } = await import('../../../Common/Utils/notification');
+        await addNotification(moveInRequest.user.id, templateSlug, templateData, payload);
+        logger.info(`In-app notification queued for move-in approval (${templateSlug}) for request ${requestId}`);
+      } catch (notifyErr) {
+        logger.error(`Failed to create in-app notification for move-in approval ${requestId}: ${notifyErr}`);
+      }
+
+      // Send approval email notifications
       await this.sendApprovalNotifications(requestId, moveInRequest.moveInRequestNo);
 
       logger.info(`Move-in request ${requestId} approved by admin ${user?.id}`);
@@ -1509,6 +1612,49 @@ export class MoveInService {
 
       // Send RFI notifications
       await this.sendRFINotifications(requestId, moveInRequest.moveInRequestNo, comments);
+
+      // In-app notification to customer about RFI Pending
+      try {
+        const moveInDateStr = moveInRequest.moveInDate
+          ? new Date(moveInRequest.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' })
+          : '';
+        const residentType =
+          moveInRequest.requestType === MOVE_IN_USER_TYPES.OWNER ? 'Owner' :
+          moveInRequest.requestType === MOVE_IN_USER_TYPES.TENANT ? 'Tenant' :
+          moveInRequest.requestType === MOVE_IN_USER_TYPES.HHO_OWNER ? 'HHO Owner' :
+          moveInRequest.requestType === MOVE_IN_USER_TYPES.HHO_COMPANY ? 'HHO Company' : String(moveInRequest.requestType);
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' });
+        const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+        const templateData: any = {
+          '<request_id>': moveInRequest.moveInRequestNo,
+          '<request_ID>': moveInRequest.moveInRequestNo,
+          '<date>': dateStr,
+          '<time>': timeStr,
+          '<resident_type>': residentType,
+          '<unit_number>': moveInRequest.unit?.unitNumber || '',
+          '<tower_name>': (moveInRequest as any).unit?.tower?.name || '',
+          '<community_name>': (moveInRequest as any).unit?.community?.name || '',
+          '<master_community_name>': (moveInRequest as any).unit?.masterCommunity?.name || '',
+          '<comment_from_admin>': comments || ''
+        };
+
+        const payload: any = {
+          user_id: moveInRequest.user?.id,
+          unit_id: moveInRequest.unit?.id,
+          status: MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING,
+          slug: 'move-in',
+          request_id: moveInRequest.moveInRequestNo,
+        };
+
+        const { addNotification } = await import('../../../Common/Utils/notification');
+        await addNotification(moveInRequest.user.id, 'move_in_rfi_pending_to_user', templateData, payload);
+        logger.info(`In-app RFI Pending notification queued for user for request ${requestId}`);
+      } catch (notifyErr) {
+        logger.error(`Failed to create in-app RFI Pending notification for ${requestId}: ${notifyErr}`);
+      }
 
       logger.info(`Move-in request ${requestId} marked as RFI by admin ${user?.id}`);
 
@@ -1604,6 +1750,47 @@ export class MoveInService {
 
       // Send cancellation notifications
       await this.sendCancellationNotifications(requestId, moveInRequest.moveInRequestNo, cancellationRemarks);
+
+      // In-app notification to customer about Admin Cancellation
+      try {
+        const moveInDateStr = moveInRequest.moveInDate
+          ? new Date(moveInRequest.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' })
+          : '';
+        const residentType =
+          moveInRequest.requestType === MOVE_IN_USER_TYPES.OWNER ? 'Owner' :
+          moveInRequest.requestType === MOVE_IN_USER_TYPES.TENANT ? 'Tenant' :
+          moveInRequest.requestType === MOVE_IN_USER_TYPES.HHO_OWNER ? 'HHO Owner' :
+          moveInRequest.requestType === MOVE_IN_USER_TYPES.HHO_COMPANY ? 'HHO Company' : String(moveInRequest.requestType);
+
+        const cancellationDate = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' });
+
+        const templateData: any = {
+          '<request_id>': moveInRequest.moveInRequestNo,
+          '<request_ID>': moveInRequest.moveInRequestNo,
+          '<move_in_date>': moveInDateStr,
+          '<cancellation_date>': cancellationDate,
+          '<resident_type>': residentType,
+          '<unit_number>': moveInRequest.unit?.unitNumber || '',
+          '<tower_name>': moveInRequest.unit?.tower?.name || '',
+          '<community_name>': moveInRequest.unit?.community?.name || '',
+          '<master_community_name>': moveInRequest.unit?.masterCommunity?.name || '',
+          '<comment_from_admin>': cancellationRemarks || ''
+        };
+
+        const payload: any = {
+          user_id: moveInRequest.user?.id,
+          unit_id: moveInRequest.unit?.id,
+          status: MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED,
+          slug: 'move-in',
+          request_id: moveInRequest.moveInRequestNo,
+        };
+
+        const { addNotification } = await import('../../../Common/Utils/notification');
+        await addNotification(moveInRequest.user.id, 'move_in_admin_cancelled_to_user', templateData, payload);
+        logger.info(`Admin-cancelled in-app notification queued for user for request ${requestId}`);
+      } catch (notifyErr) {
+        logger.error(`Failed to create in-app Admin-cancelled notification for ${requestId}: ${notifyErr}`);
+      }
 
       logger.info(`Move-in request ${requestId} cancelled by admin ${user?.id}`);
 
@@ -1719,6 +1906,55 @@ export class MoveInService {
         // TODO: Add to Active Residents list
       });
 
+      // In-app admin notification: closed by security/admin
+      try {
+        const fullRequest = await MoveInRequests.getRepository()
+          .createQueryBuilder('mir')
+          .leftJoinAndSelect('mir.unit', 'unit')
+          .leftJoinAndSelect('unit.masterCommunity', 'masterCommunity')
+          .leftJoinAndSelect('unit.community', 'community')
+          .leftJoinAndSelect('unit.tower', 'tower')
+          .leftJoinAndSelect('mir.user', 'user')
+          .where('mir.id = :id', { id: requestId })
+          .getOne();
+
+        if (fullRequest) {
+          const moveInDateStr = fullRequest.moveInDate
+            ? new Date(fullRequest.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' })
+            : '';
+          const residentType =
+            fullRequest.requestType === MOVE_IN_USER_TYPES.OWNER ? 'Owner' :
+            fullRequest.requestType === MOVE_IN_USER_TYPES.TENANT ? 'Tenant' :
+            fullRequest.requestType === MOVE_IN_USER_TYPES.HHO_OWNER ? 'HHO Owner' :
+            fullRequest.requestType === MOVE_IN_USER_TYPES.HHO_COMPANY ? 'HHO Company' : String(fullRequest.requestType);
+
+          const templateData: any = {
+            '<request_id>': fullRequest.moveInRequestNo,
+            '<request_ID>': fullRequest.moveInRequestNo,
+            '<move_in_date>': moveInDateStr,
+            '<resident_type>': residentType,
+            '<unit_number>': fullRequest.unit?.unitNumber || '',
+            '<tower_name>': fullRequest.unit?.tower?.name || '',
+            '<community_name>': fullRequest.unit?.community?.name || '',
+            '<master_community_name>': fullRequest.unit?.masterCommunity?.name || '',
+          };
+
+          const payload: any = {
+            user_id: fullRequest.user?.id,
+            unit_id: fullRequest.unit?.id,
+            status: MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED,
+            slug: 'move-in',
+            request_id: fullRequest.moveInRequestNo,
+          };
+
+          const { addAdminNotification } = await import('../../../Common/Utils/notification');
+          await addAdminNotification(user?.id || 0, 'move_in_closed_by_security_to_admin', templateData, payload);
+          logger.info(`Closed-by-security/admin in-app admin notification queued for ${fullRequest.moveInRequestNo}`);
+        }
+      } catch (notifyErr) {
+        logger.error(`Failed to send closed-by-security/admin in-app notification for ${requestId}: ${notifyErr}`);
+      }
+
       logger.info(`Move-in request ${requestId} closed by ${isSecurity ? 'security' : 'admin'} ${user?.id}`);
 
       return {
@@ -1737,7 +1973,7 @@ export class MoveInService {
   /**
    * Get email recipients (primary and CC) based on request type
    */
-  private async getEmailRecipients(moveInRequest: any): Promise<{primary: {firstName: string, lastName: string, email: string}, cc: string[]} | null> {
+  private async getEmailRecipients(moveInRequest: any): Promise<{ primary: { firstName: string, lastName: string, email: string }, cc: string[] } | null> {
     try {
       logger.info(`Getting email recipients for ${moveInRequest.requestType} request ${moveInRequest.id}, unitId: ${moveInRequest.unit?.id}`);
 
@@ -1757,7 +1993,7 @@ export class MoveInService {
           }
           break;
         }
-        
+
         case MOVE_IN_USER_TYPES.TENANT: {
           // For tenant requests: primary = tenant, CC = owner
           const tenantDetails = await MoveInRequestDetailsTenant.getRepository()
@@ -1765,7 +2001,7 @@ export class MoveInService {
             .where("tenant.move_in_request_id = :requestId", { requestId: moveInRequest.id })
             .andWhere("tenant.is_active = true")
             .getOne();
-          
+
           if (tenantDetails && tenantDetails.email) {
             primary = {
               firstName: tenantDetails.firstName || '',
@@ -1773,7 +2009,7 @@ export class MoveInService {
               email: tenantDetails.email
             };
             logger.info(`Tenant request: Primary email set to tenant (${tenantDetails.email})`);
-            
+
             // Add owner as CC
             if (ownerInfo && ownerInfo.email) {
               cc.push(ownerInfo.email);
@@ -1782,7 +2018,7 @@ export class MoveInService {
           }
           break;
         }
-        
+
         case MOVE_IN_USER_TYPES.HHO_OWNER: {
           // For HHO owner requests: primary = HHO owner, CC = unit owner
           const hhoDetails = await MoveInRequestDetailsHhoOwner.getRepository()
@@ -1790,7 +2026,7 @@ export class MoveInService {
             .where("hho.move_in_request_id = :requestId", { requestId: moveInRequest.id })
             .andWhere("hho.is_active = true")
             .getOne();
-          
+
           if (hhoDetails && hhoDetails.email) {
             primary = {
               firstName: hhoDetails.ownerFirstName || '',
@@ -1798,7 +2034,7 @@ export class MoveInService {
               email: hhoDetails.email
             };
             logger.info(`HHO Owner request: Primary email set to HHO owner (${hhoDetails.email})`);
-            
+
             // Add unit owner as CC
             if (ownerInfo && ownerInfo.email && ownerInfo.email !== hhoDetails.email) {
               cc.push(ownerInfo.email);
@@ -1807,7 +2043,7 @@ export class MoveInService {
           }
           break;
         }
-        
+
         case MOVE_IN_USER_TYPES.HHO_COMPANY: {
           // For HHC company requests: primary = companyEmail, CC = unit owner
           const companyDetails = await MoveInRequestDetailsHhcCompany.getRepository()
@@ -1815,7 +2051,7 @@ export class MoveInService {
             .where("company.move_in_request_id = :requestId", { requestId: moveInRequest.id })
             .andWhere("company.is_active = true")
             .getOne();
-          
+
           if (companyDetails && companyDetails.companyEmail) {
             primary = {
               firstName: companyDetails.name || '',
@@ -1823,7 +2059,7 @@ export class MoveInService {
               email: companyDetails.companyEmail
             };
             logger.info(`HHC Company request: Primary email set to company (${companyDetails.companyEmail})`);
-            
+
             // Add unit owner as CC
             if (ownerInfo && ownerInfo.email) {
               cc.push(ownerInfo.email);
@@ -1849,7 +2085,7 @@ export class MoveInService {
   /**
    * Get unit owner information from unit_bookings table
    */
-  private async getUnitOwnerFromBookings(unitId: number): Promise<{firstName: string, lastName: string, email: string} | null> {
+  private async getUnitOwnerFromBookings(unitId: number): Promise<{ firstName: string, lastName: string, email: string } | null> {
     try {
       logger.info(`Getting unit owner from unit_bookings for unitId: ${unitId}`);
 
@@ -1867,7 +2103,7 @@ export class MoveInService {
         const lastName = nameParts.slice(1).join(' ') || 'Owner';
 
         logger.info(`Found unit owner from unit_bookings: ${firstName} ${lastName} (${unitBooking.customerEmail})`);
-        
+
         return {
           firstName: firstName,
           lastName: lastName,
@@ -2057,7 +2293,7 @@ export class MoveInService {
     try {
       // Check if request exists and is editable
       const request = await this.ensureEditableByAdmin(requestId, user);
-      
+
       // Update the main request
       await MoveInRequests.getRepository()
         .createQueryBuilder()
@@ -2111,7 +2347,7 @@ export class MoveInService {
     try {
       // Check if request exists and is editable
       const request = await this.ensureEditableByAdmin(requestId, user);
-      
+
       // Update the main request
       await MoveInRequests.getRepository()
         .createQueryBuilder()
@@ -2177,7 +2413,7 @@ export class MoveInService {
     try {
       // Check if request exists and is editable
       const request = await this.ensureEditableByAdmin(requestId, user);
-      
+
       // Update the main request
       await MoveInRequests.getRepository()
         .createQueryBuilder()
@@ -2237,7 +2473,7 @@ export class MoveInService {
     try {
       // Check if request exists and is editable
       const request = await this.ensureEditableByAdmin(requestId, user);
-      
+
       // Update the main request
       await MoveInRequests.getRepository()
         .createQueryBuilder()
@@ -2315,17 +2551,17 @@ export class MoveInService {
       .createQueryBuilder('mir')
       .where('mir.id = :requestId AND mir.isActive = true', { requestId })
       .getOne();
-    
+
     if (!request) {
       throw new ApiError(httpStatus.NOT_FOUND, APICodes.NOT_FOUND.message, APICodes.NOT_FOUND.code);
     }
 
     // Admin can edit requests in new, rfi-pending, or rfi-submitted status
-    if (request.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN && 
-        request.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING && 
-        request.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED) {
-      throw new ApiError(httpStatus.BAD_REQUEST, 
-        "Request can only be updated when status is 'new', 'rfi-pending', or 'rfi-submitted'", 
+    if (request.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN &&
+      request.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING &&
+      request.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED) {
+      throw new ApiError(httpStatus.BAD_REQUEST,
+        "Request can only be updated when status is 'new', 'rfi-pending', or 'rfi-submitted'",
         APICodes.VALIDATION_ERROR.code);
     }
 
@@ -2352,4 +2588,3 @@ export class MoveInService {
     }
   }
 }
-
