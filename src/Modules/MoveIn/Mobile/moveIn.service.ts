@@ -23,12 +23,142 @@ import { uploadFile } from "../../../Common/Utils/azureBlobStorage";
 import { UnitBookings } from "../../../Entities/UnitBookings.entity";
 import config from "../../../Common/Config/config";
 import { EmailService, MoveInEmailData } from "../../Email/email.service";
+import { AppDataSource } from "../../../Common/data-source";
+import { OccupancyRequestWelcomePack } from "../../../Entities/OccupancyRequestWelcomePack.entity";
+import { OccupancyRequestEmailRecipients } from "../../../Entities/OccupancyRequestEmailRecipients.entity";
+import { OccupancyRequestTemplates } from "../../../Entities/OccupancyRequestTemplates.entity";
 
 export class MoveInService {
   private emailService: EmailService;
 
   constructor() {
     this.emailService = new EmailService();
+  }
+
+  /**
+   * Validate Welcome Pack and MIP configuration for move-in requests
+   * Users cannot create move-in requests if Welcome Pack or MIP are inactive
+   */
+  private async validateWelcomePackAndMIP(unitId: number): Promise<void> {
+    try {
+      logger.info(`Validating Welcome Pack and MIP for unit: ${unitId}`);
+      
+      // Get unit information with community hierarchy
+      const unit = await AppDataSource.getRepository(Units)
+        .createQueryBuilder('unit')
+        .leftJoinAndSelect('unit.masterCommunity', 'masterCommunity')
+        .leftJoinAndSelect('unit.community', 'community')
+        .leftJoinAndSelect('unit.tower', 'tower')
+        .where('unit.id = :unitId AND unit.isActive = true', { unitId })
+        .getOne();
+
+      if (!unit) {
+        throw new ApiError(
+          httpStatus.NOT_FOUND,
+          'Unit not found',
+          'UNIT_NOT_FOUND'
+        );
+      }
+
+      const { masterCommunity, community, tower } = unit;
+      
+      logger.info(`Unit hierarchy - Master Community: ${masterCommunity?.id}, Community: ${community?.id}, Tower: ${tower?.id}`);
+
+      // Check Welcome Pack configuration with fallback logic
+      let welcomePack = null;
+      
+      // First Priority: Check for exact match (Master Community + Community + Tower + Active)
+      if (tower?.id) {
+        const exactMatchQuery = AppDataSource.getRepository(OccupancyRequestWelcomePack)
+          .createQueryBuilder('welcomePack')
+          .where('welcomePack.isActive = true')
+          .andWhere('welcomePack.masterCommunityId = :masterCommunityId', { masterCommunityId: masterCommunity.id })
+          .andWhere('welcomePack.communityId = :communityId', { communityId: community.id })
+          .andWhere('welcomePack.towerId = :towerId', { towerId: tower.id });
+        
+        welcomePack = await exactMatchQuery.getOne();
+        logger.info(`Welcome Pack exact match (with tower) check: ${welcomePack ? 'Found' : 'Not found'}`);
+      }
+      
+      // Fallback: If not found with tower, check for broader match (Master Community + Community + Active)
+      if (!welcomePack) {
+        const fallbackQuery = AppDataSource.getRepository(OccupancyRequestWelcomePack)
+          .createQueryBuilder('welcomePack')
+          .where('welcomePack.isActive = true')
+          .andWhere('welcomePack.masterCommunityId = :masterCommunityId', { masterCommunityId: masterCommunity.id })
+          .andWhere('welcomePack.communityId = :communityId', { communityId: community.id })
+          .andWhere('welcomePack.towerId IS NULL');
+        
+        welcomePack = await fallbackQuery.getOne();
+        logger.info(`Welcome Pack fallback (without tower) check: ${welcomePack ? 'Found' : 'Not found'}`);
+      }
+
+      if (!welcomePack) {
+        logger.error(`Welcome Pack not found or inactive for unit: ${unitId}`);
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          APICodes.WELCOME_PACK_NOT_CONFIGURED.message,
+          APICodes.WELCOME_PACK_NOT_CONFIGURED.code
+        );
+      }
+
+      logger.info(`Welcome Pack found: ${welcomePack.id}`);
+
+      // Check MIP (Move-In Process) template configuration with fallback logic
+      let mipConfig = null;
+      
+      // First Priority: Check for exact match (Master Community + Community + Tower + Active)
+      if (tower?.id) {
+        const exactMatchQuery = AppDataSource.getRepository(OccupancyRequestTemplates)
+          .createQueryBuilder('mip')
+          .where('mip.isActive = true')
+          .andWhere('mip.templateType = :templateType', { templateType: 'move-in' })
+          .andWhere('mip.masterCommunityId = :masterCommunityId', { masterCommunityId: masterCommunity.id })
+          .andWhere('mip.communityId = :communityId', { communityId: community.id })
+          .andWhere('mip.towerId = :towerId', { towerId: tower.id });
+        
+        mipConfig = await exactMatchQuery.getOne();
+        logger.info(`MIP template exact match (with tower) check: ${mipConfig ? 'Found' : 'Not found'}`);
+      }
+      
+      // Fallback: If not found with tower, check for broader match (Master Community + Community + Active)
+      if (!mipConfig) {
+        const fallbackQuery = AppDataSource.getRepository(OccupancyRequestTemplates)
+          .createQueryBuilder('mip')
+          .where('mip.isActive = true')
+          .andWhere('mip.templateType = :templateType', { templateType: 'move-in' })
+          .andWhere('mip.masterCommunityId = :masterCommunityId', { masterCommunityId: masterCommunity.id })
+          .andWhere('mip.communityId = :communityId', { communityId: community.id })
+          .andWhere('mip.towerId IS NULL');
+        
+        mipConfig = await fallbackQuery.getOne();
+        logger.info(`MIP template fallback (without tower) check: ${mipConfig ? 'Found' : 'Not found'}`);
+      }
+
+      if (!mipConfig) {
+        logger.error(`MIP template not found or inactive for unit: ${unitId}`);
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          APICodes.MIP_NOT_CONFIGURED.message,
+          APICodes.MIP_NOT_CONFIGURED.code
+        );
+      }
+
+      logger.info(`MIP template found: ${mipConfig.id}`);
+      logger.info(`Welcome Pack and MIP validation passed for unit: ${unitId}`);
+
+    } catch (error: any) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      logger.error(`Error validating Welcome Pack and MIP for unit ${unitId}: ${error.message}`);
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        'Failed to validate Welcome Pack and MIP configuration',
+        'VALIDATION_ERROR'
+      );
+    }
   }
 
   /**
@@ -957,6 +1087,7 @@ export class MoveInService {
         comments,
         additionalInfo,
         details,
+        userId, // User ID from payload for the request owner
         // Tenant personal info (required for tenant flow)
         firstName,
         lastName,
@@ -1005,6 +1136,9 @@ export class MoveInService {
       if (!unit) {
         throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
       }
+
+      // Validate Welcome Pack and MIP configuration
+      await this.validateWelcomePackAndMIP(Number(unitId));
 
       const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
 
@@ -1092,12 +1226,16 @@ export class MoveInService {
 
       logger.info(`MOVE-IN CREATED: ${createdMaster?.moveInRequestNo} for unit ${unitId} by user ${user?.id}`);
 
-      // Send confirmation email for mobile request creation
-      try {
-        await this.sendMobileRequestConfirmationEmail(createdMaster, user);
-      } catch (emailError) {
-        logger.error(`Failed to send mobile request confirmation email for ${createdMaster?.moveInRequestNo}:`, emailError);
-        // Don't fail the request creation if email fails
+      // Send confirmation email for mobile request creation (skip for owner requests)
+      if (requestType !== MOVE_IN_USER_TYPES.OWNER) {
+        try {
+          await this.sendMobileRequestConfirmationEmail(createdMaster, user);
+        } catch (emailError) {
+          logger.error(`Failed to send mobile request confirmation email for ${createdMaster?.moveInRequestNo}:`, emailError);
+          // Don't fail the request creation if email fails
+        }
+      } else {
+        logger.info(`Skipping confirmation email for owner move-in request ${createdMaster?.moveInRequestNo}`);
       }
 
       const response = createdMaster as MoveInRequests;
@@ -1147,6 +1285,7 @@ export class MoveInService {
         comments,
         additionalInfo,
         details,
+        userId, // User ID from payload for the request owner
         // Owner fields for HHO Owner
         ownerFirstName,
         ownerLastName,
@@ -1185,6 +1324,7 @@ export class MoveInService {
           status: status || (undefined as any),
           comments: comments ?? (undefined as any),
           additionalInfo: additionalInfo ?? (undefined as any),
+          user: ({ id: user?.id } as any),
           updatedBy: user?.id,
         } as any);
 
@@ -1717,10 +1857,21 @@ export class MoveInService {
     try {
       logger.debug(`getMobileMoveInRequestDetails - requestId: ${requestId}, userId: ${user?.id}`);
 
-      // Get the main move-in request with basic details
-      let query = MoveInRequests.getRepository()
+      // Get the main move-in request with basic details (exclude password from user)
+      let query = AppDataSource.getRepository(MoveInRequests)
         .createQueryBuilder("mv")
         .leftJoinAndSelect("mv.user", "user", "user.isActive = true")
+        .addSelect([
+          "user.id",
+          "user.firstName", 
+          "user.lastName",
+          "user.email",
+          "user.dialCode",
+          "user.phoneNumber",
+          "user.isActive",
+          "user.createdAt",
+          "user.updatedAt"
+        ])
         .leftJoinAndSelect("mv.unit", "u", "u.isActive = true")
         .leftJoinAndSelect("u.masterCommunity", "mc", "mc.isActive = true")
         .leftJoinAndSelect("u.tower", "t", "t.isActive = true")

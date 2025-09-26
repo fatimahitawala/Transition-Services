@@ -38,6 +38,14 @@ router.post('/request/:requestId/documents',
 	]),
 	catchAsync(moveInController.uploadDocuments)
 );
+router.put('/request/:requestId/approve', auth.auth(), validate(moveInValidation.approveRequest), catchAsync(moveInController.approveMoveInRequest));
+router.put('/request/:requestId/rfi', auth.auth(), validate(moveInValidation.markRequestAsRFI), catchAsync(moveInController.markRequestAsRFI));
+router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.cancelRequest), catchAsync(moveInController.cancelMoveInRequest));
+router.put('/request/:requestId/close', auth.auth(), validate(moveInValidation.closeRequest), catchAsync(moveInController.closeMoveInRequest));
+router.put('/owner/:requestId', auth.auth(), validate(moveInValidation.updateOwnerMoveIn), catchAsync(moveInController.updateOwnerMoveInRequest));
+router.put('/tenant/:requestId', auth.auth(), validate(moveInValidation.updateTenantMoveIn), catchAsync(moveInController.updateTenantMoveInRequest));
+router.put('/hho-unit/:requestId', auth.auth(), validate(moveInValidation.updateHhoOwnerMoveIn), catchAsync(moveInController.updateHhoOwnerMoveInRequest));
+router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.updateHhcCompanyMoveIn), catchAsync(moveInController.updateHhcCompanyMoveInRequest));
 
 /**
  * @swagger
@@ -155,16 +163,592 @@ router.post('/request/:requestId/documents',
  */
 
 // Status management routes
-router.put('/request/:requestId/approve', auth.auth(), validate(moveInValidation.approveRequest), catchAsync(moveInController.approveMoveInRequest));
-router.put('/request/:requestId/rfi', auth.auth(), validate(moveInValidation.markRequestAsRFI), catchAsync(moveInController.markRequestAsRFI));
-router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.cancelRequest), catchAsync(moveInController.cancelMoveInRequest));
-router.put('/request/:requestId/close', auth.auth(), validate(moveInValidation.closeRequest), catchAsync(moveInController.closeMoveInRequest));
+
+/**
+ * @swagger
+ * /admin/move-in/request/{requestId}/close:
+ *   put:
+ *     summary: Close move-in request (Security/Admin)
+ *     description: Close a move-in request by security or admin. Only requests in Approved status can be closed. Actual move-in date is mandatory.
+ *     tags: [Admin MoveIn Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Move-in request ID
+ *         example: 123
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - closureRemarks
+ *               - actualMoveInDate
+ *             properties:
+ *               closureRemarks:
+ *                 type: string
+ *                 description: Remarks for closing the request
+ *                 example: "Move-in completed successfully"
+ *               actualMoveInDate:
+ *                 type: string
+ *                 format: date
+ *                 description: Actual move-in date in ISO 8601 format (YYYY-MM-DD)
+ *                 example: "2025-01-25"
+ *     responses:
+ *       200:
+ *         description: Move-in request closed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Request closed successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     requestId:
+ *                       type: integer
+ *                       example: 123
+ *                     status:
+ *                       type: string
+ *                       example: "closed"
+ *       400:
+ *         description: Bad Request - Invalid data or request not in approved status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Actual move-in date is mandatory when closing the request"
+ *                 code:
+ *                   type: string
+ *                   example: "EC131"
+ *       403:
+ *         description: Forbidden - Only security or admin can close requests
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Only security or admin users can close move-in requests"
+ *                 code:
+ *                   type: string
+ *                   example: "EC133"
+ *       404:
+ *         description: Move-in request not found
+ *       500:
+ *         description: Internal Server Error
+ */
 
 // Update routes for different types of move-in requests (Admin)
-router.put('/owner/:requestId', auth.auth(), validate(moveInValidation.updateOwnerMoveIn), catchAsync(moveInController.updateOwnerMoveInRequest));
-router.put('/tenant/:requestId', auth.auth(), validate(moveInValidation.updateTenantMoveIn), catchAsync(moveInController.updateTenantMoveInRequest));
-router.put('/hho-unit/:requestId', auth.auth(), validate(moveInValidation.updateHhoOwnerMoveIn), catchAsync(moveInController.updateHhoOwnerMoveInRequest));
-router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.updateHhcCompanyMoveIn), catchAsync(moveInController.updateHhcCompanyMoveInRequest));
+
+/**
+ * @swagger
+ * /admin/move-in/owner/{requestId}:
+ *   put:
+ *     summary: Update owner move-in request (Admin)
+ *     description: Admin endpoint to update an existing owner move-in request. All dates must be in ISO 8601 format (YYYY-MM-DD).
+ *     tags: [MoveIn Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Move-in request ID
+ *         example: 123
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - unitId
+ *               - moveInDate
+ *               - status
+ *               - details
+ *             properties:
+ *               unitId:
+ *                 type: integer
+ *                 description: ID of the unit for move-in
+ *                 example: 7
+ *               moveInDate:
+ *                 type: string
+ *                 format: date
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 example: "2025-09-17"
+ *                 pattern: '^\d{4}-\d{2}-\d{2}$'
+ *               userId:
+ *                 type: integer
+ *                 description: ID of the user for whom the move-in request is being updated. If not provided, uses the authenticated admin's ID.
+ *                 example: 456
+ *               status:
+ *                 type: string
+ *                 enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
+ *                 description: Request status
+ *                 example: "approved"
+ *               comments:
+ *                 type: string
+ *                 description: Additional comments
+ *                 example: "Updated move-in request"
+ *               additionalInfo:
+ *                 type: string
+ *                 description: Additional information
+ *                 example: "Updated information"
+ *               details:
+ *                 type: object
+ *                 required:
+ *                   - adults
+ *                   - children
+ *                   - householdStaffs
+ *                   - pets
+ *                 properties:
+ *                   adults:
+ *                     type: integer
+ *                     minimum: 1
+ *                     maximum: 6
+ *                     description: Number of adults (1-6)
+ *                     example: 1
+ *                   children:
+ *                     type: integer
+ *                     minimum: 0
+ *                     maximum: 6
+ *                     description: Number of children (0-6)
+ *                     example: 0
+ *                   householdStaffs:
+ *                     type: integer
+ *                     minimum: 0
+ *                     maximum: 4
+ *                     description: Number of household staff (0-4)
+ *                     example: 0
+ *                   pets:
+ *                     type: integer
+ *                     minimum: 0
+ *                     maximum: 6
+ *                     description: Number of pets (0-6)
+ *                     example: 0
+ *                   peopleOfDetermination:
+ *                     type: boolean
+ *                     description: Whether any occupants have special needs
+ *                     example: false
+ *                   detailsText:
+ *                     type: string
+ *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
+ *                     example: "Need wheelchair assistance"
+ *     responses:
+ *       200:
+ *         description: Move-in request updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: "SC001"
+ *                 message:
+ *                   type: string
+ *                   example: "Success."
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 123
+ *                     moveInRequestNo:
+ *                       type: string
+ *                       example: "MIP-UNIT-123-456"
+ *                     status:
+ *                       type: string
+ *                       example: "approved"
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Move-in request not found
+ *       500:
+ *         description: Internal Server Error
+ */
+
+/**
+ * @swagger
+ * /admin/move-in/tenant/{requestId}:
+ *   put:
+ *     summary: Update tenant move-in request (Admin)
+ *     description: Admin endpoint to update an existing tenant move-in request. All dates must be in ISO 8601 format (YYYY-MM-DD).
+ *     tags: [MoveIn Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Move-in request ID
+ *         example: 123
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - unitId
+ *               - moveInDate
+ *               - status
+ *               - firstName
+ *               - lastName
+ *               - email
+ *               - dialCode
+ *               - phoneNumber
+ *             properties:
+ *               unitId:
+ *                 type: integer
+ *                 description: ID of the unit for move-in
+ *                 example: 7
+ *               moveInDate:
+ *                 type: string
+ *                 format: date
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 example: "2025-09-17"
+ *                 pattern: '^\d{4}-\d{2}-\d{2}$'
+ *               userId:
+ *                 type: integer
+ *                 description: ID of the user for whom the move-in request is being updated. If not provided, uses the authenticated admin's ID.
+ *                 example: 456
+ *               status:
+ *                 type: string
+ *                 enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
+ *                 description: Request status
+ *                 example: "approved"
+ *               comments:
+ *                 type: string
+ *                 description: Additional comments
+ *                 example: "Updated move-in request"
+ *               additionalInfo:
+ *                 type: string
+ *                 description: Additional information
+ *                 example: "Updated information"
+ *               firstName:
+ *                 type: string
+ *                 description: First name of the tenant
+ *                 example: "John"
+ *               lastName:
+ *                 type: string
+ *                 description: Last name of the tenant
+ *                 example: "Doe"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address of the tenant
+ *                 example: "john.doe@example.com"
+ *               dialCode:
+ *                 type: string
+ *                 description: Phone dial code
+ *                 example: "+971"
+ *               phoneNumber:
+ *                 type: string
+ *                 description: Phone number
+ *                 example: "501234567"
+ *     responses:
+ *       200:
+ *         description: Move-in request updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: "SC001"
+ *                 message:
+ *                   type: string
+ *                   example: "Success."
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 123
+ *                     moveInRequestNo:
+ *                       type: string
+ *                       example: "MIP-UNIT-123-456"
+ *                     status:
+ *                       type: string
+ *                       example: "approved"
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Move-in request not found
+ *       500:
+ *         description: Internal Server Error
+ */
+
+/**
+ * @swagger
+ * /admin/move-in/hho-unit/{requestId}:
+ *   put:
+ *     summary: Update HHO unit move-in request (Admin)
+ *     description: Admin endpoint to update an existing HHO unit move-in request. All dates must be in ISO 8601 format (YYYY-MM-DD).
+ *     tags: [MoveIn Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Move-in request ID
+ *         example: 123
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - unitId
+ *               - moveInDate
+ *               - status
+ *               - ownerFirstName
+ *               - ownerLastName
+ *               - email
+ *               - dialCode
+ *               - phoneNumber
+ *             properties:
+ *               unitId:
+ *                 type: integer
+ *                 description: ID of the unit for move-in
+ *                 example: 7
+ *               moveInDate:
+ *                 type: string
+ *                 format: date
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 example: "2025-09-17"
+ *                 pattern: '^\d{4}-\d{2}-\d{2}$'
+ *               userId:
+ *                 type: integer
+ *                 description: ID of the user for whom the move-in request is being updated. If not provided, uses the authenticated admin's ID.
+ *                 example: 456
+ *               status:
+ *                 type: string
+ *                 enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
+ *                 description: Request status
+ *                 example: "approved"
+ *               comments:
+ *                 type: string
+ *                 description: Additional comments
+ *                 example: "Updated move-in request"
+ *               additionalInfo:
+ *                 type: string
+ *                 description: Additional information
+ *                 example: "Updated information"
+ *               ownerFirstName:
+ *                 type: string
+ *                 description: First name of the HHO owner
+ *                 example: "Jane"
+ *               ownerLastName:
+ *                 type: string
+ *                 description: Last name of the HHO owner
+ *                 example: "Smith"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address of the HHO owner
+ *                 example: "jane.smith@example.com"
+ *               dialCode:
+ *                 type: string
+ *                 description: Phone dial code
+ *                 example: "+971"
+ *               phoneNumber:
+ *                 type: string
+ *                 description: Phone number
+ *                 example: "501234567"
+ *     responses:
+ *       200:
+ *         description: Move-in request updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: "SC001"
+ *                 message:
+ *                   type: string
+ *                   example: "Success."
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 123
+ *                     moveInRequestNo:
+ *                       type: string
+ *                       example: "MIP-UNIT-123-456"
+ *                     status:
+ *                       type: string
+ *                       example: "approved"
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Move-in request not found
+ *       500:
+ *         description: Internal Server Error
+ */
+
+/**
+ * @swagger
+ * /admin/move-in/hhc-company/{requestId}:
+ *   put:
+ *     summary: Update HHC company move-in request (Admin)
+ *     description: Admin endpoint to update an existing HHC company move-in request. All dates must be in ISO 8601 format (YYYY-MM-DD).
+ *     tags: [MoveIn Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Move-in request ID
+ *         example: 123
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - unitId
+ *               - moveInDate
+ *               - status
+ *               - name
+ *               - company
+ *               - email
+ *               - dialCode
+ *               - phoneNumber
+ *             properties:
+ *               unitId:
+ *                 type: integer
+ *                 description: ID of the unit for move-in
+ *                 example: 7
+ *               moveInDate:
+ *                 type: string
+ *                 format: date
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 example: "2025-09-17"
+ *                 pattern: '^\d{4}-\d{2}-\d{2}$'
+ *               userId:
+ *                 type: integer
+ *                 description: ID of the user for whom the move-in request is being updated. If not provided, uses the authenticated admin's ID.
+ *                 example: 456
+ *               status:
+ *                 type: string
+ *                 enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
+ *                 description: Request status
+ *                 example: "approved"
+ *               comments:
+ *                 type: string
+ *                 description: Additional comments
+ *                 example: "Updated move-in request"
+ *               additionalInfo:
+ *                 type: string
+ *                 description: Additional information
+ *                 example: "Updated information"
+ *               name:
+ *                 type: string
+ *                 description: Name of the HHC company contact person
+ *                 example: "John Doe"
+ *               company:
+ *                 type: string
+ *                 description: Name of the HHC company
+ *                 example: "ABC Company Ltd"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address of the HHC company contact
+ *                 example: "contact@abccompany.com"
+ *               dialCode:
+ *                 type: string
+ *                 description: Phone dial code
+ *                 example: "+971"
+ *               phoneNumber:
+ *                 type: string
+ *                 description: Phone number
+ *                 example: "501234567"
+ *     responses:
+ *       200:
+ *         description: Move-in request updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: "SC001"
+ *                 message:
+ *                   type: string
+ *                   example: "Success."
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 123
+ *                     moveInRequestNo:
+ *                       type: string
+ *                       example: "MIP-UNIT-123-456"
+ *                     status:
+ *                       type: string
+ *                       example: "approved"
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Move-in request not found
+ *       500:
+ *         description: Internal Server Error
+ */
 
 /**
  * @swagger
@@ -774,6 +1358,10 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
+ *               userId:
+ *                 type: integer
+ *                 description: ID of the user for whom the move-in request is being created. If not provided, uses the authenticated admin user's ID.
+ *                 example: 456
  *               details:
  *                 type: object
  *                 required:
@@ -820,6 +1408,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *               value:
  *                 unitId: 7
  *                 moveInDate: "2025-09-17"
+ *                 userId: 456
  *                 details:
  *                   adults: 1
  *                   children: 0
@@ -831,6 +1420,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *               value:
  *                 unitId: 7
  *                 moveInDate: "2025-09-17"
+ *                 userId: 456
  *                 details:
  *                   adults: 2
  *                   children: 1
@@ -986,6 +1576,10 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-12-20"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
+ *               userId:
+ *                 type: integer
+ *                 description: ID of the user for whom the move-in request is being created. If not provided, uses the authenticated admin user's ID.
+ *                 example: 456
  *               firstName:
  *                 type: string
  *                 maxLength: 100
@@ -1102,6 +1696,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *               value:
  *                 unitId: 123
  *                 moveInDate: "2025-12-20"
+ *                 userId: 456
  *                 firstName: "John"
  *                 lastName: "Doe"
  *                 email: "john.doe@example.com"
@@ -1126,6 +1721,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *               value:
  *                 unitId: 123
  *                 moveInDate: "2025-12-20"
+ *                 userId: 456
  *                 firstName: "John"
  *                 lastName: "Doe"
  *                 email: "john.doe@example.com"
@@ -1283,6 +1879,10 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
+ *               userId:
+ *                 type: integer
+ *                 description: ID of the user for whom the move-in request is being created. If not provided, uses the authenticated admin user's ID.
+ *                 example: 456
  *               ownerFirstName:
  *                 type: string
  *                 maxLength: 100
@@ -1316,9 +1916,28 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                 example: "UAE"
  *               comments:
  *                 type: string
- *                 maxLength: 500
  *                 description: Additional comments
  *                 example: "Owner moving in after renovation"
+ *           examples:
+ *             basic_hho_unit:
+ *               summary: Basic HHO unit move-in request
+ *               value:
+ *                 unitId: 7
+ *                 moveInDate: "2025-09-17"
+ *                 userId: 456
+ *                 ownerFirstName: "John"
+ *                 ownerLastName: "Doe"
+ *                 email: "john.doe@example.com"
+ *                 dialCode: "+971"
+ *                 phoneNumber: "501234567"
+ *                 nationality: "UAE"
+ *                 comments: "Owner moving in after renovation"
+ *             minimal_hho_unit:
+ *               summary: Minimal HHO unit move-in request
+ *               value:
+ *                 unitId: 7
+ *                 moveInDate: "2025-09-17"
+ *                 userId: 456
  *     responses:
  *       201:
  *         description: HHO Unit move-in request created successfully
@@ -1464,6 +2083,10 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                 type: string
  *                 format: date
  *                 example: "2025-09-20"
+ *               userId:
+ *                 type: integer
+ *                 description: ID of the user for whom the move-in request is being created. If not provided, uses the authenticated admin user's ID.
+ *                 example: 456
  *               userEmail:
  *                 type: string
  *                 format: email
@@ -1551,6 +2174,38 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *               details:
  *                 type: object
  *                 description: Ignored; termsAccepted is not required or stored
+ *           examples:
+ *             basic_hhc_company:
+ *               summary: Basic HHC company move-in request
+ *               value:
+ *                 unitId: 123
+ *                 moveInDate: "2025-09-20"
+ *                 userId: 456
+ *                 userEmail: "essa.mohammed@gmail.com"
+ *                 firstName: "Essa"
+ *                 middleName: "Mohammed"
+ *                 lastName: "Mohammed"
+ *                 mobileNumber: "0555 0898XX"
+ *                 name: "Essa"
+ *                 company: "ABC Company"
+ *                 companyEmail: "abccompany@gmail.com"
+ *                 operatorOfficeNumber: "+971 122345678"
+ *                 tradeLicenseNumber: "12345678"
+ *                 tradeLicenseExpiryDate: "2026-12-31"
+ *                 nationality: "United Arab Emirates"
+ *                 emiratesIdNumber: "12345678"
+ *                 emiratesIdExpiryDate: "2030-05-15"
+ *                 tenancyContractStartDate: "2025-09-01"
+ *                 unitPermitStartDate: "2025-09-20"
+ *                 unitPermitExpiryDate: "2026-09-20"
+ *                 unitPermitNumber: "42388"
+ *                 leaseStartDate: "2025-09-20"
+ *                 leaseEndDate: "2026-09-20"
+ *                 dtcmStartDate: "2025-09-01"
+ *                 dtcmExpiryDate: "2027-12-31"
+ *                 comments: "HHC company move-in request"
+ *                 additionalInfo: "Additional information for HHC company"
+ *                 details: {}
  *     responses:
  *       201:
  *         description: HHC Company move-in request created successfully

@@ -20,12 +20,142 @@ import { UnitBookings } from "../../../Entities/UnitBookings.entity";
 import { get } from "http";
 import config from "../../../Common/Config/config";
 import { EmailService, MoveInEmailData } from "../../Email/email.service";
+import { AppDataSource } from "../../../Common/data-source";
+import { OccupancyRequestWelcomePack } from "../../../Entities/OccupancyRequestWelcomePack.entity";
+import { OccupancyRequestEmailRecipients } from "../../../Entities/OccupancyRequestEmailRecipients.entity";
+import { OccupancyRequestTemplates } from "../../../Entities/OccupancyRequestTemplates.entity";
 
 export class MoveInService {
   private emailService: EmailService;
 
   constructor() {
     this.emailService = new EmailService();
+  }
+
+  /**
+   * Validate Welcome Pack and MIP configuration for move-in requests
+   * Users cannot create move-in requests if Welcome Pack or MIP are inactive
+   */
+  private async validateWelcomePackAndMIP(unitId: number): Promise<void> {
+    try {
+      logger.info(`Validating Welcome Pack and MIP for unit: ${unitId}`);
+      
+      // Get unit information with community hierarchy
+      const unit = await AppDataSource.getRepository(Units)
+        .createQueryBuilder('unit')
+        .leftJoinAndSelect('unit.masterCommunity', 'masterCommunity')
+        .leftJoinAndSelect('unit.community', 'community')
+        .leftJoinAndSelect('unit.tower', 'tower')
+        .where('unit.id = :unitId AND unit.isActive = true', { unitId })
+        .getOne();
+
+      if (!unit) {
+        throw new ApiError(
+          httpStatus.NOT_FOUND,
+          'Unit not found',
+          'UNIT_NOT_FOUND'
+        );
+      }
+
+      const { masterCommunity, community, tower } = unit;
+      
+      logger.info(`Unit hierarchy - Master Community: ${masterCommunity?.id}, Community: ${community?.id}, Tower: ${tower?.id}`);
+
+      // Check Welcome Pack configuration with fallback logic
+      let welcomePack = null;
+      
+      // First Priority: Check for exact match (Master Community + Community + Tower + Active)
+      if (tower?.id) {
+        const exactMatchQuery = AppDataSource.getRepository(OccupancyRequestWelcomePack)
+          .createQueryBuilder('welcomePack')
+          .where('welcomePack.isActive = true')
+          .andWhere('welcomePack.masterCommunityId = :masterCommunityId', { masterCommunityId: masterCommunity.id })
+          .andWhere('welcomePack.communityId = :communityId', { communityId: community.id })
+          .andWhere('welcomePack.towerId = :towerId', { towerId: tower.id });
+        
+        welcomePack = await exactMatchQuery.getOne();
+        logger.info(`Welcome Pack exact match (with tower) check: ${welcomePack ? 'Found' : 'Not found'}`);
+      }
+      
+      // Fallback: If not found with tower, check for broader match (Master Community + Community + Active)
+      if (!welcomePack) {
+        const fallbackQuery = AppDataSource.getRepository(OccupancyRequestWelcomePack)
+          .createQueryBuilder('welcomePack')
+          .where('welcomePack.isActive = true')
+          .andWhere('welcomePack.masterCommunityId = :masterCommunityId', { masterCommunityId: masterCommunity.id })
+          .andWhere('welcomePack.communityId = :communityId', { communityId: community.id })
+          .andWhere('welcomePack.towerId IS NULL');
+        
+        welcomePack = await fallbackQuery.getOne();
+        logger.info(`Welcome Pack fallback (without tower) check: ${welcomePack ? 'Found' : 'Not found'}`);
+      }
+
+      if (!welcomePack) {
+        logger.error(`Welcome Pack not found or inactive for unit: ${unitId}`);
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          APICodes.WELCOME_PACK_NOT_CONFIGURED.message,
+          APICodes.WELCOME_PACK_NOT_CONFIGURED.code
+        );
+      }
+
+      logger.info(`Welcome Pack found: ${welcomePack.id}`);
+
+      // Check MIP (Move-In Process) template configuration with fallback logic
+      let mipConfig = null;
+      
+      // First Priority: Check for exact match (Master Community + Community + Tower + Active)
+      if (tower?.id) {
+        const exactMatchQuery = AppDataSource.getRepository(OccupancyRequestTemplates)
+          .createQueryBuilder('mip')
+          .where('mip.isActive = true')
+          .andWhere('mip.templateType = :templateType', { templateType: 'move-in' })
+          .andWhere('mip.masterCommunityId = :masterCommunityId', { masterCommunityId: masterCommunity.id })
+          .andWhere('mip.communityId = :communityId', { communityId: community.id })
+          .andWhere('mip.towerId = :towerId', { towerId: tower.id });
+        
+        mipConfig = await exactMatchQuery.getOne();
+        logger.info(`MIP template exact match (with tower) check: ${mipConfig ? 'Found' : 'Not found'}`);
+      }
+      
+      // Fallback: If not found with tower, check for broader match (Master Community + Community + Active)
+      if (!mipConfig) {
+        const fallbackQuery = AppDataSource.getRepository(OccupancyRequestTemplates)
+          .createQueryBuilder('mip')
+          .where('mip.isActive = true')
+          .andWhere('mip.templateType = :templateType', { templateType: 'move-in' })
+          .andWhere('mip.masterCommunityId = :masterCommunityId', { masterCommunityId: masterCommunity.id })
+          .andWhere('mip.communityId = :communityId', { communityId: community.id })
+          .andWhere('mip.towerId IS NULL');
+        
+        mipConfig = await fallbackQuery.getOne();
+        logger.info(`MIP template fallback (without tower) check: ${mipConfig ? 'Found' : 'Not found'}`);
+      }
+
+      if (!mipConfig) {
+        logger.error(`MIP template not found or inactive for unit: ${unitId}`);
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          APICodes.MIP_NOT_CONFIGURED.message,
+          APICodes.MIP_NOT_CONFIGURED.code
+        );
+      }
+
+      logger.info(`MIP template found: ${mipConfig.id}`);
+      logger.info(`Welcome Pack and MIP validation passed for unit: ${unitId}`);
+
+    } catch (error: any) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      logger.error(`Error validating Welcome Pack and MIP for unit ${unitId}: ${error.message}`);
+      throw new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        'Failed to validate Welcome Pack and MIP configuration',
+        'VALIDATION_ERROR'
+      );
+    }
   }
 
   async createMoveInRequest(data: any, user: any) {
@@ -37,6 +167,7 @@ export class MoveInService {
         comments,
         additionalInfo,
         details,
+        userId, // User ID from payload for the request owner
         // Tenant personal info (required for tenant flow)
         firstName,
         lastName,
@@ -118,22 +249,8 @@ export class MoveInService {
           );
         }
 
-        // 3. Check if MIP template and Welcome pack exist
-        const mipWelcomePackCheck = await this.checkMIPAndWelcomePack(Number(unitId));
-        if (!mipWelcomePackCheck.hasMIP) {
-          throw new ApiError(
-            httpStatus.BAD_REQUEST,
-            APICodes.MIP_TEMPLATE_NOT_AVAILABLE.message,
-            APICodes.MIP_TEMPLATE_NOT_AVAILABLE.code
-          );
-        }
-        if (!mipWelcomePackCheck.hasWelcomePack) {
-          throw new ApiError(
-            httpStatus.BAD_REQUEST,
-            APICodes.WELCOME_PACK_NOT_AVAILABLE.message,
-            APICodes.WELCOME_PACK_NOT_AVAILABLE.code
-          );
-        }
+        // 3. Check if MIP template and Welcome pack exist and are active
+        await this.validateWelcomePackAndMIP(Number(unitId));
       }
 
       const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
@@ -146,7 +263,7 @@ export class MoveInService {
         const master = new MoveInRequests();
         master.moveInRequestNo = tempRequestNumber;
         master.requestType = requestType;
-        master.user = { id: user?.id } as any;
+        master.user = { id: userId } as any;
         master.unit = { id: unitId } as any;
         master.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
         master.moveInDate = moveInDate ? new Date(moveInDate) : new Date();
@@ -278,7 +395,7 @@ export class MoveInService {
   // Helper method to get unit by ID
   private async getUnitById(id: number) {
     try {
-      return await Units.getRepository()
+      return await AppDataSource.getRepository(Units)
         .createQueryBuilder("ut")
         .innerJoinAndSelect("ut.masterCommunity", "mc", "mc.isActive = 1")
         .innerJoinAndSelect("ut.community", "c", "c.isActive = 1")
@@ -474,8 +591,8 @@ export class MoveInService {
         householdStaffs: details.householdStaffs,
         pets: details.pets,
         peopleOfDetermination: details.peopleOfDetermination,
-        // Store detailsText in comments field when peopleOfDetermination is true
-        comments: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
+        // Store detailsText in determination_text field when peopleOfDetermination is true
+        determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
       };
 
       logger.info(`Owner Details mapped: ${JSON.stringify(ownerDetails)}`);
@@ -521,8 +638,8 @@ export class MoveInService {
         peopleOfDetermination: details.peopleOfDetermination,
         termsAccepted: details.termsAccepted,
 
-        // Store detailsText in comments field when peopleOfDetermination is true
-        comments: details.peopleOfDetermination && details.detailsText ? details.detailsText : (rest.comments || null),
+        // Store detailsText in determination_text field when peopleOfDetermination is true
+        determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
       };
 
       logger.debug(`Tenant Details mapped: ${JSON.stringify(tenantDetails)}`);
@@ -547,6 +664,10 @@ export class MoveInService {
         phoneNumber: rest.phoneNumber || user?.mobile || user?.phoneNumber || user?.phone || '000000000',
         nationality: rest.nationality || user?.nationality || 'UAE',
 
+        // People of Determination fields
+        peopleOfDetermination: details.peopleOfDetermination,
+        determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
+
         // Comments
         comments: rest.comments || null,
 
@@ -567,7 +688,7 @@ export class MoveInService {
 
   async createHhcCompanyMoveIn(data: any, user: any) {
     try {
-      const { details: _ignoredDetails = {}, ...rest } = data || {};
+      const { details = {}, ...rest } = data || {};
       const hhcCompanyDetails = {
         name: rest.name,
         company: rest.company, // Keep as 'company' since createDetailsRecord expects this field name
@@ -586,6 +707,10 @@ export class MoveInService {
         nationality: rest.nationality,
         emiratesIdNumber: rest.emiratesIdNumber,
         emiratesIdExpiryDate: rest.emiratesIdExpiryDate,
+        
+        // People of Determination fields
+        peopleOfDetermination: details.peopleOfDetermination,
+        determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
       } as any;
 
       // Do not merge external details; ignore termsAccepted or any details from request body
@@ -1099,7 +1224,7 @@ export class MoveInService {
   // Check if unit is available for a new move-in request (no APPROVED request exists)
   private async checkUnitAvailabilityForNewRequest(unitId: number): Promise<boolean> {
     try {
-      const existingApprovedRequest = await MoveInRequests.getRepository()
+      const existingApprovedRequest = await AppDataSource.getRepository(MoveInRequests)
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
         .andWhere("mir.status = :approvedStatus", { approvedStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED })
@@ -1121,7 +1246,7 @@ export class MoveInService {
   // Check for overlapping move-in requests
   private async checkOverlappingRequests(unitId: number, moveInDate: Date): Promise<{ hasOverlap: boolean; count: number; requests: any[] }> {
     try {
-      const overlappingRequests = await MoveInRequests.getRepository()
+      const overlappingRequests = await AppDataSource.getRepository(MoveInRequests)
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
         // Only consider APPROVED requests as blocking for overlap purposes
@@ -1476,8 +1601,8 @@ export class MoveInService {
         );
       }
 
-      // Validate request status
-      if (moveInRequest.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN) {
+      // Validate request status - allow both OPEN and RFI_SUBMITTED to be marked as RFI
+      if (![MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN, MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED].includes(moveInRequest.status)) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
           APICodes.CANNOT_MARK_RFI_STATUS.message,
@@ -1696,7 +1821,7 @@ export class MoveInService {
         // Update request status to Closed
         await MoveInRequests.update({ id: requestId }, {
           status: MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED,
-          moveInDate: actualMoveInDate,
+          actualMoveInDate: actualMoveInDate,
           updatedBy: user?.id,
           updatedAt: new Date()
         });
@@ -2066,6 +2191,7 @@ export class MoveInService {
           unit: data.unitId ? { id: data.unitId } : undefined,
           moveInDate: data.moveInDate,
           status: data.status,
+          user: data.userId ? { id: data.userId } : undefined,
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
@@ -2122,6 +2248,7 @@ export class MoveInService {
           status: data.status,
           comments: data.comments || null,
           additionalInfo: data.additionalInfo || null,
+          user: data.userId ? { id: data.userId } : undefined,
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
@@ -2188,6 +2315,7 @@ export class MoveInService {
           status: data.status,
           comments: data.comments || null,
           additionalInfo: data.additionalInfo || null,
+          user: data.userId ? { id: data.userId } : undefined,
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
@@ -2248,6 +2376,7 @@ export class MoveInService {
           status: data.status,
           comments: data.comments || null,
           additionalInfo: data.additionalInfo || null,
+          user: data.userId ? { id: data.userId } : undefined,
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
