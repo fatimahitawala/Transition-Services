@@ -17,12 +17,9 @@ import { uploadFile } from "../../../Common/Utils/azureBlobStorage";
 import { executeInTransaction } from "../../../Common/Utils/transactionUtil";
 import { Units } from "../../../Entities/Units.entity";
 import { UnitBookings } from "../../../Entities/UnitBookings.entity";
-import { get } from "http";
 import config from "../../../Common/Config/config";
 import { EmailService, MoveInEmailData } from "../../Email/email.service";
-import { AppDataSource } from "../../../Common/data-source";
 import { OccupancyRequestWelcomePack } from "../../../Entities/OccupancyRequestWelcomePack.entity";
-import { OccupancyRequestEmailRecipients } from "../../../Entities/OccupancyRequestEmailRecipients.entity";
 import { OccupancyRequestTemplates } from "../../../Entities/OccupancyRequestTemplates.entity";
 
 export class MoveInService {

@@ -16,16 +16,13 @@ import { MoveInRequestDetailsHhoOwner } from "../../../Entities/MoveInRequestDet
 import { MoveInRequestDetailsHhcCompany } from "../../../Entities/MoveInRequestDetailsHhcCompany.entity";
 import { MoveInRequestLogs } from "../../../Entities/MoveInRequestLogs.entity";
 import { logger } from "../../../Common/Utils/logger";
-import { stringToBoolean } from "../../../Common/Utils/common-utility";
 import { MoveInRequestDocuments } from "../../../Entities/MoveInRequestDocuments.entity";
 import { TRANSITION_DOCUMENT_TYPES } from "../../../Entities/EntityTypes";
 import { uploadFile } from "../../../Common/Utils/azureBlobStorage";
 import { UnitBookings } from "../../../Entities/UnitBookings.entity";
 import config from "../../../Common/Config/config";
 import { EmailService, MoveInEmailData } from "../../Email/email.service";
-import { AppDataSource } from "../../../Common/data-source";
 import { OccupancyRequestWelcomePack } from "../../../Entities/OccupancyRequestWelcomePack.entity";
-import { OccupancyRequestEmailRecipients } from "../../../Entities/OccupancyRequestEmailRecipients.entity";
 import { OccupancyRequestTemplates } from "../../../Entities/OccupancyRequestTemplates.entity";
 
 export class MoveInService {
