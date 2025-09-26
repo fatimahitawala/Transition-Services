@@ -41,7 +41,7 @@ export class MoveInService {
       logger.info(`Validating Welcome Pack and MIP for unit: ${unitId}`);
       
       // Get unit information with community hierarchy
-      const unit = await AppDataSource.getRepository(Units)
+      const unit = await Units.getRepository()
         .createQueryBuilder('unit')
         .leftJoinAndSelect('unit.masterCommunity', 'masterCommunity')
         .leftJoinAndSelect('unit.community', 'community')
@@ -66,7 +66,7 @@ export class MoveInService {
       
       // First Priority: Check for exact match (Master Community + Community + Tower + Active)
       if (tower?.id) {
-        const exactMatchQuery = AppDataSource.getRepository(OccupancyRequestWelcomePack)
+        const exactMatchQuery = OccupancyRequestWelcomePack.getRepository()
           .createQueryBuilder('welcomePack')
           .where('welcomePack.isActive = true')
           .andWhere('welcomePack.masterCommunityId = :masterCommunityId', { masterCommunityId: masterCommunity.id })
@@ -79,7 +79,7 @@ export class MoveInService {
       
       // Fallback: If not found with tower, check for broader match (Master Community + Community + Active)
       if (!welcomePack) {
-        const fallbackQuery = AppDataSource.getRepository(OccupancyRequestWelcomePack)
+        const fallbackQuery = OccupancyRequestWelcomePack.getRepository()
           .createQueryBuilder('welcomePack')
           .where('welcomePack.isActive = true')
           .andWhere('welcomePack.masterCommunityId = :masterCommunityId', { masterCommunityId: masterCommunity.id })
@@ -106,7 +106,7 @@ export class MoveInService {
       
       // First Priority: Check for exact match (Master Community + Community + Tower + Active)
       if (tower?.id) {
-        const exactMatchQuery = AppDataSource.getRepository(OccupancyRequestTemplates)
+        const exactMatchQuery = OccupancyRequestTemplates.getRepository()
           .createQueryBuilder('mip')
           .where('mip.isActive = true')
           .andWhere('mip.templateType = :templateType', { templateType: 'move-in' })
@@ -120,7 +120,7 @@ export class MoveInService {
       
       // Fallback: If not found with tower, check for broader match (Master Community + Community + Active)
       if (!mipConfig) {
-        const fallbackQuery = AppDataSource.getRepository(OccupancyRequestTemplates)
+        const fallbackQuery = OccupancyRequestTemplates.getRepository()
           .createQueryBuilder('mip')
           .where('mip.isActive = true')
           .andWhere('mip.templateType = :templateType', { templateType: 'move-in' })
@@ -455,7 +455,7 @@ export class MoveInService {
   // Helper method to get unit by ID
   private async getUnitById(id: number) {
     try {
-      return await AppDataSource.getRepository(Units)
+      return await Units.getRepository()
         .createQueryBuilder("ut")
         .innerJoinAndSelect("ut.masterCommunity", "mc", "mc.isActive = 1")
         .innerJoinAndSelect("ut.community", "c", "c.isActive = 1")
@@ -1284,7 +1284,7 @@ export class MoveInService {
   // Check if unit is available for a new move-in request (no APPROVED request exists)
   private async checkUnitAvailabilityForNewRequest(unitId: number): Promise<boolean> {
     try {
-      const existingApprovedRequest = await AppDataSource.getRepository(MoveInRequests)
+      const existingApprovedRequest = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
         .andWhere("mir.status = :approvedStatus", { approvedStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED })
@@ -1306,7 +1306,7 @@ export class MoveInService {
   // Check for overlapping move-in requests
   private async checkOverlappingRequests(unitId: number, moveInDate: Date): Promise<{ hasOverlap: boolean; count: number; requests: any[] }> {
     try {
-      const overlappingRequests = await AppDataSource.getRepository(MoveInRequests)
+      const overlappingRequests = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
         // Only consider APPROVED requests as blocking for overlap purposes

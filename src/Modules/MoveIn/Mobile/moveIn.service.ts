@@ -44,7 +44,7 @@ export class MoveInService {
       logger.info(`Validating Welcome Pack and MIP for unit: ${unitId}`);
       
       // Get unit information with community hierarchy
-      const unit = await AppDataSource.getRepository(Units)
+      const unit = await Units.getRepository()
         .createQueryBuilder('unit')
         .leftJoinAndSelect('unit.masterCommunity', 'masterCommunity')
         .leftJoinAndSelect('unit.community', 'community')
@@ -69,7 +69,7 @@ export class MoveInService {
       
       // First Priority: Check for exact match (Master Community + Community + Tower + Active)
       if (tower?.id) {
-        const exactMatchQuery = AppDataSource.getRepository(OccupancyRequestWelcomePack)
+        const exactMatchQuery = OccupancyRequestWelcomePack.getRepository()
           .createQueryBuilder('welcomePack')
           .where('welcomePack.isActive = true')
           .andWhere('welcomePack.masterCommunityId = :masterCommunityId', { masterCommunityId: masterCommunity.id })
@@ -82,7 +82,7 @@ export class MoveInService {
       
       // Fallback: If not found with tower, check for broader match (Master Community + Community + Active)
       if (!welcomePack) {
-        const fallbackQuery = AppDataSource.getRepository(OccupancyRequestWelcomePack)
+        const fallbackQuery = OccupancyRequestWelcomePack.getRepository()
           .createQueryBuilder('welcomePack')
           .where('welcomePack.isActive = true')
           .andWhere('welcomePack.masterCommunityId = :masterCommunityId', { masterCommunityId: masterCommunity.id })
@@ -109,7 +109,7 @@ export class MoveInService {
       
       // First Priority: Check for exact match (Master Community + Community + Tower + Active)
       if (tower?.id) {
-        const exactMatchQuery = AppDataSource.getRepository(OccupancyRequestTemplates)
+        const exactMatchQuery = OccupancyRequestTemplates.getRepository()
           .createQueryBuilder('mip')
           .where('mip.isActive = true')
           .andWhere('mip.templateType = :templateType', { templateType: 'move-in' })
@@ -123,7 +123,7 @@ export class MoveInService {
       
       // Fallback: If not found with tower, check for broader match (Master Community + Community + Active)
       if (!mipConfig) {
-        const fallbackQuery = AppDataSource.getRepository(OccupancyRequestTemplates)
+        const fallbackQuery = OccupancyRequestTemplates.getRepository()
           .createQueryBuilder('mip')
           .where('mip.isActive = true')
           .andWhere('mip.templateType = :templateType', { templateType: 'move-in' })
@@ -1106,7 +1106,6 @@ export class MoveInService {
         company,
         companyEmail,
         countryCode,
-        operatorCountryCode,
         operatorOfficeNumber,
         tradeLicenseNumber,
         tradeLicenseExpiryDate,
@@ -1196,7 +1195,6 @@ export class MoveInService {
           company,
           companyEmail,
           countryCode,
-          operatorCountryCode,
           operatorOfficeNumber,
           tradeLicenseNumber,
           tradeLicenseExpiryDate,
@@ -1365,7 +1363,6 @@ export class MoveInService {
         company,
         companyEmail,
         countryCode,
-        operatorCountryCode,
         operatorOfficeNumber,
         tradeLicenseNumber,
         tradeLicenseExpiryDate,
@@ -1470,7 +1467,6 @@ export class MoveInService {
                 companyName: company,
                 companyEmail,
                 countryCode,
-                operatorCountryCode,
                 operatorOfficeNumber,
                 tradeLicenseNumber,
                 tradeLicenseExpiryDate,
@@ -1777,7 +1773,6 @@ export class MoveInService {
         entity.companyName = details.company;
         entity.companyEmail = details.companyEmail;
         entity.countryCode = details.countryCode;
-        entity.operatorCountryCode = details.operatorCountryCode;
         entity.operatorOfficeNumber = details.operatorOfficeNumber;
         entity.tradeLicenseNumber = details.tradeLicenseNumber;
         entity.tradeLicenseExpiryDate = details.tradeLicenseExpiryDate;
@@ -2010,7 +2005,7 @@ export class MoveInService {
       logger.debug(`getMobileMoveInRequestDetails - requestId: ${requestId}, userId: ${user?.id}`);
 
       // Get the main move-in request with basic details (exclude password from user)
-      let query = AppDataSource.getRepository(MoveInRequests)
+      let query = MoveInRequests.getRepository()
         .createQueryBuilder("mv")
         .leftJoinAndSelect("mv.user", "user", "user.isActive = true")
         .addSelect([
