@@ -718,7 +718,7 @@ export class MoveInService {
         // Owner identity: use UI values if present, else fallback to admin user
         ownerFirstName: rest.ownerFirstName || user?.firstName || user?.name?.split(' ')?.[0] || 'Admin',
         ownerLastName: rest.ownerLastName || user?.lastName || user?.name?.split(' ')?.slice(1).join(' ') || 'User',
-        email: rest.email || user?.email || `admin${user?.id || 'user'}@onesobha.com`,
+        email: rest.email || user?.email || `admin${user?.id || 'user'}@${process.env.ADMIN_EMAIL_DOMAIN || 'onesobha.com'}`,
         dialCode: rest.dialCode || user?.dialCode?.dialCode || user?.dialCode || '+971',
         phoneNumber: rest.phoneNumber || user?.mobile || user?.phoneNumber || user?.phone || '000000000',
         nationality: rest.nationality || user?.nationality || 'UAE',
@@ -1504,8 +1504,8 @@ export class MoveInService {
           const mipEmailData: MoveInEmailData = {
             ...baseEmailData,
             userDetails: {
-              firstName: 'Community',
-              lastName: 'Management',
+              firstName: moveInRequest.user?.firstName || 'Community',
+              lastName: moveInRequest.user?.lastName || 'Management',
               email: mipRecipients // Send to all MIP recipients
             },
             isRecipientEmail: true // This is a recipient email, not user email
@@ -2508,8 +2508,8 @@ export class MoveInService {
         const mipEmailData: MoveInEmailData = {
           ...baseEmailData,
           userDetails: {
-            firstName: 'Community',
-            lastName: 'Management',
+            firstName: moveInRequest.user?.firstName || 'Community',
+            lastName: moveInRequest.user?.lastName || 'Management',
             email: mipRecipients // Send to all MIP recipients
           },
           ccEmails: [], // No CC for approval emails
