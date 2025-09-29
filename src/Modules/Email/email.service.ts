@@ -1364,8 +1364,10 @@ export class EmailService {
                 userType = data.requestType || 'Owner';
         }
 
-        // Get applicant and occupant names
-        const applicantName = data.userDetails ? `${data.userDetails.firstName} ${data.userDetails.lastName}` : '';
+        // Get applicant and occupant names with better fallback handling
+        const applicantName = data.userDetails ? 
+            `${data.userDetails.firstName || ''} ${data.userDetails.lastName || ''}`.trim() || 'Not specified' : 
+            'Not specified';
         const occupantName = data.additionalInfo?.occupantName || applicantName;
 
         return `
@@ -1402,7 +1404,7 @@ export class EmailService {
                             </tr>
                             <tr>
                                 <td style="padding: 8px 0; font-weight: bold; color: #333;">Property details:</td>
-                                <td style="padding: 8px 0; color: #666;">${data.unitDetails.unitNumber} - ${data.unitDetails.unitName}, ${data.unitDetails.communityName}${data.unitDetails.towerName ? ', ' + data.unitDetails.towerName : ''}</td>
+                                <td style="padding: 8px 0; color: #666;">${data.unitDetails.unitNumber || 'Not specified'} - ${data.unitDetails.unitName || 'Not specified'}, ${data.unitDetails.communityName || 'Not specified'}${data.unitDetails.towerName ? ', ' + data.unitDetails.towerName : ''}</td>
                             </tr>
                             <tr>
                                 <td style="padding: 8px 0; font-weight: bold; color: #333;">Applicant name:</td>
@@ -1493,8 +1495,8 @@ export class EmailService {
         
         if (status.toLowerCase() === 'approved') {
             if (isRecipientEmail) {
-                // For recipient emails: "Move in request Raised and request id"
-                return `Move in request Raised and ${requestNumber}`;
+                // For recipient emails: "Move in request Raised : request id"
+                return `Move in request Raised : ${requestNumber}`;
             } else {
                 // For user emails: "Your move in date starts from 15 August 2022 Ref # MIP-10"
                 return `Your move in date starts from ${moveInDateStr} Ref # ${requestNumber}`;
