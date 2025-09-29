@@ -194,7 +194,7 @@ export class EmailController {
      * - Development and debugging tool
      * 
      * Request Body:
-     * - email: Optional recipient email (defaults to test@example.com)
+     * - email: Optional recipient email (defaults to TEST_EMAIL_ADDRESS env var or test@example.com)
      * 
      * Sample Data:
      * - Uses predefined test data for request details
@@ -221,7 +221,7 @@ export class EmailController {
                 userDetails: {
                     firstName: "John",
                     lastName: "Doe",
-                    email: req.body.email || "test@example.com"
+                    email: req.body.email || process.env.TEST_EMAIL_ADDRESS || "test@example.com"
                 },
                 unitDetails: {
                     unitNumber: "A001",

@@ -718,7 +718,7 @@ export class MoveInService {
         // Owner identity: use UI values if present, else fallback to admin user
         ownerFirstName: rest.ownerFirstName || user?.firstName || user?.name?.split(' ')?.[0] || 'Admin',
         ownerLastName: rest.ownerLastName || user?.lastName || user?.name?.split(' ')?.slice(1).join(' ') || 'User',
-        email: rest.email || user?.email || `admin${user?.id || 'user'}@onesobha.com`,
+        email: rest.email || user?.email || `admin${user?.id || 'user'}@${process.env.ADMIN_EMAIL_DOMAIN || 'onesobha.com'}`,
         dialCode: rest.dialCode || user?.dialCode?.dialCode || user?.dialCode || '+971',
         phoneNumber: rest.phoneNumber || user?.mobile || user?.phoneNumber || user?.phone || '000000000',
         nationality: rest.nationality || user?.nationality || 'UAE',
@@ -1504,8 +1504,8 @@ export class MoveInService {
           const mipEmailData: MoveInEmailData = {
             ...baseEmailData,
             userDetails: {
-              firstName: 'Community',
-              lastName: 'Management',
+              firstName: moveInRequest.user?.firstName || 'Community',
+              lastName: moveInRequest.user?.lastName || 'Management',
               email: mipRecipients // Send to all MIP recipients
             },
             isRecipientEmail: true // This is a recipient email, not user email
@@ -1612,9 +1612,10 @@ export class MoveInService {
       }
 
       await executeInTransaction(async (qr: any) => {
-        // Update request status to Approved
+        // Update request status to Approved and save comments
         await MoveInRequests.update({ id: requestId }, {
           status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
+          comments: comments || '',
           updatedBy: user?.id,
           updatedAt: new Date()
         });
@@ -1718,14 +1719,7 @@ export class MoveInService {
         );
       }
 
-      // Validate comments (mandatory)
-      if (!comments || comments.trim().length === 0) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          APICodes.COMMENTS_REQUIRED.message,
-          APICodes.COMMENTS_REQUIRED.code
-        );
-      }
+      // Comments are now optional - no validation needed
 
       // Get the move-in request
       const moveInRequest = await MoveInRequests.getRepository()
@@ -1753,9 +1747,10 @@ export class MoveInService {
       }
 
       await executeInTransaction(async (qr: any) => {
-        // Update request status to RFI Pending
+        // Update request status to RFI Pending and save comments
         await MoveInRequests.update({ id: requestId }, {
           status: MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING,
+          comments: comments,
           updatedBy: user?.id,
           updatedAt: new Date()
         });
@@ -1891,9 +1886,10 @@ export class MoveInService {
       }
 
       await executeInTransaction(async (qr: any) => {
-        // Update request status to Cancelled
+        // Update request status to Cancelled and save cancellation remarks
         await MoveInRequests.update({ id: requestId }, {
           status: MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED,
+          comments: cancellationRemarks,
           updatedBy: user?.id,
           updatedAt: new Date()
         });
@@ -2508,8 +2504,8 @@ export class MoveInService {
         const mipEmailData: MoveInEmailData = {
           ...baseEmailData,
           userDetails: {
-            firstName: 'Community',
-            lastName: 'Management',
+            firstName: moveInRequest.user?.firstName || 'Community',
+            lastName: moveInRequest.user?.lastName || 'Management',
             email: mipRecipients // Send to all MIP recipients
           },
           ccEmails: [], // No CC for approval emails
