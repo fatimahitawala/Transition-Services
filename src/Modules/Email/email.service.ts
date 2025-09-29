@@ -845,38 +845,46 @@ export class EmailService {
             // Replace placeholders with actual data
             const processedTemplate = this.replaceTemplatePlaceholders(emailTemplate, data);
 
-            // Generate MIP template as PDF attachment
-            logger.info(`Generating MIP template as PDF attachment...`);
-            const mipTemplateHtml = this.getMIPTemplateHTML(data);
-            const mipPdfAttachment = await this.generateMIPTemplatePDF(mipTemplateHtml, data);
-
-            // Get welcome pack attachment
-            logger.info(`Fetching welcome pack for MC:${data.unitDetails.masterCommunityId}, C:${data.unitDetails.communityId}, T:${data.unitDetails.towerId}`);
-            const welcomePackAttachment = await this.getWelcomePackFile(
-                data.unitDetails.masterCommunityId,
-                data.unitDetails.communityId,
-                data.unitDetails.towerId
-            );
-
+            // Generate attachments only for user emails, not for recipient emails
             const attachments: EmailAttachment[] = [];
-            if (mipPdfAttachment) {
-                attachments.push(mipPdfAttachment);
-                logger.info(`MIP template PDF attachment added (${mipPdfAttachment.filename})`);
-            } else {
-                logger.warn(`MIP template PDF attachment failed to generate`);
-            }
             
-            if (welcomePackAttachment) {
-                attachments.push(welcomePackAttachment);
-                logger.info(`Welcome pack attachment found and added (${welcomePackAttachment.filename})`);
-            } else {
-                logger.warn(`No welcome pack found for community ${data.unitDetails.communityId}, tower ${data.unitDetails.towerId}`);
-            }
+            if (!data.isRecipientEmail) {
+                // Generate MIP template as PDF attachment
+                logger.info(`Generating MIP template as PDF attachment...`);
+                const mipTemplateHtml = this.getMIPTemplateHTML(data);
+                const mipPdfAttachment = await this.generateMIPTemplatePDF(mipTemplateHtml, data);
 
-            logger.info(`Total attachments: ${attachments.length} (MIP: ${mipPdfAttachment ? 'Yes' : 'No'}, Welcome Pack: ${welcomePackAttachment ? 'Yes' : 'No'})`);
+                // Get welcome pack attachment
+                logger.info(`Fetching welcome pack for MC:${data.unitDetails.masterCommunityId}, C:${data.unitDetails.communityId}, T:${data.unitDetails.towerId}`);
+                const welcomePackAttachment = await this.getWelcomePackFile(
+                    data.unitDetails.masterCommunityId,
+                    data.unitDetails.communityId,
+                    data.unitDetails.towerId
+                );
+
+                if (mipPdfAttachment) {
+                    attachments.push(mipPdfAttachment);
+                    logger.info(`MIP template PDF attachment added (${mipPdfAttachment.filename})`);
+                } else {
+                    logger.warn(`MIP template PDF attachment failed to generate`);
+                }
+                
+                if (welcomePackAttachment) {
+                    attachments.push(welcomePackAttachment);
+                    logger.info(`Welcome pack attachment found and added (${welcomePackAttachment.filename})`);
+                } else {
+                    logger.warn(`No welcome pack found for community ${data.unitDetails.communityId}, tower ${data.unitDetails.towerId}`);
+                }
+
+                logger.info(`Total attachments: ${attachments.length} (MIP: ${mipPdfAttachment ? 'Yes' : 'No'}, Welcome Pack: ${welcomePackAttachment ? 'Yes' : 'No'})`);
+            } else {
+                logger.info(`Recipient email - no attachments will be sent`);
+            }
 
             // Create detailed email body with header image and move-in permit content
-            const emailBody = this.createDetailedApprovalEmailBody(data);
+            const emailBody = data.isRecipientEmail ? 
+                this.createRecipientApprovalEmailBody(data) : 
+                this.createDetailedApprovalEmailBody(data);
 
             // Generate subject
             const subject = this.getEmailSubject('approved', data.requestNumber, data.isRecipientEmail, data);
@@ -1287,6 +1295,162 @@ export class EmailService {
     }
 
     /**
+     * RECIPIENT APPROVAL EMAIL BODY CREATOR
+     * =====================================
+     * Creates email body specifically for recipient emails (team/community management)
+     * Uses the new MIP notification format with structured content
+     * 
+     * Features:
+     * - Professional header with Sobha branding
+     * - "Dear Team" greeting
+     * - Structured MIP notification format
+     * - All required fields: MIP reference, user type, property details, etc.
+     * - Professional footer with Sobha Community Management signature
+     * 
+     * @param {MoveInEmailData} data - Complete email data for content generation
+     * @returns {string} - HTML email body for recipient notifications
+     */
+    private createRecipientApprovalEmailBody(data: MoveInEmailData): string {
+        // Format dates properly
+        const moveInDate = data.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        }) : '';
+        
+        const moveOutDate = data.additionalInfo?.moveOutDate ? 
+            new Date(data.additionalInfo.moveOutDate).toLocaleDateString('en-GB', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            }) : '';
+            
+        const startDate = data.additionalInfo?.startDate ? 
+            new Date(data.additionalInfo.startDate).toLocaleDateString('en-GB', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            }) : '';
+            
+        const endDate = data.additionalInfo?.endDate ? 
+            new Date(data.additionalInfo.endDate).toLocaleDateString('en-GB', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            }) : '';
+        
+        const mipIssueDate = new Date().toLocaleDateString('en-GB', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+
+        // Get user type based on request type
+        let userType = '';
+        switch (data.requestType?.toLowerCase()) {
+            case 'owner':
+                userType = 'Owner';
+                break;
+            case 'tenant':
+                userType = 'Tenant';
+                break;
+            case 'hho-owner':
+                userType = 'HHO Owner';
+                break;
+            case 'hhc-company':
+                userType = 'HHC Company';
+                break;
+            default:
+                userType = data.requestType || 'Owner';
+        }
+
+        // Get applicant and occupant names
+        const applicantName = data.userDetails ? `${data.userDetails.firstName} ${data.userDetails.lastName}` : '';
+        const occupantName = data.additionalInfo?.occupantName || applicantName;
+
+        return `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <!-- Header Image with Frame -->
+            <div style="width: 100%; margin-bottom: 20px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
+                <img src="https://res.cloudinary.com/ddbdlqjcq/image/upload/v1755076402/Screenshot_2025-08-13_142428_1_qwua5y.png" 
+                     alt="ONE Sobha Header" 
+                     style="width: 100%; height: auto; display: block;" />
+            </div>
+            
+            <!-- Email Content -->
+            <div style="padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
+                <h2 style="color: #333; margin-bottom: 15px;">Move-in Request Raised - ${data.requestNumber}</h2>
+                
+                <div style="background-color: #fff; border: 1px solid #ddd; padding: 20px; border-radius: 5px; margin: 15px 0;">
+                    <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                        Dear Team,
+                    </p>
+                    
+                    <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                        This is to notify you that a new Move In Permit (MIP) has been issued.
+                    </p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; width: 40%; color: #333;">MIP reference no.:</td>
+                                <td style="padding: 8px 0; color: #666;">${data.requestNumber}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">User type:</td>
+                                <td style="padding: 8px 0; color: #666;">${userType}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Property details:</td>
+                                <td style="padding: 8px 0; color: #666;">${data.unitDetails.unitNumber} - ${data.unitDetails.unitName}, ${data.unitDetails.communityName}${data.unitDetails.towerName ? ', ' + data.unitDetails.towerName : ''}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Applicant name:</td>
+                                <td style="padding: 8px 0; color: #666;">${applicantName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Occupant name:</td>
+                                <td style="padding: 8px 0; color: #666;">${occupantName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Move in date:</td>
+                                <td style="padding: 8px 0; color: #666;">${moveInDate || 'Not specified'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Move out date:</td>
+                                <td style="padding: 8px 0; color: #666;">${moveOutDate || 'Not specified'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Start date (lease):</td>
+                                <td style="padding: 8px 0; color: #666;">${startDate || 'Not specified'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">End date (lease):</td>
+                                <td style="padding: 8px 0; color: #666;">${endDate || 'Not specified'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">MIP date of issue:</td>
+                                <td style="padding: 8px 0; color: #666;">${mipIssueDate}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    
+                    <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 20px 0 0 0;">
+                        Kind regards,<br>
+                        Sobha Community Management
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="text-align: center; margin-top: 20px; padding: 15px; color: #999; font-size: 12px;">
+                <p>This is an automated message from ONE Sobha App</p>
+                <p>For support, please contact your community management team</p>
+            </div>
+        </div>`;
+    }
+
+    /**
      * STATUS MESSAGE GENERATOR
      * ========================
      * Generates user-friendly status messages for email content
@@ -1329,9 +1493,8 @@ export class EmailService {
         
         if (status.toLowerCase() === 'approved') {
             if (isRecipientEmail) {
-                // For recipient emails: "User name move in date starts from 15 August 2022 Ref # MIP-10"
-                const userName = data?.userDetails ? `${data.userDetails.firstName} ${data.userDetails.lastName}` : 'User';
-                return `${userName} move in date starts from ${moveInDateStr} Ref # ${requestNumber}`;
+                // For recipient emails: "Move in request Raised and request id"
+                return `Move in request Raised and ${requestNumber}`;
             } else {
                 // For user emails: "Your move in date starts from 15 August 2022 Ref # MIP-10"
                 return `Your move in date starts from ${moveInDateStr} Ref # ${requestNumber}`;
