@@ -21,6 +21,8 @@ import config from "../../../Common/Config/config";
 import { EmailService, MoveInEmailData } from "../../Email/email.service";
 import { OccupancyRequestWelcomePack } from "../../../Entities/OccupancyRequestWelcomePack.entity";
 import { OccupancyRequestTemplates } from "../../../Entities/OccupancyRequestTemplates.entity";
+import { OccupancyRequestEmailRecipients } from "../../../Entities/OccupancyRequestEmailRecipients.entity";
+import { IsNull } from "typeorm";
 
 export class MoveInService {
   private emailService: EmailService;
@@ -1393,7 +1395,33 @@ export class MoveInService {
     }
   }
 
-  // Send notifications to owner/tenant and community recipients
+  /**
+   * EMAIL NOTIFICATION DISPATCHER
+   * =============================
+   * Central method for sending move-in request notifications via email
+   * 
+   * Purpose:
+   * - Handles all email notifications for move-in requests
+   * - Determines appropriate email recipients based on request type
+   * - Prepares comprehensive email data for template processing
+   * - Sends appropriate email type based on request status
+   * 
+   * Email Types Sent:
+   * - Status emails: For confirmations, RFIs, cancellations, updates
+   * - Approval emails: For approved requests with attachments
+   * 
+   * Recipient Logic (NO CC to unit owners):
+   * - Owner requests: Primary = unit owner only
+   * - Tenant requests: Primary = tenant only
+   * - HHO requests: Primary = HHO owner only
+   * - HHC requests: Primary = company email only
+   * 
+   * @param {number} requestId - Unique move-in request identifier
+   * @param {string} requestNumber - Human-readable request number
+   * @returns {Promise<void>}
+   * 
+   * @throws {Error} - When email sending fails
+   */
   private async sendNotifications(requestId: number, requestNumber: string): Promise<void> {
     try {
       logger.info(`=== EMAIL NOTIFICATION START ===`);
@@ -1415,33 +1443,27 @@ export class MoveInService {
         return;
       }
 
-      // Get the primary recipient and CC emails based on request type
-      const emailRecipients = await this.getEmailRecipients(moveInRequest);
-
-      if (!emailRecipients || !emailRecipients.primary.email) {
-        logger.error(`EMAIL ERROR: No primary email recipient found for ${moveInRequest.requestType} request ${requestId}, unitId: ${moveInRequest.unit?.id}`);
+      // Check if user exists for the request
+      if (!moveInRequest.user) {
+        logger.error(`EMAIL ERROR: No user found for request ${requestId}`);
         return;
       }
 
-      logger.info(`EMAIL DATA: Primary: ${emailRecipients.primary.firstName} ${emailRecipients.primary.lastName} (${emailRecipients.primary.email})`);
-      if (emailRecipients.cc && emailRecipients.cc.length > 0) {
-        logger.info(`EMAIL DATA: CC: ${emailRecipients.cc.join(', ')}`);
-      }
-      logger.info(`EMAIL DATA: Unit: ${moveInRequest.unit?.unitName} in ${moveInRequest.unit?.community?.name}`);
-      logger.info(`EMAIL DATA: Status: ${moveInRequest.status}`);
+      // Get MIP recipients from occupancy_request_email_recipients table
+      const mipRecipients = await this.getMIPRecipients(
+        moveInRequest.unit?.masterCommunity?.id || 0,
+        moveInRequest.unit?.community?.id || 0,
+        moveInRequest.unit?.tower?.id
+      );
 
-      // Prepare email data
-      const emailData: MoveInEmailData = {
+      logger.info(`Found ${mipRecipients.length} MIP recipients: ${mipRecipients.join(', ')}`);
+
+      // Prepare base email data
+      const baseEmailData = {
         requestId: requestId,
         requestNumber: requestNumber,
-        status: moveInRequest.status, // Use actual current status
+        status: moveInRequest.status === MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED ? 'Approved' : moveInRequest.status,
         requestType: moveInRequest.requestType,
-        userDetails: {
-          firstName: emailRecipients.primary.firstName,
-          lastName: emailRecipients.primary.lastName,
-          email: emailRecipients.primary.email
-        },
-        ccEmails: emailRecipients.cc,
         unitDetails: {
           unitNumber: moveInRequest.unit?.unitNumber || '',
           unitName: moveInRequest.unit?.unitName || '',
@@ -1453,33 +1475,53 @@ export class MoveInService {
           towerName: moveInRequest.unit?.tower?.name || undefined
         },
         moveInDate: moveInRequest.moveInDate,
-        comments: moveInRequest.comments || ''
+        comments: moveInRequest.comments || '',
+        ccEmails: [] // No CC functionality
       };
 
-      logger.info(`=== UNIT DETAILS FOR EMAIL ===`);
-      logger.info(`Unit ID: ${moveInRequest.unit?.id}`);
-      logger.info(`Unit Number: ${moveInRequest.unit?.unitNumber}`);
-      logger.info(`Unit Name: ${moveInRequest.unit?.unitName}`);
-      logger.info(`Master Community ID: ${moveInRequest.unit?.masterCommunity?.id}`);
-      logger.info(`Master Community Name: ${moveInRequest.unit?.masterCommunity?.name}`);
-      logger.info(`Community ID: ${moveInRequest.unit?.community?.id}`);
-      logger.info(`Community Name: ${moveInRequest.unit?.community?.name}`);
-      logger.info(`Tower ID: ${moveInRequest.unit?.tower?.id}`);
-      logger.info(`Tower Name: ${moveInRequest.unit?.tower?.name}`);
-      logger.info(`=== UNIT DETAILS END ===`);
-
-      logger.info(`EMAIL PAYLOAD: ${JSON.stringify(emailData)}`);
-
-      // Check if this is an auto-approved request (status should be 'approved')
+      // Only send emails for approved status
       if (moveInRequest.status === MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
-        logger.info(`SENDING APPROVAL EMAIL with welcome pack for auto-approved request`);
-        await this.emailService.sendMoveInApprovalEmail(emailData);
+        // EMAIL 1: Send to the user who raised the request (from move_in_requests.user)
+        if (moveInRequest.user && moveInRequest.user.email) {
+          const userEmailData: MoveInEmailData = {
+            ...baseEmailData,
+            userDetails: {
+              firstName: moveInRequest.user.firstName || '',
+              lastName: moveInRequest.user.lastName || '',
+              email: moveInRequest.user.email
+            },
+            isRecipientEmail: false // This is a user email, not recipient email
+          };
+
+          logger.info(`Sending approval email to user: ${moveInRequest.user.email}`);
+          await this.emailService.sendMoveInApprovalEmail(userEmailData);
+        } else {
+          logger.warn(`No user email found for request ${requestId}, skipping user email`);
+        }
+
+        // EMAIL 2: Send to MIP recipients (if any)
+        if (mipRecipients.length > 0) {
+          const mipEmailData: MoveInEmailData = {
+            ...baseEmailData,
+            userDetails: {
+              firstName: 'Community',
+              lastName: 'Management',
+              email: mipRecipients // Send to all MIP recipients
+            },
+            isRecipientEmail: true // This is a recipient email, not user email
+          };
+
+          logger.info(`Sending approval email to MIP recipients: ${mipRecipients.join(', ')}`);
+          await this.emailService.sendMoveInApprovalEmail(mipEmailData);
+        } else {
+          logger.warn(`No MIP recipients found for request ${requestId}, skipping MIP recipient email`);
+        }
       } else {
-        logger.info(`SENDING STATUS EMAIL for status: ${moveInRequest.status}`);
-        await this.emailService.sendMoveInStatusEmail(emailData);
+        logger.info(`Request ${requestId} status is ${moveInRequest.status}, skipping email notifications (only approved status sends emails)`);
       }
 
       logger.info(`=== EMAIL NOTIFICATION SUCCESS ===`);
+      logger.info(`Sent emails for request ${requestId} - User email and ${mipRecipients.length} MIP recipient emails`);
       logger.info(`Notifications sent successfully for move-in request ${requestId}`);
     } catch (error) {
       logger.error(`=== EMAIL NOTIFICATION ERROR ===`);
@@ -2005,7 +2047,6 @@ export class MoveInService {
         // Update request status to Closed
         await MoveInRequests.update({ id: requestId }, {
           status: MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED,
-          actualMoveInDate: actualMoveInDate,
           updatedBy: user?.id,
           updatedAt: new Date()
         });
@@ -2093,7 +2134,31 @@ export class MoveInService {
   // ==================== NOTIFICATION METHODS ====================
 
   /**
-   * Get email recipients (primary and CC) based on request type
+   * EMAIL RECIPIENT DETERMINATION LOGIC
+   * ====================================
+   * Determines primary email recipients based on move-in request type
+   * 
+   * Purpose:
+   * - Identifies appropriate email recipients for different request types
+   * - NO CC functionality - only primary recipients
+   * - Handles various request types with specific recipient rules
+   * - Ensures proper email routing for notifications
+   * 
+   * Request Type Logic (NO CC):
+   * - OWNER: Primary = unit owner from unit_bookings only
+   * - TENANT: Primary = tenant from request details only
+   * - HHO_OWNER: Primary = HHO owner from request details only
+   * - HHO_COMPANY: Primary = company email from request details only
+   * 
+   * Data Sources:
+   * - Unit owner: Retrieved from unit_bookings table
+   * - Tenant details: Retrieved from MoveInRequestDetailsTenant
+   * - HHO details: Retrieved from MoveInRequestDetailsHhoOwner
+   * - Company details: Retrieved from MoveInRequestDetailsHhcCompany
+   * 
+   * @param {any} moveInRequest - Complete move-in request object with relations
+   * @returns {Promise<{primary: {firstName: string, lastName: string, email: string}, cc: string[]} | null>}
+   *          - Recipient object with primary email only (cc will always be empty array)
    */
   private async getEmailRecipients(moveInRequest: any): Promise<{ primary: { firstName: string, lastName: string, email: string }, cc: string[] } | null> {
     try {
@@ -2101,14 +2166,12 @@ export class MoveInService {
 
       const unitId = moveInRequest.unit?.id;
       let primary = null;
-      let cc: string[] = [];
-
-      // Get unit owner email from unit_bookings (always needed for CC in tenant requests)
-      const ownerInfo = await this.getUnitOwnerFromBookings(unitId);
+      let cc: string[] = []; // Always empty - no CC functionality
 
       switch (moveInRequest.requestType) {
         case MOVE_IN_USER_TYPES.OWNER: {
-          // For owner requests: primary = owner, no CC
+          // For owner requests: primary = owner only
+          const ownerInfo = await this.getUnitOwnerFromBookings(unitId);
           if (ownerInfo) {
             primary = ownerInfo;
             logger.info(`Owner request: Primary email set to owner from unit_bookings`);
@@ -2117,7 +2180,7 @@ export class MoveInService {
         }
 
         case MOVE_IN_USER_TYPES.TENANT: {
-          // For tenant requests: primary = tenant, CC = owner
+          // For tenant requests: primary = tenant only
           const tenantDetails = await MoveInRequestDetailsTenant.getRepository()
             .createQueryBuilder("tenant")
             .where("tenant.move_in_request_id = :requestId", { requestId: moveInRequest.id })
@@ -2131,18 +2194,12 @@ export class MoveInService {
               email: tenantDetails.email
             };
             logger.info(`Tenant request: Primary email set to tenant (${tenantDetails.email})`);
-
-            // Add owner as CC
-            if (ownerInfo && ownerInfo.email) {
-              cc.push(ownerInfo.email);
-              logger.info(`Tenant request: Owner email added to CC (${ownerInfo.email})`);
-            }
           }
           break;
         }
 
         case MOVE_IN_USER_TYPES.HHO_OWNER: {
-          // For HHO owner requests: primary = HHO owner, CC = unit owner
+          // For HHO owner requests: primary = HHO owner only
           const hhoDetails = await MoveInRequestDetailsHhoOwner.getRepository()
             .createQueryBuilder("hho")
             .where("hho.move_in_request_id = :requestId", { requestId: moveInRequest.id })
@@ -2156,18 +2213,12 @@ export class MoveInService {
               email: hhoDetails.email
             };
             logger.info(`HHO Owner request: Primary email set to HHO owner (${hhoDetails.email})`);
-
-            // Add unit owner as CC
-            if (ownerInfo && ownerInfo.email && ownerInfo.email !== hhoDetails.email) {
-              cc.push(ownerInfo.email);
-              logger.info(`HHO Owner request: Unit owner email added to CC (${ownerInfo.email})`);
-            }
           }
           break;
         }
 
         case MOVE_IN_USER_TYPES.HHO_COMPANY: {
-          // For HHC company requests: primary = companyEmail, CC = unit owner
+          // For HHC company requests: primary = company email only
           const companyDetails = await MoveInRequestDetailsHhcCompany.getRepository()
             .createQueryBuilder("company")
             .where("company.move_in_request_id = :requestId", { requestId: moveInRequest.id })
@@ -2181,12 +2232,6 @@ export class MoveInService {
               email: companyDetails.companyEmail
             };
             logger.info(`HHC Company request: Primary email set to company (${companyDetails.companyEmail})`);
-
-            // Add unit owner as CC
-            if (ownerInfo && ownerInfo.email) {
-              cc.push(ownerInfo.email);
-              logger.info(`HHC Company request: Unit owner email added to CC (${ownerInfo.email})`);
-            }
           }
           break;
         }
@@ -2197,7 +2242,7 @@ export class MoveInService {
         return null;
       }
 
-      return { primary, cc };
+      return { primary, cc: [] }; // Always return empty CC array
     } catch (error) {
       logger.error(`Error getting email recipients for request ${moveInRequest.id}:`, error);
       return null;
@@ -2205,7 +2250,132 @@ export class MoveInService {
   }
 
   /**
-   * Get unit owner information from unit_bookings table
+   * MIP RECIPIENTS RETRIEVAL
+   * ========================
+   * Retrieves MIP email recipients from occupancy_request_email_recipients table
+   * 
+   * Purpose:
+   * - Gets community-specific MIP recipients for approval emails
+   * - Implements hierarchical fallback: Tower → Community → Master Community
+   * - Parses comma-separated email addresses from mipRecipients column
+   * 
+   * Hierarchy Logic:
+   * 1. Tower-specific recipients (most specific)
+   * 2. Community-level recipients (fallback)
+   * 3. Master community recipients (final fallback)
+   * 
+   * Email Processing:
+   * - Splits comma-separated email addresses
+   * - Trims whitespace from each email
+   * - Filters out empty strings
+   * - Returns array of valid email addresses
+   * 
+   * @param {number} masterCommunityId - Master community identifier
+   * @param {number} communityId - Community identifier
+   * @param {number} [towerId] - Tower identifier (optional)
+   * @returns {Promise<string[]>} - Array of MIP recipient email addresses
+   */
+  private async getMIPRecipients(
+    masterCommunityId: number,
+    communityId: number,
+    towerId?: number
+  ): Promise<string[]> {
+    try {
+      logger.info(`Getting MIP recipients for MC:${masterCommunityId}, C:${communityId}, T:${towerId}`);
+      
+      let recipients = null;
+      
+      // 1. First try: Tower-specific recipients
+      if (towerId) {
+        recipients = await OccupancyRequestEmailRecipients.findOne({
+          where: {
+            masterCommunity: { id: masterCommunityId },
+            community: { id: communityId },
+            tower: { id: towerId },
+            isActive: true
+          }
+        });
+        
+        if (recipients) {
+          logger.info(`Found tower-specific MIP recipients for tower: ${towerId}`);
+        }
+      }
+      
+      // 2. Second try: Community-level recipients
+      if (!recipients) {
+        recipients = await OccupancyRequestEmailRecipients.findOne({
+          where: {
+            masterCommunity: { id: masterCommunityId },
+            community: { id: communityId },
+            tower: IsNull(),
+            isActive: true
+          }
+        });
+        
+        if (recipients) {
+          logger.info(`Found community-level MIP recipients for community: ${communityId}`);
+        }
+      }
+      
+      // 3. Third try: Master community level recipients
+      if (!recipients) {
+        recipients = await OccupancyRequestEmailRecipients.findOne({
+          where: {
+            masterCommunity: { id: masterCommunityId },
+            community: IsNull(),
+            tower: IsNull(),
+            isActive: true
+          }
+        });
+        
+        if (recipients) {
+          logger.info(`Found master community MIP recipients for masterCommunity: ${masterCommunityId}`);
+        }
+      }
+      
+      if (!recipients || !recipients.mipRecipients) {
+        logger.warn(`No MIP recipients found for MC:${masterCommunityId}, C:${communityId}, T:${towerId}`);
+        return [];
+      }
+      
+      // Parse comma-separated email addresses
+      const emailList = recipients.mipRecipients
+        .split(',')
+        .map(email => email.trim())
+        .filter(email => email.length > 0);
+      
+      logger.info(`Parsed MIP recipients: ${emailList.join(', ')}`);
+      return emailList;
+      
+    } catch (error) {
+      logger.error(`Error getting MIP recipients for MC:${masterCommunityId}, C:${communityId}, T:${towerId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * UNIT OWNER INFORMATION RETRIEVAL
+   * ================================
+   * Retrieves unit owner information from unit_bookings table
+   * 
+   * Purpose:
+   * - Gets unit owner details for CC email functionality
+   * - Used for tenant, HHO, and HHC request notifications
+   * - Ensures unit owners are informed about move-in activities
+   * 
+   * Data Source:
+   * - unit_bookings table with active bookings
+   * - Gets latest booking for the unit
+   * - Extracts customer name and email information
+   * 
+   * Name Processing:
+   * - Splits customerName into firstName and lastName
+   * - Handles cases where only first name is provided
+   * - Provides fallback names if customerName is empty
+   * 
+   * @param {number} unitId - Unit identifier
+   * @returns {Promise<{firstName: string, lastName: string, email: string} | null>}
+   *          - Unit owner information or null if not found
    */
   private async getUnitOwnerFromBookings(unitId: number): Promise<{ firstName: string, lastName: string, email: string } | null> {
     try {
@@ -2242,7 +2412,34 @@ export class MoveInService {
   }
 
   /**
-   * Send approval notifications
+   * APPROVAL EMAIL NOTIFICATION SENDER
+   * =================================
+   * Sends approval emails for move-in requests with attachments
+   * 
+   * Purpose:
+   * - Sends TWO separate approval emails:
+   *   1. To the user who raised the request (primary recipient)
+   *   2. To MIP recipients from occupancy_request_email_recipients table
+   * - Includes MIP template and welcome pack attachments
+   * - No CC recipients for approval emails
+   * 
+   * Email Features:
+   * - Detailed approval information
+   * - MIP template PDF attachment (generated dynamically)
+   * - Welcome pack PDF attachment (from Azure Blob Storage)
+   * - Separate emails for user and MIP recipients
+   * 
+   * Process:
+   * 1. Retrieves complete move-in request details
+   * 2. Gets MIP recipients from occupancy_request_email_recipients table
+   * 3. Prepares email data for both recipient groups
+   * 4. Sends two separate approval emails via EmailService
+   * 
+   * @param {number} requestId - Unique move-in request identifier
+   * @param {string} requestNumber - Human-readable request number
+   * @returns {Promise<void>}
+   * 
+   * @throws {Error} - When email sending fails
    */
   private async sendApprovalNotifications(requestId: number, requestNumber: string): Promise<void> {
     try {
@@ -2262,16 +2459,20 @@ export class MoveInService {
         return;
       }
 
-      // Prepare email data
-      const emailData: MoveInEmailData = {
+      // Get MIP recipients from occupancy_request_email_recipients table
+      const mipRecipients = await this.getMIPRecipients(
+        moveInRequest.unit?.masterCommunity?.id || 0,
+        moveInRequest.unit?.community?.id || 0,
+        moveInRequest.unit?.tower?.id
+      );
+
+      logger.info(`Found ${mipRecipients.length} MIP recipients: ${mipRecipients.join(', ')}`);
+
+      // Prepare base email data
+      const baseEmailData = {
         requestId: requestId,
         requestNumber: requestNumber,
-        status: 'approved',
-        userDetails: {
-          firstName: moveInRequest.user.firstName || '',
-          lastName: moveInRequest.user.lastName || '',
-          email: moveInRequest.user.email || ''
-        },
+        status: 'Approved',
         unitDetails: {
           unitNumber: moveInRequest.unit?.unitNumber || '',
           unitName: moveInRequest.unit?.unitName || '',
@@ -2283,13 +2484,45 @@ export class MoveInService {
           towerName: moveInRequest.unit?.tower?.name || undefined
         },
         moveInDate: moveInRequest.moveInDate,
-        comments: moveInRequest.comments || ''
+        comments: moveInRequest.comments || '',
+        ccEmails: [] // No CC functionality
       };
 
-      // Send approval email with welcome pack attachment
-      await this.emailService.sendMoveInApprovalEmail(emailData);
+      // EMAIL 1: Send to the user who raised the request
+      const userEmailData: MoveInEmailData = {
+        ...baseEmailData,
+        userDetails: {
+          firstName: moveInRequest.user.firstName || '',
+          lastName: moveInRequest.user.lastName || '',
+          email: moveInRequest.user.email || ''
+        },
+        ccEmails: [], // No CC for approval emails
+        isRecipientEmail: false // This is a user email, not recipient email
+      };
 
-      logger.info(`Approval notifications sent for move-in request ${requestId}`);
+      logger.info(`Sending approval email to user: ${moveInRequest.user.email}`);
+      await this.emailService.sendMoveInApprovalEmail(userEmailData);
+
+      // EMAIL 2: Send to MIP recipients (if any)
+      if (mipRecipients.length > 0) {
+        const mipEmailData: MoveInEmailData = {
+          ...baseEmailData,
+          userDetails: {
+            firstName: 'Community',
+            lastName: 'Management',
+            email: mipRecipients // Send to all MIP recipients
+          },
+          ccEmails: [], // No CC for approval emails
+          isRecipientEmail: true // This is a recipient email, not user email
+        };
+
+        logger.info(`Sending approval email to MIP recipients: ${mipRecipients.join(', ')}`);
+        await this.emailService.sendMoveInApprovalEmail(mipEmailData);
+      } else {
+        logger.warn(`No MIP recipients found for request ${requestId}, skipping MIP recipient email`);
+      }
+
+      logger.info(`Approval notifications sent for move-in request ${requestId} - User email and ${mipRecipients.length} MIP recipient emails`);
     } catch (error) {
       logger.error(`Error sending approval notifications: ${error}`);
       // Don't throw error to avoid breaking the approval process
@@ -2297,7 +2530,33 @@ export class MoveInService {
   }
 
   /**
-   * Send RFI notifications
+   * RFI (REQUEST FOR INFORMATION) EMAIL NOTIFICATION SENDER
+   * ======================================================
+   * Sends RFI emails when admin requests additional information
+   * 
+   * Purpose:
+   * - Notifies users when additional information is required
+   * - Provides specific comments about what information is needed
+   * - Maintains communication flow during request processing
+   * 
+   * Email Features:
+   * - RFI-specific messaging and styling
+   * - Admin comments explaining required information
+   * - Clear next steps for user action
+   * - CC to unit owners for tenant/HHO/HHC requests
+   * 
+   * Process:
+   * 1. Retrieves complete move-in request details
+   * 2. Determines email recipients based on request type
+   * 3. Prepares email data with RFI status and comments
+   * 4. Sends RFI notification email via EmailService
+   * 
+   * @param {number} requestId - Unique move-in request identifier
+   * @param {string} requestNumber - Human-readable request number
+   * @param {string} comments - Admin comments explaining required information
+   * @returns {Promise<void>}
+   * 
+   * @throws {Error} - When email sending fails
    */
   private async sendRFINotifications(requestId: number, requestNumber: string, comments: string): Promise<void> {
     try {
@@ -2352,7 +2611,33 @@ export class MoveInService {
   }
 
   /**
-   * Send cancellation notifications
+   * CANCELLATION EMAIL NOTIFICATION SENDER
+   * =====================================
+   * Sends cancellation emails when admin cancels move-in requests
+   * 
+   * Purpose:
+   * - Notifies users when their move-in request has been cancelled
+   * - Provides cancellation remarks explaining the reason
+   * - Maintains transparency in the cancellation process
+   * 
+   * Email Features:
+   * - Cancellation-specific messaging and styling
+   * - Admin cancellation remarks explaining the reason
+   * - Information about next steps or alternatives
+   * - CC to unit owners for tenant/HHO/HHC requests
+   * 
+   * Process:
+   * 1. Retrieves complete move-in request details
+   * 2. Determines email recipients based on request type
+   * 3. Prepares email data with cancellation status and remarks
+   * 4. Sends cancellation notification email via EmailService
+   * 
+   * @param {number} requestId - Unique move-in request identifier
+   * @param {string} requestNumber - Human-readable request number
+   * @param {string} cancellationRemarks - Admin remarks explaining cancellation reason
+   * @returns {Promise<void>}
+   * 
+   * @throws {Error} - When email sending fails
    */
   private async sendCancellationNotifications(requestId: number, requestNumber: string, cancellationRemarks: string): Promise<void> {
     try {
@@ -2424,7 +2709,6 @@ export class MoveInService {
           unit: data.unitId ? { id: data.unitId } : undefined,
           moveInDate: data.moveInDate,
           status: data.status,
-          user: data.userId ? { id: data.userId } : undefined,
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
@@ -2481,7 +2765,6 @@ export class MoveInService {
           status: data.status,
           comments: data.comments || null,
           additionalInfo: data.additionalInfo || null,
-          user: data.userId ? { id: data.userId } : undefined,
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })

@@ -302,10 +302,6 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
- *               userId:
- *                 type: integer
- *                 description: ID of the user for whom the move-in request is being updated. If not provided, uses the authenticated admin's ID.
- *                 example: 456
  *               status:
  *                 type: string
  *                 enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
@@ -439,10 +435,6 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
- *               userId:
- *                 type: integer
- *                 description: ID of the user for whom the move-in request is being updated. If not provided, uses the authenticated admin's ID.
- *                 example: 456
  *               status:
  *                 type: string
  *                 enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
@@ -557,10 +549,6 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
- *               userId:
- *                 type: integer
- *                 description: ID of the user for whom the move-in request is being updated. If not provided, uses the authenticated admin's ID.
- *                 example: 456
  *               status:
  *                 type: string
  *                 enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
@@ -675,10 +663,6 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.upd
  *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
- *               userId:
- *                 type: integer
- *                 description: ID of the user for whom the move-in request is being updated. If not provided, uses the authenticated admin's ID.
- *                 example: 456
  *               status:
  *                 type: string
  *                 enum: ["new", "rfi-pending", "rfi-submitted", "approved", "user-cancelled", "cancelled", "closed"]
