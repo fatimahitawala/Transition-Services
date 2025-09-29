@@ -1612,9 +1612,10 @@ export class MoveInService {
       }
 
       await executeInTransaction(async (qr: any) => {
-        // Update request status to Approved
+        // Update request status to Approved and save comments
         await MoveInRequests.update({ id: requestId }, {
           status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
+          comments: comments || '',
           updatedBy: user?.id,
           updatedAt: new Date()
         });
@@ -1718,14 +1719,7 @@ export class MoveInService {
         );
       }
 
-      // Validate comments (mandatory)
-      if (!comments || comments.trim().length === 0) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          APICodes.COMMENTS_REQUIRED.message,
-          APICodes.COMMENTS_REQUIRED.code
-        );
-      }
+      // Comments are now optional - no validation needed
 
       // Get the move-in request
       const moveInRequest = await MoveInRequests.getRepository()
@@ -1753,9 +1747,10 @@ export class MoveInService {
       }
 
       await executeInTransaction(async (qr: any) => {
-        // Update request status to RFI Pending
+        // Update request status to RFI Pending and save comments
         await MoveInRequests.update({ id: requestId }, {
           status: MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING,
+          comments: comments,
           updatedBy: user?.id,
           updatedAt: new Date()
         });
@@ -1891,9 +1886,10 @@ export class MoveInService {
       }
 
       await executeInTransaction(async (qr: any) => {
-        // Update request status to Cancelled
+        // Update request status to Cancelled and save cancellation remarks
         await MoveInRequests.update({ id: requestId }, {
           status: MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED,
+          comments: cancellationRemarks,
           updatedBy: user?.id,
           updatedAt: new Date()
         });

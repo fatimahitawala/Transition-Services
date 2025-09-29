@@ -265,8 +265,8 @@ export class MoveInvalidation {
       requestId: Joi.number().required(),
     }),
     body: Joi.object().keys({
-      comments: Joi.string().required().messages({
-        'any.required': 'Comments are required for approval'
+      comments: Joi.string().optional().allow('').messages({
+        'string.base': 'Comments must be a string'
       }),
     }).required(),
   };
@@ -279,8 +279,8 @@ export class MoveInvalidation {
       requestId: Joi.number().required(),
     }),
     body: Joi.object().keys({
-      comments: Joi.string().required().messages({
-        'any.required': 'Comments/remarks are mandatory when marking request as RFI'
+      comments: Joi.string().optional().allow('').messages({
+        'string.base': 'Comments must be a string'
       }),
     }).required(),
   };
@@ -293,8 +293,8 @@ export class MoveInvalidation {
       requestId: Joi.number().required(),
     }),
     body: Joi.object().keys({
-      cancellationRemarks: Joi.string().required().messages({
-        'any.required': 'Cancellation remarks are mandatory'
+      cancellationRemarks: Joi.string().optional().allow('').messages({
+        'string.base': 'Cancellation remarks must be a string'
       }),
     }).required(),
   };
