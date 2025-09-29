@@ -329,7 +329,6 @@ export class MoveInvalidation {
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
-        userId: Joi.number().optional(),
         details: Joi.object()
           .keys({
             adults: Joi.number().integer().min(1).max(6).required(),
@@ -358,7 +357,6 @@ export class MoveInvalidation {
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
-        userId: Joi.number().optional(),
         firstName: Joi.string().max(100).required(),
         lastName: Joi.string().max(100).required(),
         email: Joi.string().email().max(255).required(),
@@ -400,7 +398,6 @@ export class MoveInvalidation {
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
-        userId: Joi.number().optional(),
         // Optional owner identity fields - if omitted, derived from authenticated admin
         ownerFirstName: Joi.string().max(100).optional(),
         ownerLastName: Joi.string().max(100).optional(),
@@ -432,7 +429,6 @@ export class MoveInvalidation {
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
-        userId: Joi.number().optional(),
         userEmail: Joi.string().email().max(255).required(),
         firstName: Joi.string().max(100).required(),
         middleName: Joi.string().max(100).allow('').optional(),
