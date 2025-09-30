@@ -1393,6 +1393,9 @@ export class MoveInService {
       const moveInRequest = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .leftJoinAndSelect("mir.unit", "unit")
+        .leftJoinAndSelect("unit.masterCommunity", "masterCommunity")
+        .leftJoinAndSelect("unit.community", "community")
+        .leftJoinAndSelect("unit.tower", "tower")
         .leftJoinAndSelect("mir.user", "user")
         .where("mir.id = :requestId AND mir.isActive = true", { requestId })
         .getOne();
@@ -1567,6 +1570,9 @@ export class MoveInService {
       const moveInRequest = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .leftJoinAndSelect("mir.unit", "unit")
+        .leftJoinAndSelect("unit.masterCommunity", "masterCommunity")
+        .leftJoinAndSelect("unit.community", "community")
+        .leftJoinAndSelect("unit.tower", "tower")
         .leftJoinAndSelect("mir.user", "user")
         .where("mir.id = :requestId AND mir.isActive = true", { requestId })
         .getOne();
