@@ -117,6 +117,7 @@ export class MoveInvalidation {
       .keys({
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        userId: Joi.number().required(),
         details: Joi.object()
           .keys({
             adults: Joi.number().integer().min(1).max(6).required(),
@@ -140,6 +141,7 @@ export class MoveInvalidation {
       .keys({
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        userId: Joi.number().required(),
         firstName: Joi.string().max(100).required(),
         lastName: Joi.string().max(100).required(),
         email: Joi.string().email().max(255).required(),
@@ -176,6 +178,7 @@ export class MoveInvalidation {
       .keys({
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        userId: Joi.number().required(),
         // Optional owner identity fields - if omitted, derived from authenticated admin
         ownerFirstName: Joi.string().max(100).optional(),
         ownerLastName: Joi.string().max(100).optional(),
@@ -187,9 +190,9 @@ export class MoveInvalidation {
         additionalInfo: Joi.string().allow('').optional(),
         details: Joi.object()
           .keys({
-            unitPermitNumber: Joi.string().required(),
-            unitPermitStartDate: Joi.date().iso().required(),
-            unitPermitExpiryDate: Joi.date().iso().custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE)).required(),
+            unitPermitNumber: Joi.string().optional(),
+            unitPermitStartDate: Joi.date().iso().optional(),
+            unitPermitExpiryDate: Joi.date().iso().custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE)).optional(),
             termsAccepted: Joi.boolean().valid(true).required(),
           })
           .required(),
@@ -202,6 +205,7 @@ export class MoveInvalidation {
       .keys({
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        userId: Joi.number().required(),
         userEmail: Joi.string().email().required(),
         firstName: Joi.string().required(),
         middleName: Joi.string().allow('').optional(),
@@ -261,9 +265,8 @@ export class MoveInvalidation {
       requestId: Joi.number().required(),
     }),
     body: Joi.object().keys({
-      comments: Joi.string().max(35).required().messages({
-        'string.max': 'Comments cannot exceed 35 characters',
-        'any.required': 'Comments are required for approval'
+      comments: Joi.string().optional().allow('').messages({
+        'string.base': 'Comments must be a string'
       }),
     }).required(),
   };
@@ -276,9 +279,8 @@ export class MoveInvalidation {
       requestId: Joi.number().required(),
     }),
     body: Joi.object().keys({
-      comments: Joi.string().max(35).required().messages({
-        'string.max': 'Comments cannot exceed 35 characters',
-        'any.required': 'Comments/remarks are mandatory when marking request as RFI'
+      comments: Joi.string().optional().allow('').messages({
+        'string.base': 'Comments must be a string'
       }),
     }).required(),
   };
@@ -291,9 +293,8 @@ export class MoveInvalidation {
       requestId: Joi.number().required(),
     }),
     body: Joi.object().keys({
-      cancellationRemarks: Joi.string().max(100).required().messages({
-        'string.max': 'Cancellation remarks cannot exceed 100 characters',
-        'any.required': 'Cancellation remarks are mandatory'
+      cancellationRemarks: Joi.string().optional().allow('').messages({
+        'string.base': 'Cancellation remarks must be a string'
       }),
     }).required(),
   };
@@ -306,8 +307,7 @@ export class MoveInvalidation {
       requestId: Joi.number().required(),
     }),
     body: Joi.object().keys({
-      closureRemarks: Joi.string().max(100).required().messages({
-        'string.max': 'Closure remarks cannot exceed 100 characters',
+      closureRemarks: Joi.string().required().messages({
         'any.required': 'Closure remarks are mandatory'
       }),
       actualMoveInDate: Joi.date().iso().required().messages({
@@ -409,9 +409,9 @@ export class MoveInvalidation {
         additionalInfo: Joi.string().allow('').optional(),
         details: Joi.object()
           .keys({
-            unitPermitNumber: Joi.string().required(),
-            unitPermitStartDate: Joi.date().iso().required(),
-            unitPermitExpiryDate: Joi.date().iso().custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE)).required(),
+            unitPermitNumber: Joi.string().optional(),
+            unitPermitStartDate: Joi.date().iso().optional(),
+            unitPermitExpiryDate: Joi.date().iso().custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE)).optional(),
             termsAccepted: Joi.boolean().valid(true).required(),
           })
           .required(),

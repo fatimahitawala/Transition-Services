@@ -1,3 +1,27 @@
+/**
+ * EMAIL SERVICE MODULE - TRANSITION SERVICES
+ * ==========================================
+ * 
+ * This module handles all email functionality for the Transition Services, including:
+ * - Move-in request notifications (status changes, approvals, cancellations)
+ * - OTP verification emails
+ * - Support and error notification emails
+ * - Email template management with community-specific customization
+ * - PDF attachment generation (MIP templates and welcome packs)
+ * 
+ * Key Features:
+ * - SMTP email delivery using nodemailer
+ * - Community/tower-specific email templates
+ * - Dynamic placeholder replacement
+ * - PDF generation for MIP templates using Puppeteer
+ * - Welcome pack attachment handling
+ * - Comprehensive logging and error handling
+ * 
+ * @author Transition Services Team
+ * @version 1.0.0
+ * @since 2024
+ */
+
 import nodemailer from 'nodemailer';
 import httpStatus from 'http-status';
 import { logger } from '../../Common/Utils/logger';
@@ -10,47 +34,70 @@ import { OCUPANCY_REQUEST_TYPES } from '../../Entities/EntityTypes/transition';
 import { AppDataSource } from '../../Common/data-source';
 import { IsNull } from 'typeorm';
 
+/**
+ * EMAIL ATTACHMENT INTERFACE
+ * ==========================
+ * Defines the structure for email attachments including PDFs and documents
+ */
 export interface EmailAttachment {
-    filename: string;
-    content?: Buffer;
-    path?: string;
-    contentType?: string;
+    filename: string;        // Display name for the attachment
+    content?: Buffer;        // File content as buffer (for generated PDFs)
+    path?: string;           // File path or URL (for existing files)
+    contentType?: string;     // MIME type of the attachment
 }
 
+/**
+ * EMAIL OPTIONS INTERFACE
+ * =======================
+ * Enhanced email options supporting multiple recipients and CC
+ */
 export interface EmailOptions {
-    to: string | string[]; // Support multiple "To" recipients
-    cc?: string[];
-    subject: string;
-    html: string;
-    attachments?: EmailAttachment[];
+    to: string | string[];   // Primary recipients (supports multiple)
+    cc?: string[];           // CC recipients
+    subject: string;          // Email subject line
+    html: string;            // HTML email content
+    attachments?: EmailAttachment[]; // File attachments
 }
 
+/**
+ * MOVE-IN EMAIL DATA INTERFACE
+ * ============================
+ * Comprehensive data structure for move-in related emails
+ * Contains all necessary information for template processing and personalization
+ */
 export interface MoveInEmailData {
-    requestId: number;
-    requestNumber: string;
-    status: string;
+    requestId: number;       // Unique request identifier
+    requestNumber: string;   // Human-readable request number (e.g., "MIN-2024-001")
+    status: string;          // Current request status (approved, rfi-pending, cancelled, etc.)
     userDetails: {
-        firstName: string;
-        lastName: string;
-        email: string | string[]; // Support multiple primary emails
+        firstName: string;   // User's first name
+        lastName: string;    // User's last name
+        email: string | string[]; // Primary email(s) - supports multiple for company requests
     };
     unitDetails: {
-        unitNumber: string;
-        unitName: string;
-        masterCommunityId: number;
-        communityId: number;
-        towerId?: number;
-        masterCommunityName: string;
-        communityName: string;
-        towerName?: string;
+        unitNumber: string;         // Unit identifier (e.g., "A001")
+        unitName: string;           // Full unit name
+        masterCommunityId: number;  // Master community ID for template lookup
+        communityId: number;         // Community ID for template lookup
+        towerId?: number;           // Tower ID for template lookup (optional)
+        masterCommunityName: string; // Master community name
+        communityName: string;      // Community name
+        towerName?: string;         // Tower name (optional)
     };
-    moveInDate?: Date;
-    comments?: string;
-    additionalInfo?: any;
-    ccEmails?: string[]; // CC emails (e.g., owner email for tenant requests)
-    requestType?: string; // To determine email logic
+    moveInDate?: Date;       // Scheduled move-in date
+    comments?: string;       // Additional comments or remarks
+    additionalInfo?: any;     // Extra data for template processing
+    ccEmails?: string[];     // CC recipients (e.g., unit owner for tenant requests)
+    requestType?: string;    // Request type (owner, tenant, hho-owner, hhc-company)
+    isRecipientEmail?: boolean; // Flag to differentiate between user and recipient emails
 }
 
+/**
+ * SMTP TRANSPORT CONFIGURATION
+ * ============================
+ * Initialize nodemailer transport using SMTP configuration from environment
+ * Includes connection verification for non-test environments
+ */
 // Use the exact same pattern as User-Services
 const transport = nodemailer.createTransport(config.email.smtp);
 if (config.env !== 'test') {
@@ -63,15 +110,41 @@ if (config.env !== 'test') {
         });
 }
 
+/**
+ * EMAIL SERVICE CLASS
+ * ==================
+ * Main service class handling all email operations for Transition Services
+ * 
+ * Features:
+ * - Core email sending with SMTP
+ * - Move-in specific email templates and processing
+ * - PDF generation for MIP templates
+ * - Welcome pack attachment handling
+ * - Community-specific template management
+ * - Comprehensive error handling and logging
+ */
 export class EmailService {
 
     /**
-     * Send an email (copied from User-Services with attachment support)
-     * @param {string} to
-     * @param {string} subject
-     * @param {string} text
-     * @param {EmailAttachment[]} attachments
-     * @returns {Promise}
+     * CORE EMAIL SENDING METHOD
+     * =========================
+     * Sends emails using nodemailer with comprehensive logging and error handling
+     * 
+     * Enhanced features over User-Services:
+     * - Support for multiple recipients
+     * - CC functionality
+     * - File attachment support
+     * - Detailed logging for debugging
+     * - SMTP configuration validation
+     * 
+     * @param {string|string[]} to - Primary recipient(s)
+     * @param {string} subject - Email subject line
+     * @param {string} text - HTML email content
+     * @param {EmailAttachment[]} attachments - File attachments (optional)
+     * @param {string[]} cc - CC recipients (optional)
+     * @returns {Promise<nodemailer.SentMessageInfo>} - Email delivery result
+     * 
+     * @throws {ApiError} - When email sending fails
      */
     async sendEmail(to: string | string[], subject: string, text: string, attachments: EmailAttachment[] = [], cc: string[] = []) {
         try {
@@ -132,7 +205,13 @@ export class EmailService {
     };
 
     /**
-     * Send email with enhanced options (including CC)
+     * ENHANCED EMAIL SENDING WITH OPTIONS
+     * ===================================
+     * Wrapper method for sending emails using the EmailOptions interface
+     * Provides a cleaner API for complex email operations
+     * 
+     * @param {EmailOptions} options - Complete email configuration
+     * @returns {Promise<nodemailer.SentMessageInfo>} - Email delivery result
      */
     async sendEmailWithOptions(options: EmailOptions) {
         return await this.sendEmail(
@@ -145,10 +224,14 @@ export class EmailService {
     };
 
     /**
-     * Send reset password email (copied from User-Services)
-     * @param {string} to
-     * @param {any} details
-     * @returns {Promise}
+     * PASSWORD RESET OTP EMAIL
+     * ========================
+     * Sends OTP email for password reset functionality
+     * Uses standardized template with user personalization
+     * 
+     * @param {string} to - Recipient email address
+     * @param {any} details - User details containing firstName, lastName, and otp
+     * @returns {Promise<void>}
      */
     async sendResetPasswordEmail(to: string, details: any) {
         const subject = 'Reset Password : OTP Verification Required';
@@ -157,10 +240,14 @@ export class EmailService {
     };
 
     /**
-     * Send OTP Validation email (copied from User-Services)
-     * @param {string} to
-     * @param {any} details
-     * @returns {Promise}
+     * MOVE-IN VERIFICATION OTP EMAIL
+     * ==============================
+     * Sends OTP email for move-in verification process
+     * Used during the move-in request submission workflow
+     * 
+     * @param {string} to - Recipient email address
+     * @param {any} details - User details containing firstName, lastName, and otp
+     * @returns {Promise<void>}
      */
     async sendMoveInVerificationEmail(to: string, details: any) {
         const subject = 'Move In : OTP Verification Required';
@@ -169,10 +256,14 @@ export class EmailService {
     };
 
     /**
-     * Send general OTP email (copied from User-Services)
-     * @param {string} to
-     * @param {any} otp
-     * @returns {Promise}
+     * GENERAL PURPOSE OTP EMAIL
+     * =========================
+     * Sends generic OTP email for various verification purposes
+     * Used for general authentication and verification workflows
+     * 
+     * @param {string} to - Recipient email address
+     * @param {any} otp - OTP code to be sent
+     * @returns {Promise<nodemailer.SentMessageInfo>} - Email delivery result
      */
     async sendEmailOTPGeneral(to: string, otp: any) {
         const subject = 'Your One-Time Password (OTP) from ONE Sobha App';
@@ -183,11 +274,15 @@ export class EmailService {
     };
 
     /**
-     * Send support email (copied from User-Services)
-     * @param {string} message
-     * @param {string} error
-     * @param {string} apiDetails
-     * @returns {Promise}
+     * SUPPORT/ERROR NOTIFICATION EMAIL
+     * ===============================
+     * Sends error notifications to support team
+     * Used for system error reporting and debugging
+     * 
+     * @param {string} message - Error message or description
+     * @param {string} error - Error stack trace or details
+     * @param {string} apiDetails - API endpoint and request details
+     * @returns {Promise<void>}
      */
     async sendSupportEmail(message: string, error: string, apiDetails: string) {
         const subject = `${message} - ${process.env.NODE_ENV || 'development'} - ${new Date().toISOString()}`;
@@ -211,7 +306,21 @@ export class EmailService {
     };
 
     /**
-     * Get email template for move-in based on community/tower (MIP specific)
+     * EMAIL TEMPLATE RETRIEVAL
+     * ========================
+     * Retrieves community-specific email templates from database
+     * Implements hierarchical fallback: Tower → Community → Master Community
+     * 
+     * Template Hierarchy:
+     * 1. Tower-specific template (most specific)
+     * 2. Community-level template (fallback)
+     * 3. Master community template (final fallback)
+     * 
+     * @param {number} masterCommunityId - Master community identifier
+     * @param {number} communityId - Community identifier
+     * @param {number} [towerId] - Tower identifier (optional)
+     * @param {string} [status] - Request status for template filtering
+     * @returns {Promise<string|null>} - Template HTML string or null if not found
      */
     private async getMoveInEmailTemplate(
         masterCommunityId: number,
@@ -291,7 +400,22 @@ export class EmailService {
     }
 
     /**
-     * Get welcome pack PDF for approved move-in
+     * WELCOME PACK FILE RETRIEVAL
+     * ===========================
+     * Retrieves welcome pack PDF files for approved move-in requests
+     * Implements hierarchical fallback similar to email templates
+     * 
+     * File Hierarchy:
+     * 1. Tower-specific welcome pack (most specific)
+     * 2. Community-level welcome pack (fallback)
+     * 3. Master community welcome pack (final fallback)
+     * 
+     * Files are stored in Azure Blob Storage and accessed via URLs
+     * 
+     * @param {number} masterCommunityId - Master community identifier
+     * @param {number} communityId - Community identifier
+     * @param {number} [towerId] - Tower identifier (optional)
+     * @returns {Promise<EmailAttachment|null>} - Welcome pack attachment or null if not found
      */
     private async getWelcomePackFile(
         masterCommunityId: number,
@@ -382,7 +506,22 @@ export class EmailService {
     }
 
     /**
-     * Replace template placeholders with actual data (Enhanced for MIP templates)
+     * TEMPLATE PLACEHOLDER REPLACEMENT
+     * ================================
+     * Replaces template placeholders with actual data for email personalization
+     * Supports comprehensive placeholder system for dynamic content generation
+     * 
+     * Supported Placeholders:
+     * - User Information: {{firstName}}, {{lastName}}, {{fullName}}, {{email}}
+     * - Request Details: {{requestNumber}}, {{requestId}}, {{status}}, {{comments}}
+     * - Unit Information: {{unitNumber}}, {{unitName}}, {{communityName}}, etc.
+     * - Date Information: {{moveInDate}}, {{currentDate}}, {{currentYear}}
+     * - Status-specific: {{statusMessage}}, {{nextSteps}}
+     * - Company Info: {{companyName}}, {{supportEmail}}, {{appName}}
+     * 
+     * @param {string} template - HTML template with placeholders
+     * @param {MoveInEmailData} data - Data object containing replacement values
+     * @returns {string} - Processed template with placeholders replaced
      */
     private replaceTemplatePlaceholders(template: string, data: MoveInEmailData): string {
         const currentDate = new Date();
@@ -586,7 +725,26 @@ export class EmailService {
     }
 
     /**
-     * Send move-in status change email with MIP template as PDF attachment
+     * MOVE-IN STATUS EMAIL SENDER
+     * ==========================
+     * Sends status update emails for move-in requests (confirmations, RFIs, cancellations)
+     * 
+     * Features:
+     * - Uses community-specific templates with fallback to default
+     * - No attachments (status emails are informational only)
+     * - Supports CC recipients (e.g., unit owners for tenant requests)
+     * - Comprehensive logging for debugging
+     * 
+     * Email Types:
+     * - Confirmation emails (request submitted)
+     * - RFI notifications (additional information required)
+     * - Cancellation notifications
+     * - Update notifications
+     * 
+     * @param {MoveInEmailData} data - Complete email data including user, unit, and request details
+     * @returns {Promise<void>}
+     * 
+     * @throws {Error} - When email sending fails
      */
     async sendMoveInStatusEmail(data: MoveInEmailData): Promise<void> {
         try {
@@ -613,10 +771,10 @@ export class EmailService {
             }
 
             // Create simple email body with header image and status content
-            const emailBody = this.createEmailBodyWithHeader(data.status, data.requestNumber);
+            const emailBody = this.createEmailBodyWithHeader(data.status, data.requestNumber, data.isRecipientEmail, data);
 
             // Generate subject based on status
-            const subject = this.getEmailSubject(data.status, data.requestNumber);
+            const subject = this.getEmailSubject(data.status, data.requestNumber, data.isRecipientEmail, data);
             logger.info(`Email subject generated: ${subject}`);
 
             // Send email with header image only (no attachments for status emails)
@@ -641,7 +799,25 @@ export class EmailService {
     }
 
     /**
-     * Send move-in approval email with welcome pack attachment
+     * MOVE-IN APPROVAL EMAIL SENDER
+     * =============================
+     * Sends approval emails for move-in requests with attachments
+     * 
+     * Features:
+     * - Uses community-specific templates with fallback to default
+     * - Includes MIP template as PDF attachment (generated dynamically)
+     * - Includes welcome pack PDF attachment (retrieved from Azure Blob Storage)
+     * - Supports CC recipients (e.g., unit owners for tenant requests)
+     * - Comprehensive logging for debugging
+     * 
+     * Attachments:
+     * - MIP Template PDF: Generated from HTML template using Puppeteer
+     * - Welcome Pack PDF: Retrieved from community-specific storage
+     * 
+     * @param {MoveInEmailData} data - Complete email data including user, unit, and request details
+     * @returns {Promise<void>}
+     * 
+     * @throws {Error} - When email sending fails
      */
     async sendMoveInApprovalEmail(data: MoveInEmailData): Promise<void> {
         try {
@@ -669,41 +845,49 @@ export class EmailService {
             // Replace placeholders with actual data
             const processedTemplate = this.replaceTemplatePlaceholders(emailTemplate, data);
 
-            // Generate MIP template as PDF attachment
-            logger.info(`Generating MIP template as PDF attachment...`);
-            const mipTemplateHtml = this.getMIPTemplateHTML(data);
-            const mipPdfAttachment = await this.generateMIPTemplatePDF(mipTemplateHtml, data);
-
-            // Get welcome pack attachment
-            logger.info(`Fetching welcome pack for MC:${data.unitDetails.masterCommunityId}, C:${data.unitDetails.communityId}, T:${data.unitDetails.towerId}`);
-            const welcomePackAttachment = await this.getWelcomePackFile(
-                data.unitDetails.masterCommunityId,
-                data.unitDetails.communityId,
-                data.unitDetails.towerId
-            );
-
+            // Generate attachments only for user emails, not for recipient emails
             const attachments: EmailAttachment[] = [];
-            if (mipPdfAttachment) {
-                attachments.push(mipPdfAttachment);
-                logger.info(`MIP template PDF attachment added (${mipPdfAttachment.filename})`);
-            } else {
-                logger.warn(`MIP template PDF attachment failed to generate`);
-            }
             
-            if (welcomePackAttachment) {
-                attachments.push(welcomePackAttachment);
-                logger.info(`Welcome pack attachment found and added (${welcomePackAttachment.filename})`);
-            } else {
-                logger.warn(`No welcome pack found for community ${data.unitDetails.communityId}, tower ${data.unitDetails.towerId}`);
-            }
+            if (!data.isRecipientEmail) {
+                // Generate MIP template as PDF attachment
+                logger.info(`Generating MIP template as PDF attachment...`);
+                const mipTemplateHtml = this.getMIPTemplateHTML(data);
+                const mipPdfAttachment = await this.generateMIPTemplatePDF(mipTemplateHtml, data);
 
-            logger.info(`Total attachments: ${attachments.length} (MIP: ${mipPdfAttachment ? 'Yes' : 'No'}, Welcome Pack: ${welcomePackAttachment ? 'Yes' : 'No'})`);
+                // Get welcome pack attachment
+                logger.info(`Fetching welcome pack for MC:${data.unitDetails.masterCommunityId}, C:${data.unitDetails.communityId}, T:${data.unitDetails.towerId}`);
+                const welcomePackAttachment = await this.getWelcomePackFile(
+                    data.unitDetails.masterCommunityId,
+                    data.unitDetails.communityId,
+                    data.unitDetails.towerId
+                );
+
+                if (mipPdfAttachment) {
+                    attachments.push(mipPdfAttachment);
+                    logger.info(`MIP template PDF attachment added (${mipPdfAttachment.filename})`);
+                } else {
+                    logger.warn(`MIP template PDF attachment failed to generate`);
+                }
+                
+                if (welcomePackAttachment) {
+                    attachments.push(welcomePackAttachment);
+                    logger.info(`Welcome pack attachment found and added (${welcomePackAttachment.filename})`);
+                } else {
+                    logger.warn(`No welcome pack found for community ${data.unitDetails.communityId}, tower ${data.unitDetails.towerId}`);
+                }
+
+                logger.info(`Total attachments: ${attachments.length} (MIP: ${mipPdfAttachment ? 'Yes' : 'No'}, Welcome Pack: ${welcomePackAttachment ? 'Yes' : 'No'})`);
+            } else {
+                logger.info(`Recipient email - no attachments will be sent`);
+            }
 
             // Create detailed email body with header image and move-in permit content
-            const emailBody = this.createDetailedApprovalEmailBody(data);
+            const emailBody = data.isRecipientEmail ? 
+                this.createRecipientApprovalEmailBody(data) : 
+                this.createDetailedApprovalEmailBody(data);
 
             // Generate subject
-            const subject = this.getEmailSubject('approved', data.requestNumber);
+            const subject = this.getEmailSubject('approved', data.requestNumber, data.isRecipientEmail, data);
 
             // Send email with MIP template and welcome pack attachments (with CC if provided)
             await this.sendEmail(
@@ -722,7 +906,21 @@ export class EmailService {
     }
 
     /**
-     * Get MIP template HTML content
+     * MIP TEMPLATE HTML GENERATOR
+     * ===========================
+     * Generates HTML content for MIP (Move-In Permit) template
+     * Creates a comprehensive HTML document with all request details
+     * 
+     * Features:
+     * - Professional styling with CSS
+     * - Header image integration
+     * - Request details table
+     * - Status-specific content sections
+     * - Next steps and important information
+     * - Placeholder replacement for dynamic content
+     * 
+     * @param {MoveInEmailData} data - Complete email data for template generation
+     * @returns {string} - Complete HTML document ready for PDF conversion
      */
     private getMIPTemplateHTML(data: MoveInEmailData): string {
         // Use the uploaded MIP template and replace placeholders
@@ -869,7 +1067,26 @@ export class EmailService {
     }
 
     /**
-     * Generate MIP template as PDF attachment
+     * PDF GENERATION USING PUPPETEER
+     * ==============================
+     * Converts HTML content to PDF using Puppeteer browser automation
+     * 
+     * Features:
+     * - Headless Chrome browser for PDF generation
+     * - A4 format with proper margins
+     * - Background graphics and styling preserved
+     * - Network idle wait for image loading
+     * - Error handling for PDF generation failures
+     * 
+     * Technical Details:
+     * - Uses Puppeteer for reliable PDF generation
+     * - Waits for network idle to ensure images load
+     * - Returns buffer content for email attachment
+     * - Handles browser cleanup automatically
+     * 
+     * @param {string} htmlContent - Complete HTML document to convert
+     * @param {MoveInEmailData} data - Email data for filename generation
+     * @returns {Promise<EmailAttachment|null>} - PDF attachment or null if generation fails
      */
     private async generateMIPTemplatePDF(htmlContent: string, data: MoveInEmailData): Promise<EmailAttachment | null> {
         try {
@@ -917,10 +1134,38 @@ export class EmailService {
     }
 
     /**
-     * Create simple email body with header image
+     * SIMPLE EMAIL BODY CREATOR
+     * =========================
+     * Creates a simple email body with header image for status emails
+     * Used for non-approval emails that don't require detailed content
+     * 
+     * Features:
+     * - Header image with professional styling
+     * - Status-specific messaging
+     * - Request number display
+     * - Clean, minimal design
+     * 
+     * @param {string} status - Request status for appropriate messaging
+     * @param {string} requestNumber - Request number for display
+     * @returns {string} - HTML email body
      */
-    private createEmailBodyWithHeader(status: string, requestNumber: string): string {
+    private createEmailBodyWithHeader(status: string, requestNumber: string, isRecipientEmail: boolean = false, data?: MoveInEmailData): string {
         const statusMessage = this.getStatusMessage(status);
+        const moveInDateStr = data?.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+        
+        let heading = '';
+        if (status.toLowerCase() === 'approved') {
+            if (isRecipientEmail) {
+                // For recipient emails: "User name move in date starts from 15 August 2022 Ref # MIP-10"
+                const userName = data?.userDetails ? `${data.userDetails.firstName} ${data.userDetails.lastName}` : 'User';
+                heading = `${userName} move in date starts from ${moveInDateStr} Ref # ${requestNumber}`;
+            } else {
+                // For user emails: "Your move in date starts from 15 August 2022 Ref # MIP-10"
+                heading = `Your move in date starts from ${moveInDateStr} Ref # ${requestNumber}`;
+            }
+        } else {
+            heading = 'Move-in Request Update';
+        }
         
         return `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -933,7 +1178,7 @@ export class EmailService {
             
             <!-- Email Content -->
             <div style="padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
-                <h2 style="color: #333; margin-bottom: 15px;">Move-in Request Update</h2>
+                <h2 style="color: #333; margin-bottom: 15px;">${heading}</h2>
                 <p style="color: #666; font-size: 16px; line-height: 1.5;">
                     ${statusMessage}
                 </p>
@@ -954,7 +1199,22 @@ export class EmailService {
     }
 
     /**
-     * Create detailed approval email body with move-in permit content
+     * DETAILED APPROVAL EMAIL BODY CREATOR
+     * ====================================
+     * Creates comprehensive email body for approval emails with detailed information
+     * Used specifically for move-in approval notifications
+     * 
+     * Features:
+     * - Professional header image with styling
+     * - Congratulations message with status-specific styling
+     * - Detailed request information table
+     * - Next steps section with guidance
+     * - Attachment information section
+     * - Additional comments section (if provided)
+     * - Professional footer
+     * 
+     * @param {MoveInEmailData} data - Complete email data for content generation
+     * @returns {string} - Comprehensive HTML email body
      */
     private createDetailedApprovalEmailBody(data: MoveInEmailData): string {
         const statusMessage = this.getStatusMessage('approved');
@@ -984,11 +1244,11 @@ export class EmailService {
                     <h3 style="color: #333; margin-top: 0;">Request Details</h3>
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; width: 40%;">Request Number:</td>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${data.requestNumber}</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; width: 40%;">Occupant Name:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${data.userDetails.firstName} ${data.userDetails.lastName}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold;">Unit Details:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold;">Address:</td>
                             <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${data.unitDetails.unitNumber} - ${data.unitDetails.unitName}</td>
                         </tr>
                         <tr>
@@ -996,20 +1256,8 @@ export class EmailService {
                             <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${data.unitDetails.communityName}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold;">Master Community:</td>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${data.unitDetails.masterCommunityName}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold;">Tower:</td>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${data.unitDetails.towerName || 'N/A'}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold;">Move-in Date:</td>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${data.moveInDate ? new Date(data.moveInDate).toLocaleDateString() : 'TBD'}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold;">Request Type:</td>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${data.requestType}</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold;">Date of Issue:</td>
+                            <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${new Date().toLocaleDateString()}</td>
                         </tr>
                     </table>
                 </div>
@@ -1047,7 +1295,171 @@ export class EmailService {
     }
 
     /**
-     * Get status-specific message for email body
+     * RECIPIENT APPROVAL EMAIL BODY CREATOR
+     * =====================================
+     * Creates email body specifically for recipient emails (team/community management)
+     * Uses the new MIP notification format with structured content
+     * 
+     * Features:
+     * - Professional header with Sobha branding
+     * - "Dear Team" greeting
+     * - Structured MIP notification format
+     * - All required fields: MIP reference, user type, property details, etc.
+     * - Professional footer with Sobha Community Management signature
+     * 
+     * @param {MoveInEmailData} data - Complete email data for content generation
+     * @returns {string} - HTML email body for recipient notifications
+     */
+    private createRecipientApprovalEmailBody(data: MoveInEmailData): string {
+        // Format dates properly
+        const moveInDate = data.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        }) : '';
+        
+        const moveOutDate = data.additionalInfo?.moveOutDate ? 
+            new Date(data.additionalInfo.moveOutDate).toLocaleDateString('en-GB', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            }) : '';
+            
+        const startDate = data.additionalInfo?.startDate ? 
+            new Date(data.additionalInfo.startDate).toLocaleDateString('en-GB', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            }) : '';
+            
+        const endDate = data.additionalInfo?.endDate ? 
+            new Date(data.additionalInfo.endDate).toLocaleDateString('en-GB', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            }) : '';
+        
+        const mipIssueDate = new Date().toLocaleDateString('en-GB', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+
+        // Get user type based on request type
+        let userType = '';
+        switch (data.requestType?.toLowerCase()) {
+            case 'owner':
+                userType = 'Owner';
+                break;
+            case 'tenant':
+                userType = 'Tenant';
+                break;
+            case 'hho-owner':
+                userType = 'HHO Owner';
+                break;
+            case 'hhc-company':
+                userType = 'HHC Company';
+                break;
+            default:
+                userType = data.requestType || 'Owner';
+        }
+
+        // Get applicant and occupant names with better fallback handling
+        const applicantName = data.userDetails ? 
+            `${data.userDetails.firstName || ''} ${data.userDetails.lastName || ''}`.trim() || 'Not specified' : 
+            'Not specified';
+        const occupantName = data.additionalInfo?.occupantName || applicantName;
+
+        return `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <!-- Header Image with Frame -->
+            <div style="width: 100%; margin-bottom: 20px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
+                <img src="https://res.cloudinary.com/ddbdlqjcq/image/upload/v1755076402/Screenshot_2025-08-13_142428_1_qwua5y.png" 
+                     alt="ONE Sobha Header" 
+                     style="width: 100%; height: auto; display: block;" />
+            </div>
+            
+            <!-- Email Content -->
+            <div style="padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
+                <h2 style="color: #333; margin-bottom: 15px;">Move-in Request Raised - ${data.requestNumber}</h2>
+                
+                <div style="background-color: #fff; border: 1px solid #ddd; padding: 20px; border-radius: 5px; margin: 15px 0;">
+                    <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                        Dear Team,
+                    </p>
+                    
+                    <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                        This is to notify you that a new Move In Permit (MIP) has been issued.
+                    </p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; width: 40%; color: #333;">MIP reference no.:</td>
+                                <td style="padding: 8px 0; color: #666;">${data.requestNumber}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">User type:</td>
+                                <td style="padding: 8px 0; color: #666;">${userType}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Property details:</td>
+                                <td style="padding: 8px 0; color: #666;">${data.unitDetails.unitNumber || 'Not specified'} - ${data.unitDetails.unitName || 'Not specified'}, ${data.unitDetails.communityName || 'Not specified'}${data.unitDetails.towerName ? ', ' + data.unitDetails.towerName : ''}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Applicant name:</td>
+                                <td style="padding: 8px 0; color: #666;">${applicantName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Occupant name:</td>
+                                <td style="padding: 8px 0; color: #666;">${occupantName}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Move in date:</td>
+                                <td style="padding: 8px 0; color: #666;">${moveInDate || 'Not specified'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Move out date:</td>
+                                <td style="padding: 8px 0; color: #666;">${moveOutDate || 'Not specified'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Start date (lease):</td>
+                                <td style="padding: 8px 0; color: #666;">${startDate || 'Not specified'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">End date (lease):</td>
+                                <td style="padding: 8px 0; color: #666;">${endDate || 'Not specified'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; font-weight: bold; color: #333;">MIP date of issue:</td>
+                                <td style="padding: 8px 0; color: #666;">${mipIssueDate}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    
+                    <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 20px 0 0 0;">
+                        Kind regards,<br>
+                        Sobha Community Management
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="text-align: center; margin-top: 20px; padding: 15px; color: #999; font-size: 12px;">
+                <p>This is an automated message from ONE Sobha App</p>
+                <p>For support, please contact your community management team</p>
+            </div>
+        </div>`;
+    }
+
+    /**
+     * STATUS MESSAGE GENERATOR
+     * ========================
+     * Generates user-friendly status messages for email content
+     * Provides contextual messaging based on request status
+     * 
+     * @param {string} status - Request status (approved, rfi-pending, cancelled, etc.)
+     * @returns {string} - User-friendly status message
      */
     private getStatusMessage(status: string): string {
         switch (status.toLowerCase()) {
@@ -1067,12 +1479,32 @@ export class EmailService {
     }
 
     /**
-     * Generate email subject based on status
+     * EMAIL SUBJECT GENERATION
+     * ========================
+     * Generates appropriate email subjects based on request status and recipient type
+     * Different subjects for user vs recipient emails
+     * 
+     * @param {string} status - Current request status
+     * @param {string} requestNumber - Request number for identification
+     * @param {boolean} isRecipientEmail - Whether this is a recipient email (vs user email)
+     * @param {MoveInEmailData} data - Email data for additional context
+     * @returns {string} - Formatted email subject
      */
-    private getEmailSubject(status: string, requestNumber: string): string {
+    private getEmailSubject(status: string, requestNumber: string, isRecipientEmail: boolean = false, data?: MoveInEmailData): string {
+        const moveInDateStr = data?.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+        
+        if (status.toLowerCase() === 'approved') {
+            if (isRecipientEmail) {
+                // For recipient emails: "Move in request Raised : request id"
+                return `Move in request Raised : ${requestNumber}`;
+            } else {
+                // For user emails: "Your move in date starts from 15 August 2022 Ref # MIP-10"
+                return `Your move in date starts from ${moveInDateStr} Ref # ${requestNumber}`;
+            }
+        }
+        
+        // For other statuses, use the original format
         switch (status.toLowerCase()) {
-            case 'approved':
-                return `🎉 Move-in Request Approved - ${requestNumber} | ONE Sobha App`;
             case 'rfi-pending':
                 return `📋 Additional Information Required - ${requestNumber} | ONE Sobha App`;
             case 'cancelled':

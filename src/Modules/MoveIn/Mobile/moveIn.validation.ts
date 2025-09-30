@@ -168,12 +168,12 @@ export class MoveInvalidation {
         nationality: Joi.string().max(100).required(),
         details: Joi.object()
           .keys({
-            unitPermitNumber: Joi.string().required(),
-            unitPermitStartDate: Joi.date().iso().required(),
+            unitPermitNumber: Joi.string().optional(),
+            unitPermitStartDate: Joi.date().iso().optional(),
             unitPermitExpiryDate: Joi.date()
               .iso()
               .custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE))
-              .required(),
+              .optional(),
             peopleOfDetermination: Joi.boolean().default(false).required(),
             detailsText: Joi.when('peopleOfDetermination', {
               is: true,
@@ -241,6 +241,7 @@ export class MoveInvalidation {
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
+        userId: Joi.number().optional(),
         comments: Joi.string().allow('').optional(),
         additionalInfo: Joi.string().allow('').optional(),
         details: Joi.object()
@@ -268,6 +269,7 @@ export class MoveInvalidation {
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
+        userId: Joi.number().optional(),
         firstName: Joi.string().max(100).required(),
         lastName: Joi.string().max(100).required(),
         email: Joi.string().email().max(255).required(),
@@ -305,6 +307,7 @@ export class MoveInvalidation {
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
+        userId: Joi.number().optional(),
         userEmail: Joi.string().email().max(255).required(),
         firstName: Joi.string().max(100).required(),
         middleName: Joi.string().max(100).allow('').optional(),
@@ -352,6 +355,7 @@ export class MoveInvalidation {
         unitId: Joi.number().required(),
         moveInDate: Joi.date().iso().custom(moveInWithinDays(30)).required(),
         status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').required(),
+        userId: Joi.number().optional(),
         // Owner identity (optional - can come from UI; if omitted, will be derived from authenticated user)
         ownerFirstName: Joi.string().max(100).optional(),
         ownerLastName: Joi.string().max(100).optional(),
@@ -363,12 +367,12 @@ export class MoveInvalidation {
         additionalInfo: Joi.string().allow('').optional(),
         details: Joi.object()
           .keys({
-            unitPermitNumber: Joi.string().required(),
-            unitPermitStartDate: Joi.date().iso().required(),
+            unitPermitNumber: Joi.string().optional(),
+            unitPermitStartDate: Joi.date().iso().optional(),
             unitPermitExpiryDate: Joi.date()
               .iso()
               .custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE))
-              .required(),
+              .optional(),
             peopleOfDetermination: Joi.boolean().default(false).required(),
             detailsText: Joi.when('peopleOfDetermination', {
               is: true,
@@ -407,9 +411,8 @@ export class MoveInvalidation {
     params: Joi.object().keys({ requestId: Joi.number().required() }),
     body: Joi.object()
       .keys({
-        cancellationRemarks: Joi.string().min(1).max(500).optional().messages({
-          'string.min': 'Cancellation remarks cannot be empty if provided',
-          'string.max': 'Cancellation remarks cannot exceed 500 characters'
+        cancellationRemarks: Joi.string().min(1).optional().messages({
+          'string.min': 'Cancellation remarks cannot be empty if provided'
         }),
       })
       .required(),
