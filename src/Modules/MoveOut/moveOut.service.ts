@@ -6,13 +6,36 @@ import { MoveOutRequests } from "../../Entities/MoveOutRequests.entity";
 import { getPaginationInfo } from "../../Common/Utils/paginationUtils";
 import { checkAdminPermission, checkIsSecurity } from "../../Common/Utils/adminAccess";
 import { Units } from "../../Entities/Units.entity";
+import { UnitBookings } from "../../Entities/UnitBookings.entity";
 import { MOVE_IN_AND_OUT_REQUEST_STATUS, MOVE_IN_USER_TYPES, MOVE_REQUEST_STATUS } from "../../Entities/EntityTypes";
 import { addNotification, addAdminNotification } from "../../Common/Utils/notification";
 import { UserRoles } from "../../Entities/UserRoles.entity";
 import { MoveInRequests } from "../../Entities/MoveInRequests.entity";
 import { AccountRenewalRequests } from "../../Entities/AccountRenewalRequests.entity";
+import { executeInTransaction } from "../../Common/Utils/transactionUtil";
+import { EntityManager } from "typeorm";
 
 export class MoveOutService {
+    private async ensureUnitHandoverCompleted(unitId: number): Promise<void> {
+        try {
+            const handover = await UnitBookings.getRepository()
+                .createQueryBuilder('ub')
+                .innerJoin('ub.unit', 'u', 'u.isActive = true')
+                .where('ub.isActive = true')
+                .andWhere('u.id = :unitId', { unitId })
+                .andWhere('ub.actualHandoverDate IS NOT NULL')
+                .getOne();
+
+            if (!handover) {
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.NO_HANDOVER_DATE.message, APICodes.NO_HANDOVER_DATE.code);
+            }
+        } catch (error) {
+            if (error instanceof ApiError) throw error;
+            logger.error(`Error in ensureUnitHandoverCompleted : ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
+        }
+    }
 
     async getAllMoveOutListAdmin(query: any, user: any) {
         try {
@@ -404,24 +427,32 @@ export class MoveOutService {
             const requestUserId = Number(user.id);
             const targetUnitId = Number(body.unitId);
 
+            await this.ensureUnitHandoverCompleted(targetUnitId);
             const userRoleSlug = await this.getUserRoleSlugForUnit(requestUserId, targetUnitId);
             const { moveInRequest, accountRenewalRequest } = await this.getMoveInAndRenewalRequests(requestUserId, targetUnitId);
-            const moveOutRequestNo = await this.generateMoveOutRequestNo();
-            const moveOutRequest = new MoveOutRequests();
-            moveOutRequest.moveOutRequestNo = moveOutRequestNo;
-            moveOutRequest.requestType = userRoleSlug;
-            moveOutRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
-            moveOutRequest.moveOutDate = body.moveOutDate;
-            moveOutRequest.comments = body.comments;
-            moveOutRequest.createdBy = user.id;
-            moveOutRequest.updatedBy = user.id;
-            moveOutRequest.user = { id: requestUserId } as any;
-            moveOutRequest.unit = { id: targetUnitId } as any;
-            moveOutRequest.moveInRequest = { id: moveInRequest.id } as any;
-            if (accountRenewalRequest) {
-                moveOutRequest.accountRenewalRequest = { id: accountRenewalRequest.id } as any;
-            }
-            await moveOutRequest.save();
+
+            let moveOutRequest!: MoveOutRequests;
+            await executeInTransaction(async (qr: any) => {
+                const manager: EntityManager = qr.manager;
+                const moveOutRequestNo = await this.generateUnitScopedMoveOutRequestNo(manager, targetUnitId);
+                const req = new MoveOutRequests();
+                req.moveOutRequestNo = moveOutRequestNo;
+                req.requestType = userRoleSlug;
+                req.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
+                req.moveOutDate = body.moveOutDate;
+                req.comments = body.comments;
+                req.createdBy = user.id;
+                req.updatedBy = user.id;
+                // set relations by id without extra fetches
+                (req as any).user = { id: requestUserId };
+                (req as any).unit = { id: targetUnitId };
+                (req as any).moveInRequest = { id: moveInRequest.id };
+                if (accountRenewalRequest) {
+                    (req as any).accountRenewalRequest = { id: accountRenewalRequest.id };
+                }
+                await manager.save(MoveOutRequests, req);
+                moveOutRequest = req;
+            });
             // Notify Community Admins on submission (non-blocking)
             try {
                 await addAdminNotification(
@@ -454,26 +485,31 @@ export class MoveOutService {
             const occupantUserId = Number(userId);
             const targetUnitId = Number(unitId);
 
+            await this.ensureUnitHandoverCompleted(targetUnitId);
             const userRoleSlug = await this.getUserRoleSlugForUnit(occupantUserId, targetUnitId);
             const { moveInRequest, accountRenewalRequest } = await this.getMoveInAndRenewalRequests(occupantUserId, targetUnitId);
 
-            const moveOutRequestNo = await this.generateMoveOutRequestNo();
-            const moveOutRequest = new MoveOutRequests();
-            moveOutRequest.moveOutRequestNo = moveOutRequestNo;
-            moveOutRequest.requestType = userRoleSlug;
-            moveOutRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
-            moveOutRequest.moveOutDate = moveOutDate;
-            moveOutRequest.comments = comments;
-            moveOutRequest.createdBy = adminUser.id;
-            moveOutRequest.updatedBy = adminUser.id;
-            moveOutRequest.user = { id: occupantUserId } as any;
-            moveOutRequest.unit = { id: targetUnitId } as any;
-            moveOutRequest.moveInRequest = { id: moveInRequest.id } as any;
-            if (accountRenewalRequest) {
-                moveOutRequest.accountRenewalRequest = { id: accountRenewalRequest.id } as any;
-            }
-
-            await moveOutRequest.save();
+            let moveOutRequest!: MoveOutRequests;
+            await executeInTransaction(async (qr: any) => {
+                const manager: EntityManager = qr.manager;
+                const moveOutRequestNo = await this.generateUnitScopedMoveOutRequestNo(manager, targetUnitId);
+                const req = new MoveOutRequests();
+                req.moveOutRequestNo = moveOutRequestNo;
+                req.requestType = userRoleSlug;
+                req.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
+                req.moveOutDate = moveOutDate;
+                req.comments = comments;
+                req.createdBy = adminUser.id;
+                req.updatedBy = adminUser.id;
+                (req as any).user = { id: occupantUserId };
+                (req as any).unit = { id: targetUnitId };
+                (req as any).moveInRequest = { id: moveInRequest.id };
+                if (accountRenewalRequest) {
+                    (req as any).accountRenewalRequest = { id: accountRenewalRequest.id };
+                }
+                await manager.save(MoveOutRequests, req);
+                moveOutRequest = req;
+            });
             return moveOutRequest;
         } catch (error) {
             logger.error(`Error in createMoveOutRequestByAdmin : ${JSON.stringify(error)}`);
@@ -482,11 +518,33 @@ export class MoveOutService {
         }
     }
 
-    private async generateMoveOutRequestNo(): Promise<string> {
-        const repository = MoveOutRequests.getRepository();
-        const totalRequests = await repository.count();
-        const nextRequestNumber = totalRequests + 1;
-        return `MOP-${nextRequestNumber}`;
+    // Generates a request no like MOP-<unit_number>-<n> safely under concurrency
+    private async generateUnitScopedMoveOutRequestNo(manager: EntityManager, unitId: number): Promise<string> {
+        // Lock the unit row to serialize per-unit numbering
+        const lockedUnit = await manager.getRepository(Units)
+            .createQueryBuilder('u')
+            .setLock('pessimistic_write')
+            .where('u.id = :unitId', { unitId })
+            .getOne();
+        if (!lockedUnit) {
+            throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND?.message || 'Unit not found', (APICodes as any).UNIT_NOT_FOUND?.code || 'UNIT_NOT_FOUND');
+        }
+
+        const unitNumber = lockedUnit.unitNumber;
+        const prefix = `MOP-${unitNumber}-`;
+
+        // Get the current max sequence for this unit
+        const raw = await manager.getRepository(MoveOutRequests)
+            .createQueryBuilder('mor')
+            .innerJoin('mor.unit', 'u')
+            .select("MAX(CAST(SUBSTRING_INDEX(mor.moveOutRequestNo, '-', -1) AS UNSIGNED))", 'max')
+            .where('u.id = :unitId', { unitId })
+            .andWhere('mor.moveOutRequestNo LIKE :prefix', { prefix: `${prefix}%` })
+            .getRawOne();
+
+        const currentMax = Number(raw?.max) || 0;
+        const next = currentMax + 1;
+        return `${prefix}${next}`;
     }
 
     private async getUserRoleSlugForUnit(userId: number, unitId: number): Promise<MOVE_IN_USER_TYPES> {
