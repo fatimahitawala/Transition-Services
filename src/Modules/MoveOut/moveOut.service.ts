@@ -16,8 +16,51 @@ import { executeInTransaction } from "../../Common/Utils/transactionUtil";
 import { EntityManager } from "typeorm";
 import { MoveOutHistories } from "../../Entities/MoveOutHistories.entity";
 import { TransitionRequestActionByTypes } from "../../Entities/EntityTypes";
+import { OccupancyRequestEmailRecipients } from "../../Entities/OccupancyRequestEmailRecipients.entity";
+import { EmailService } from "../Email/email.service";
 
 export class MoveOutService {
+    private emailService = new EmailService();
+
+    // Find MOP recipients by hierarchy: tower -> community -> master community
+    private async getMopRecipients(masterCommunityId: number, communityId: number, towerId?: number | null): Promise<string[]> {
+        try {
+            const repo = OccupancyRequestEmailRecipients.getRepository();
+
+            // 1) Tower-specific
+            if (towerId) {
+                const towerRec = await repo.createQueryBuilder('r')
+                    .leftJoin('r.masterCommunity', 'mc')
+                    .leftJoin('r.community', 'c')
+                    .leftJoin('r.tower', 't')
+                    .where('mc.id = :mcId AND c.id = :cId AND t.id = :tId AND r.isActive = true', { mcId: masterCommunityId, cId: communityId, tId: towerId })
+                    .getOne();
+                if (towerRec?.mopRecipients) {
+                    return towerRec.mopRecipients.split(',').map(e => e.trim()).filter(Boolean);
+                }
+            }
+
+            // 2) Community-level
+            const commRec = await repo.createQueryBuilder('r')
+                .leftJoin('r.masterCommunity', 'mc')
+                .leftJoin('r.community', 'c')
+                .where('mc.id = :mcId AND c.id = :cId AND r.tower IS NULL AND r.isActive = true', { mcId: masterCommunityId, cId: communityId })
+                .getOne();
+            if (commRec?.mopRecipients) {
+                return commRec.mopRecipients.split(',').map(e => e.trim()).filter(Boolean);
+            }
+
+            // 3) Master community-level
+            const mcRec = await repo.createQueryBuilder('r')
+                .leftJoin('r.masterCommunity', 'mc')
+                .where('mc.id = :mcId AND r.community IS NULL AND r.tower IS NULL AND r.isActive = true', { mcId: masterCommunityId })
+                .getOne();
+            if (mcRec?.mopRecipients) {
+                return mcRec.mopRecipients.split(',').map(e => e.trim()).filter(Boolean);
+            }
+        } catch (e) { }
+        return [];
+    }
     // Build common details payload for notifications from unit info
     private async buildMoveOutDetailsPayload(unitId: number, requestNo: string, moveOutDate: any, residentType?: string) {
         const unit: any = await getUnitInformation(unitId);
@@ -274,6 +317,57 @@ export class MoveOutService {
                     await MoveOutRequests.getRepository().update({ id: result.id }, {
                         additionalInfo: JSON.stringify({ permit: { permitNumber: result.moveOutRequestNo, permitDate, validUntil: body?.moveOutDate || result?.moveOutDate } })
                     });
+                } catch (e) { }
+
+                // Email official recipients (MOP Approved)
+                try {
+                    const unitInfo: any = await getUnitInformation(result.unitId);
+                    const emails = await this.getMopRecipients(
+                        Number(unitInfo?.masterCommunity?.id),
+                        Number(unitInfo?.community?.id),
+                        unitInfo?.tower?.id ? Number(unitInfo?.tower?.id) : null
+                    );
+
+                    if (emails.length > 0) {
+                        const uniqueEmails = Array.from(new Set(
+                            emails.filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+                        ));
+
+                        if (uniqueEmails.length > 0) {
+                            const propertyDetails = [
+                                unitInfo?.unitName,
+                                unitInfo?.unitNumber,
+                                unitInfo?.tower?.name,
+                                unitInfo?.community?.name,
+                                unitInfo?.masterCommunity?.name,
+                            ].filter(Boolean).join(', ');
+
+                            const userType = userRoleResult?.slug || '';
+                            const occupantName = `${result?.firstName || ''} ${result?.lastName || ''}`.trim();
+                            const moveOutDateDisp = (body?.moveOutDate || result?.moveOutDate) ? new Date(body?.moveOutDate || result?.moveOutDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' }) : '';
+                            const endDateLease = '';
+                            const dateOfIssueDisp = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' });
+
+                            const subject = `Move Out Permit Issued - ${result.moveOutRequestNo}`;
+                            const html = [
+                                'Dear Team,',
+                                'This is to notify you that a Move Out Permit has been issued.',
+                                '',
+                                `Move Out Permit reference no. - ${result.moveOutRequestNo}`,
+                                `User type - ${userType}`,
+                                `Property details - ${propertyDetails}`,
+                                `Occupant name - ${occupantName}`,
+                                `Move out date - ${moveOutDateDisp}`,
+                                `End date (lease) - ${endDateLease}`,
+                                `Move Out Permit date of issue - ${dateOfIssueDisp}`,
+                                '',
+                                'Kind regards,',
+                                'Sobha Community Management'
+                            ].map(l => `<div>${l}</div>`).join('');
+
+                            await this.emailService.sendEmail(uniqueEmails, subject, html);
+                        }
+                    }
                 } catch (e) { }
                 // History
                 try {
