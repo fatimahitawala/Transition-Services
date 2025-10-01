@@ -18,9 +18,272 @@ import { MoveOutHistories } from "../../Entities/MoveOutHistories.entity";
 import { TransitionRequestActionByTypes } from "../../Entities/EntityTypes";
 import { OccupancyRequestEmailRecipients } from "../../Entities/OccupancyRequestEmailRecipients.entity";
 import { EmailService } from "../Email/email.service";
+import { uploadFile } from "../../Common/Utils/azureBlobStorage";
+import config from "../../Common/Config/config";
+import { OccupancyRequestTemplates } from "../../Entities/OccupancyRequestTemplates.entity";
+import { OCUPANCY_REQUEST_TYPES } from "../../Entities/EntityTypes/transition";
+import { IsNull } from "typeorm";
 
 export class MoveOutService {
     private emailService = new EmailService();
+
+    // Build absolute blob URL from stored relative path
+    private buildBlobUrl(relativePath: string): string {
+        return `https://${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/application/${relativePath}`;
+    }
+
+    // Render Move-Out Permit HTML (placeholders are already sanitized at source)
+    private renderMoveOutPermitHtml(tpl: {
+        headerImageUrl: string;
+        moveOutStartDate: string;
+        refNumber: string;
+        occupantName: string;
+        addressLine: string;
+        communityName: string;
+        dateOfIssue: string;
+    }): string {
+        const html = `<!DOCTYPE html>
+<html lang="en" style="margin:0;padding:0;">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Move-Out Permit</title>
+  <style>
+    :root{--ink:#1a1a1a;--muted:#5d636b;--divider:#e6e6e9;--dot:#b8bcc2;--icon-text:#2a2e34;--rem-bg:#6b4a6b;--rem-fg:#ffffff;--rem-num:#ffe6e6}
+    html,body{margin:0;background:#ffffff;color:var(--ink)}
+    body{font-family:Arial,Helvetica,sans-serif;line-height:1.5}
+    .page{max-width:794px;margin:0 auto}
+    .hero{width:100%;overflow:hidden}
+    .hero img{display:block;width:100%;height:auto;border:0;outline:0}
+    .title-wrap{padding:24px 28px 10px 28px}
+    .stamp{font-weight:900;letter-spacing:.4px;font-size:30px;line-height:1.05;text-transform:uppercase}
+    .stamp span{display:block}
+    .script{margin:14px 0 4px 0;font-family:"BrandScript","Brush Script MT","Segoe Script",cursive;font-size:34px;font-weight:400;color:var(--ink)}
+    .details{padding:10px 28px 18px 28px}
+    .lead{margin:6px 0 18px 0}
+    .field-col{display:flex;flex-direction:column;gap:10px;max-width:100%}
+    .row{display:flex;gap:14px;align-items:center}
+    .k{min-width:170px;font-weight:600}
+    .v{flex:1;border-bottom:1px dotted var(--dot);padding-bottom:6px}
+    .sub-note{margin:12px 0 0 0;color:var(--muted);font-size:13px}
+    .strip{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;padding:18px 24px 8px 24px}
+    .ico{display:flex;flex-direction:column;align-items:center;text-align:center;padding:6px 4px}
+    .ico svg{display:block;width:40px;height:40px;margin-bottom:10px}
+    .ico .t{font-size:12.5px;color:var(--icon-text)}
+    .rem{background:var(--rem-bg);color:var(--rem-fg);margin:18px 0;padding:18px 24px}
+    .rem h3{margin:0 0 8px 0;font-size:16px;letter-spacing:.2px}
+    .rem ol{margin:0;padding-left:20px}
+    .rem li{margin:8px 0}
+    .rem .num{color:var(--rem-num);font-weight:700}
+    .foot{padding:8px 24px 20px 24px;text-align:center;color:var(--muted);font-size:13px}
+    .divider{height:1px;background:var(--divider);margin:16px 24px}
+    .logo{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;color:var(--muted);font-size:12px}
+    .logo svg{width:18px;height:18px}
+    @media print{.page{max-width:100%}}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="hero"><img src="${tpl.headerImageUrl}" alt="Header image" /></div>
+    <div class="title-wrap">
+      <div class="stamp"><span>MOVE-OUT</span><span>PERMIT</span></div>
+      <div class="script">Thank you for making us your home</div>
+    </div>
+    <div class="details">
+      <p class="lead">Your move out date starts from <strong>${tpl.moveOutStartDate}</strong><br />Ref # <strong>${tpl.refNumber}</strong></p>
+      <div class="field-col">
+        <div class="row"><div class="k">Occupant name:</div><div class="v">${tpl.occupantName}</div></div>
+        <div class="row"><div class="k">Address:</div><div class="v">${tpl.addressLine}</div></div>
+        <div class="row"><div class="k">Community:</div><div class="v">${tpl.communityName}</div></div>
+        <div class="row"><div class="k">Date of issue:</div><div class="v">${tpl.dateOfIssue}</div></div>
+      </div>
+      <p class="sub-note">This permit provides you and your moving company (if any) unhindered access to move out of the above-mentioned unit, subject to the below terms.</p>
+    </div>
+    <div class="strip">
+      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="#2a2e34" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="#2a2e34" stroke-width="2" stroke-linecap="round"/></svg><div class="t">Move out timings:<br/>8 AM to 6 PM during weekdays,<br/>10 AM to 6 PM during Sundays and public holidays.</div></div>
+      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12l8-5v10l-8-5z" fill="#2a2e34"/><rect x="3" y="5" width="6" height="14" rx="1.5" fill="none" stroke="#2a2e34" stroke-width="1.8"/></svg><div class="t">Share a copy of the MOP with your moving company.</div></div>
+      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 9-8 9s-8-4-8-9V6l8-3z" fill="none" stroke="#2a2e34" stroke-width="2"/><path d="M9 12l2 2 4-4" fill="none" stroke="#2a2e34" stroke-width="2" stroke-linecap="round"/></svg><div class="t">Observe security and access protocol.</div></div>
+      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="12" height="16" rx="2" fill="none" stroke="#2a2e34" stroke-width="2"/><path d="M8 8h6M8 12h6M8 16h6" stroke="#2a2e34" stroke-width="2" stroke-linecap="round"/></svg><div class="t">Follow the community rules and guidelines.</div></div>
+      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l6-6 4 4-6 6H4z" fill="none" stroke="#2a2e34" stroke-width="2"/><path d="M12 8l5-5" stroke="#2a2e34" stroke-width="2" stroke-linecap="round"/></svg><div class="t">Keep the common areas clean and tidy.</div></div>
+      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16" stroke="#2a2e34" stroke-width="2" stroke-linecap="round"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" fill="none" stroke="#2a2e34" stroke-width="2"/><path d="M9 7V5h6v2" stroke="#2a2e34" stroke-width="2" stroke-linecap="round"/></svg><div class="t">Dispose all waste properly and safely.</div></div>
+    </div>
+    <div class="rem">
+      <h3>IMPORTANT REMINDERS</h3>
+      <ol>
+        <li><span class="num">1.</span> The Community Management will not be liable for any incident/accident/injury that may occur on the premises during the move out process.</li>
+        <li><span class="num">2.</span> Any damage caused to the common areas during the move out process (either directly by them or the hired moving company) will be the sole responsibility of the owner/tenant. The damages will be repaired by the Community Management at the owner’s/tenant’s expense.</li>
+        <li><span class="num">3.</span> You may need to produce your valid photo ID upon request by the Community Security.</li>
+      </ol>
+    </div>
+    <div class="foot">For any queries or concerns, please contact us on 800 SOBHA (76242)
+      <div class="divider"></div>
+      <div class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span>SOBHA • COMMUNITY MANAGEMENT</span></div>
+    </div>
+  </div>
+</body>
+</html>`;
+        return html;
+    }
+
+    // Generate PDF (buffer) from HTML using Puppeteer
+    private async generatePermitPdf(html: string, fileName: string): Promise<{ buffer: Buffer; filename: string } | null> {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const puppeteer = require('puppeteer');
+            const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+            const page = await browser.newPage();
+            await page.setContent(html, { waitUntil: 'networkidle0' });
+            const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' } });
+            await browser.close();
+            return { buffer: pdfBuffer, filename: fileName };
+        } catch (e) {
+            logger.error(`Failed generating Move-Out permit PDF: ${e}`);
+            return null;
+        }
+    }
+
+    // Replace placeholders in a template string
+    private replacePlaceholders(template: string, variables: Record<string, string>): string {
+        let out = template;
+        for (const [key, value] of Object.entries(variables)) {
+            const re = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), 'g');
+            out = out.replace(re, value || '');
+        }
+        return out;
+    }
+
+    // Fetch Move-Out permit HTML template from DB with hierarchy fallback
+    private async getMoveOutPermitTemplate(masterCommunityId: number, communityId: number, towerId?: number | null): Promise<string | null> {
+        // 1) Tower
+        if (towerId) {
+            const rec = await OccupancyRequestTemplates.findOne({ where: { masterCommunityId, communityId, towerId: towerId || undefined, templateType: OCUPANCY_REQUEST_TYPES.MOVE_OUT, isActive: true } });
+            if (rec?.templateString) return rec.templateString;
+        }
+        // 2) Community
+        {
+            const rec = await OccupancyRequestTemplates.findOne({ where: { masterCommunityId, communityId, towerId: IsNull(), templateType: OCUPANCY_REQUEST_TYPES.MOVE_OUT, isActive: true } });
+            if (rec?.templateString) return rec.templateString;
+        }
+        // 3) Master Community
+        {
+            const rec = await OccupancyRequestTemplates.findOne({ where: { masterCommunityId, communityId: IsNull(), towerId: IsNull(), templateType: OCUPANCY_REQUEST_TYPES.MOVE_OUT, isActive: true } });
+            if (rec?.templateString) return rec.templateString;
+        }
+        return null;
+    }
+
+    // Create, upload and persist permit; returns attachment info for email
+    private async createAndStoreMoveOutPermit(req: { requestId: number; requestNo: string; occupantName: string; addressLine: string; communityName: string; moveOutDateISO: string; headerImageUrl?: string; masterCommunityId: number; communityId: number; towerId?: number | null }): Promise<{ fileUrl: string; filename: string; attachment: { filename: string; content: Buffer; contentType: string } } | null> {
+        const headerImageUrl = req.headerImageUrl || 'https://srmapp01.blob.core.windows.net/sit-onesobha/content/move-out/mop_pdf_header.png?sp=r&st=2025-10-01T08:55:55Z&se=2025-10-01T17:10:55Z&spr=https&sv=2024-11-04&sr=b&sig=J4sYRHTeDR8WoFN3t%2BVBhQaoNWmOknt7rFu7gdhDvDU%3D';
+        const dateOfIssue = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: '2-digit' });
+        const moveOutStartDate = req.moveOutDateISO ? new Date(req.moveOutDateISO).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: '2-digit' }) : '';
+
+        let html = await this.getMoveOutPermitTemplate(req.masterCommunityId, req.communityId, req.towerId ?? undefined);
+        if (html) {
+            const vars: Record<string, string> = {
+                '{{headerImageUrl}}': headerImageUrl,
+                '{{moveOutStartDate}}': moveOutStartDate,
+                '{{moveOutDate}}': moveOutStartDate,
+                '{{refNumber}}': req.requestNo,
+                '{{requestNumber}}': req.requestNo,
+                '{{occupantName}}': req.occupantName,
+                '{{addressLine}}': req.addressLine,
+                '{{communityName}}': req.communityName,
+                '{{dateOfIssue}}': dateOfIssue,
+            };
+            html = this.replacePlaceholders(html, vars);
+        } else {
+            html = this.renderMoveOutPermitHtml({
+                headerImageUrl,
+                moveOutStartDate,
+                refNumber: req.requestNo,
+                occupantName: req.occupantName,
+                addressLine: req.addressLine,
+                communityName: req.communityName,
+                dateOfIssue
+            });
+        }
+
+        const pdf = await this.generatePermitPdf(html, `${req.requestNo}-move-out-permit.pdf`);
+        if (!pdf) return null;
+
+        // Upload to Azure
+        const pseudoFile: any = {
+            originalname: pdf.filename,
+            mimetype: 'application/pdf',
+            buffer: pdf.buffer,
+            size: pdf.buffer.length
+        };
+        const upload = await uploadFile(pdf.filename, pseudoFile, `move-out/${req.requestId}/permit/`, 0);
+        const isFile = (u: any) => u && typeof u === 'object' && 'filePath' in u && 'fileName' in u;
+        if (!upload || (upload as any).status === false || !isFile(upload)) {
+            logger.warn(`Move-Out permit upload failed for request ${req.requestId}`);
+            return null;
+        }
+        const uploaded: any = upload;
+
+        // Persist in additionalInfo JSON
+        try {
+            const existing = await MoveOutRequests.getRepository().findOne({ where: { id: req.requestId } });
+            if (existing) {
+                let info: any = {};
+                try { info = existing.additionalInfo ? JSON.parse(existing.additionalInfo) : {}; } catch { info = {}; }
+                info.permit = {
+                    permitNumber: req.requestNo,
+                    dateOfIssue,
+                    fileName: uploaded.fileOriginalName || pdf.filename,
+                    filePath: uploaded.filePath,
+                    fileUrl: this.buildBlobUrl(uploaded.filePath)
+                };
+                await MoveOutRequests.getRepository().update({ id: req.requestId }, { additionalInfo: JSON.stringify(info) });
+            }
+        } catch (e) {
+            logger.error(`Failed persisting permit meta for request ${req.requestId}: ${e}`);
+        }
+
+        return {
+            fileUrl: this.buildBlobUrl(uploaded.filePath),
+            filename: pdf.filename,
+            attachment: { filename: pdf.filename, content: pdf.buffer, contentType: 'application/pdf' }
+        };
+    }
+
+    // Compose local subject/body for requester by request type
+    private composeRequesterEmail(requestType: MOVE_IN_USER_TYPES, referenceNo: string): { subject: string; html: string } {
+        const subject = `Move Out Permit Reference no. ${referenceNo}`;
+        const footer = ['Kind regards,', 'Sobha Community Management'];
+        let headerLines: string[] = [];
+        if (requestType === MOVE_IN_USER_TYPES.OWNER) {
+            headerLines = [
+                'Dear homeowner,',
+                'We hope you enjoyed living in our community.',
+                'Kindly find enclosed your Move Out Permit.',
+                'Please provide your movers with a copy of this permit to gain access into the community if you will not be accompanying them.',
+                'We would like to take this opportunity to thank you for being a member of our community, and hope to accommodate you again in the future.',
+                'If you have any enquiries, please do not hesitate to get in touch with us at 800 SOBHA (76242).',
+            ];
+        } else if (requestType === MOVE_IN_USER_TYPES.TENANT) {
+            headerLines = [
+                'Dear tenant,',
+                'We hope you enjoyed living in our community.',
+                'Kindly find enclosed your Move Out Permit.',
+                'Please provide your movers with a copy of this permit to gain access into the community if you will not be accompanying them.',
+                'We would like to take this opportunity to thank you for being a member of our community, and hope to accommodate you again in the future.',
+                'If you have any enquiries, please do not hesitate to get in touch with us at 800 SOBHA (76242).',
+            ];
+        } else {
+            // HHO and HHC (duplicate from HHO)
+            headerLines = [
+                'Dear operator,',
+                'We hope your guests enjoyed their stay in the community.',
+                'Kindly find enclosed your Move Out Permit.',
+                'Please provide your movers with a copy of this permit to gain access into the community if you (or any company representative) will not be accompanying them.',
+                'If you have any enquiries, please do not hesitate to get in touch with us at 800 SOBHA (76242).',
+            ];
+        }
+        const html = [...headerLines, '', ...footer].map(l => `<div>${l}</div>`).join('');
+        return { subject, html };
+    }
 
     // Find MOP recipients by hierarchy: tower -> community -> master community
     private async getMopRecipients(masterCommunityId: number, communityId: number, towerId?: number | null): Promise<string[]> {
@@ -301,8 +564,6 @@ export class MoveOutService {
                 }
                 // Push/app notification (align to existing templates)
                 addNotification(userId, 'move_out_request_approved', { "<request_no>": result.moveOutRequestNo, "<reference_id>": result.moveOutRequestNo, "<request_id>": result.moveOutRequestNo })
-                // Email notification
-                addNotification(userId, 'move_out_approval_email_to_user', payload)
                 // Notify Security Team on approval (non-blocking)
                 try {
                     await addAdminNotification(
@@ -319,20 +580,49 @@ export class MoveOutService {
                     });
                 } catch (e) { }
 
-                // Email official recipients (MOP Approved)
+                // Generate and store Move-Out Permit PDF, then email to user (with attachment) and MOP recipients (no attachment)
                 try {
                     const unitInfo: any = await getUnitInformation(result.unitId);
+                    const addressLine = [unitInfo?.unitName, unitInfo?.unitNumber].filter(Boolean).join(', ');
+                    const communityName = unitInfo?.community?.name || '';
+                    const occupantName = `${result?.firstName || ''} ${result?.lastName || ''}`.trim();
+                    const permit = await this.createAndStoreMoveOutPermit({
+                        requestId: result.id,
+                        requestNo: result.moveOutRequestNo,
+                        occupantName,
+                        addressLine,
+                        communityName,
+                        moveOutDateISO: body?.moveOutDate || result?.moveOutDate,
+                        masterCommunityId: Number(unitInfo?.masterCommunity?.id) || 0,
+                        communityId: Number(unitInfo?.community?.id) || 0,
+                        towerId: unitInfo?.tower?.id ? Number(unitInfo?.tower?.id) : null
+                    });
+
+                    // Send templated approval email to requester (with PDF)
+                    try {
+                        const userEmailRow = await MoveOutRequests.getRepository()
+                            .createQueryBuilder('mor')
+                            .leftJoin('mor.user', 'user')
+                            .select(['mor.id', 'user.email', 'user.firstName', 'user.lastName'])
+                            .where('mor.id = :id', { id: result.id })
+                            .getRawOne();
+                        const userEmail = userEmailRow?.user_email;
+                        if (userEmail) {
+                            const content = this.composeRequesterEmail(result.requestType as MOVE_IN_USER_TYPES, result.moveOutRequestNo);
+                            await this.emailService.sendEmail(userEmail, content.subject, content.html, permit ? [permit.attachment] : []);
+                        }
+                    } catch (e) { }
+
+                    // Email official recipients (MOP Approved) - without PDF attachment
                     const emails = await this.getMopRecipients(
                         Number(unitInfo?.masterCommunity?.id),
                         Number(unitInfo?.community?.id),
                         unitInfo?.tower?.id ? Number(unitInfo?.tower?.id) : null
                     );
-
                     if (emails.length > 0) {
                         const uniqueEmails = Array.from(new Set(
                             emails.filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
                         ));
-
                         if (uniqueEmails.length > 0) {
                             const propertyDetails = [
                                 unitInfo?.unitName,
@@ -341,13 +631,10 @@ export class MoveOutService {
                                 unitInfo?.community?.name,
                                 unitInfo?.masterCommunity?.name,
                             ].filter(Boolean).join(', ');
-
                             const userType = userRoleResult?.slug || '';
-                            const occupantName = `${result?.firstName || ''} ${result?.lastName || ''}`.trim();
                             const moveOutDateDisp = (body?.moveOutDate || result?.moveOutDate) ? new Date(body?.moveOutDate || result?.moveOutDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' }) : '';
                             const endDateLease = '';
                             const dateOfIssueDisp = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' });
-
                             const subject = `Move Out Permit Issued - ${result.moveOutRequestNo}`;
                             const html = [
                                 'Dear Team,',
@@ -364,11 +651,10 @@ export class MoveOutService {
                                 'Kind regards,',
                                 'Sobha Community Management'
                             ].map(l => `<div>${l}</div>`).join('');
-
-                            await this.emailService.sendEmail(uniqueEmails, subject, html);
+                            await this.emailService.sendEmail(uniqueEmails, subject, html, []);
                         }
                     }
-                } catch (e) { }
+                } catch (e) { logger.error(`Error generating/sending Move-Out permit emails: ${e}`); }
                 // History
                 try {
                     const hist = new MoveOutHistories();
@@ -743,6 +1029,79 @@ export class MoveOutService {
                 hist.createdBy = adminUser.id;
                 await hist.save();
             } catch (e) { }
+
+            // Generate, store, and email Move-Out Permit (admin-created auto-approved)
+            try {
+                const unitInfo: any = await getUnitInformation(targetUnitId);
+                const addressLine = [unitInfo?.unitName, unitInfo?.unitNumber].filter(Boolean).join(', ');
+                const communityName = unitInfo?.community?.name || '';
+                // fetch occupant name + email
+                const userRow = await MoveOutRequests.getRepository()
+                    .createQueryBuilder('mor')
+                    .leftJoin('mor.user', 'user')
+                    .select(['mor.id', 'user.firstName', 'user.lastName', 'user.email'])
+                    .where('mor.id = :id', { id: moveOutRequest.id })
+                    .getRawOne();
+                const occupantName = `${userRow?.user_firstName || ''} ${userRow?.user_lastName || ''}`.trim();
+                const userEmail = userRow?.user_email;
+                const permit = await this.createAndStoreMoveOutPermit({
+                    requestId: moveOutRequest.id,
+                    requestNo: moveOutRequest.moveOutRequestNo,
+                    occupantName,
+                    addressLine,
+                    communityName,
+                    moveOutDateISO: moveOutDate,
+                    masterCommunityId: Number(unitInfo?.masterCommunity?.id) || 0,
+                    communityId: Number(unitInfo?.community?.id) || 0,
+                    towerId: unitInfo?.tower?.id ? Number(unitInfo?.tower?.id) : null
+                });
+                if (userEmail) {
+                    const content = this.composeRequesterEmail(moveOutRequest.requestType as MOVE_IN_USER_TYPES, moveOutRequest.moveOutRequestNo);
+                    await this.emailService.sendEmail(userEmail, content.subject, content.html, permit ? [permit.attachment] : []);
+                }
+
+                // official recipients (no PDF attachment)
+                const emails = await this.getMopRecipients(
+                    Number(unitInfo?.masterCommunity?.id),
+                    Number(unitInfo?.community?.id),
+                    unitInfo?.tower?.id ? Number(unitInfo?.tower?.id) : null
+                );
+                if (emails.length > 0) {
+                    const uniqueEmails = Array.from(new Set(
+                        emails.filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+                    ));
+                    if (uniqueEmails.length > 0) {
+                        const propertyDetails = [
+                            unitInfo?.unitName,
+                            unitInfo?.unitNumber,
+                            unitInfo?.tower?.name,
+                            unitInfo?.community?.name,
+                            unitInfo?.masterCommunity?.name,
+                        ].filter(Boolean).join(', ');
+                        const userType = userRoleSlug || '';
+                        const moveOutDateDisp = new Date(moveOutDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' });
+                        const endDateLease = '';
+                        const dateOfIssueDisp = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' });
+                        const subject = `Move Out Permit Issued - ${moveOutRequest.moveOutRequestNo}`;
+                        const html = [
+                            'Dear Team,',
+                            'This is to notify you that a Move Out Permit has been issued.',
+                            '',
+                            `Move Out Permit reference no. - ${moveOutRequest.moveOutRequestNo}`,
+                            `User type - ${userType}`,
+                            `Property details - ${propertyDetails}`,
+                            `Occupant name - ${occupantName}`,
+                            `Move out date - ${moveOutDateDisp}`,
+                            `End date (lease) - ${endDateLease}`,
+                            `Move Out Permit date of issue - ${dateOfIssueDisp}`,
+                            '',
+                            'Kind regards,',
+                            'Sobha Community Management'
+                        ].map(l => `<div>${l}</div>`).join('');
+                        await this.emailService.sendEmail(uniqueEmails, subject, html, []);
+                    }
+                }
+            } catch (e) { logger.error(`Error generating/sending Move-Out permit (admin create): ${e}`); }
             return moveOutRequest;
         } catch (error) {
             logger.error(`Error in createMoveOutRequestByAdmin : ${JSON.stringify(error)}`);
