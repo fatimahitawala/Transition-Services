@@ -29,13 +29,36 @@ export default router;
  * @swagger
  * /move-out/request-list:
  *   get:
- *     summary: Get list of move out requests
+ *     summary: Get list of move out requests (mobile)
  *     tags: [MoveOut]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: per_page
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Items per page
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by request status
+ *       - in: query
+ *         name: unitIds
+ *         schema:
+ *           type: string
+ *         description: Comma-separated Unit IDs to filter (e.g., 10,12,15)
  *     responses:
  *       200:
- *         description: A list of move out requests
+ *         description: Paginated list of current user's move-out requests
  *       401:
  *         description: Unauthorized
  */
@@ -53,6 +76,18 @@ export default router;
  *         name: requestId
  *         required: true
  *         description: The ID of the move out request to cancel
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Cancellation reason (optional)
  *     responses:
  *       200:
  *         description: Move out request canceled successfully
