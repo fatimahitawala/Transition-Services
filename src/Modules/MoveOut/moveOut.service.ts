@@ -5,12 +5,24 @@ import { APICodes } from "../../Common/Constants";
 import { MoveOutRequests } from "../../Entities/MoveOutRequests.entity";
 import { getPaginationInfo } from "../../Common/Utils/paginationUtils";
 import { checkAdminPermission, checkIsSecurity } from "../../Common/Utils/adminAccess";
-import { Units } from "../../Entities/Units.entity";
-import { MOVE_IN_AND_OUT_REQUEST_STATUS, MOVE_IN_USER_TYPES, MOVE_REQUEST_STATUS } from "../../Entities/EntityTypes";
+import { Units, getUnitInformation, getCurrentOccupancyRoleForUnit } from "../../Entities/Units.entity";
+import { UnitBookings } from "../../Entities/UnitBookings.entity";
+import { MOVE_IN_AND_OUT_REQUEST_STATUS, MOVE_IN_USER_TYPES, MOVE_REQUEST_STATUS, OccupancyStatus } from "../../Entities/EntityTypes";
 import { addNotification, addAdminNotification } from "../../Common/Utils/notification";
 import { UserRoles } from "../../Entities/UserRoles.entity";
 import { MoveInRequests } from "../../Entities/MoveInRequests.entity";
 import { AccountRenewalRequests } from "../../Entities/AccountRenewalRequests.entity";
+import { executeInTransaction } from "../../Common/Utils/transactionUtil";
+import { EntityManager } from "typeorm";
+import { MoveOutHistories } from "../../Entities/MoveOutHistories.entity";
+import { TransitionRequestActionByTypes } from "../../Entities/EntityTypes";
+import { OccupancyRequestEmailRecipients } from "../../Entities/OccupancyRequestEmailRecipients.entity";
+import { EmailService } from "../Email/email.service";
+import { uploadFile } from "../../Common/Utils/azureBlobStorage";
+import config from "../../Common/Config/config";
+import { OccupancyRequestTemplates } from "../../Entities/OccupancyRequestTemplates.entity";
+import { OCUPANCY_REQUEST_TYPES } from "../../Entities/EntityTypes/transition";
+import { IsNull } from "typeorm";
 
 export class MoveOutService {
     private emailService = new EmailService();
@@ -436,8 +448,10 @@ export class MoveOutService {
                     "mor.id as id",
                     "user.id as userId",
                     "unit.id as unitId",
+                    "unit.occupancyStatus as occupancyStatus",
                     "mor.moveOutRequestNo as moveOutRequestNo",
                     "mor.moveOutDate as moveOutDate",
+                    "mor.createdAt as createdAt",
                     "mor.status as status",
                     "unit.unitName as unitName",
                     "unit.unitNumber as unitNumber",
@@ -464,6 +478,29 @@ export class MoveOutService {
             }
 
             if (action === 'approve') {
+                // moveOutDate required for approval
+                if (!body?.moveOutDate) {
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.APPROVAL_NOT_POSSIBLE.message, APICodes.APPROVAL_NOT_POSSIBLE.code);
+                }
+                // Unit must be occupied (not VACANT)
+                if (result.occupancyStatus === OccupancyStatus.VACANT) {
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.APPROVAL_NOT_POSSIBLE.message, APICodes.APPROVAL_NOT_POSSIBLE.code);
+                }
+                // Move-out date must be within 1 month of submission and not in the past
+                try {
+                    const createdAt = new Date(result.createdAt);
+                    const moveOutDate = new Date(body.moveOutDate);
+                    const today = new Date();
+                    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                    const maxDate = new Date(createdAt);
+                    maxDate.setMonth(maxDate.getMonth() + 1);
+                    if (moveOutDate < startOfToday || moveOutDate > maxDate) {
+                        throw new ApiError(httpStatus.BAD_REQUEST, APICodes.APPROVAL_NOT_POSSIBLE.message, APICodes.APPROVAL_NOT_POSSIBLE.code);
+                    }
+                } catch (e) {
+                    if (e instanceof ApiError) throw e;
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.APPROVAL_NOT_POSSIBLE.message, APICodes.APPROVAL_NOT_POSSIBLE.code);
+                }
                 if (result.status === MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
                     throw new ApiError(httpStatus.CONFLICT, APICodes.ALREADY_APPROVED.message, APICodes.ALREADY_APPROVED.code);
                 }
@@ -474,6 +511,10 @@ export class MoveOutService {
                     throw new ApiError(httpStatus.BAD_REQUEST, APICodes.APPROVAL_NOT_POSSIBLE.message, APICodes.APPROVAL_NOT_POSSIBLE.code);
                 }
             } else if (action === 'cancel') {
+                // cancellation remarks required
+                if (!body?.reason || String(body.reason).trim() === '') {
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.CANCELLATION_REMARKS_REQUIRED.message, APICodes.CANCELLATION_REMARKS_REQUIRED.code);
+                }
                 if (result.status === MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED) {
                     throw new ApiError(httpStatus.CONFLICT, APICodes.ALREADY_CLOSED_ERROR.message, APICodes.ALREADY_CLOSED_ERROR.code);
                 }
@@ -510,19 +551,20 @@ export class MoveOutService {
 
             if (action === 'approve') {
 
+                const permitDate = new Date().toISOString().slice(0, 10);
                 const payload = {
                     "<request_no>": result.moveOutRequestNo,
+                    "<reference_id>": result.moveOutRequestNo,
+                    "<request_id>": result.moveOutRequestNo,
                     "<user_type>": userRoleResult?.slug,
                     "<property_details>": `${result.unitName}, ${result.unitNumber}`,
                     "<occupant_name>": `${result?.firstName} ${result?.lastName}`,
-                    "<move_out_date>": result?.moveOutDate,
+                    "<move_out_date>": body?.moveOutDate || result?.moveOutDate,
                     "<end_date>": '',
-                    "<permit_date>": ''
+                    "<permit_date>": permitDate
                 }
-                addNotification(userId, 'move_out_request_approval_to_user', { "<request_no>": result.moveOutRequestNo })
-                console.log("Sending move_out_request_approval_to_user_mail notification", userId, payload);
-
-                addNotification(userId, 'move_out_request_approval_to_user_mail', payload)
+                // Push/app notification (align to existing templates)
+                addNotification(userId, 'move_out_request_approved', { "<request_no>": result.moveOutRequestNo, "<reference_id>": result.moveOutRequestNo, "<request_id>": result.moveOutRequestNo })
                 // Notify Security Team on approval (non-blocking)
                 try {
                     await addAdminNotification(
@@ -532,8 +574,112 @@ export class MoveOutService {
                         { unit_id: unitId }
                     );
                 } catch (e) { }
+                // Attach simple permit info to additionalInfo JSON
+                try {
+                    await MoveOutRequests.getRepository().update({ id: result.id }, {
+                        additionalInfo: JSON.stringify({ permit: { permitNumber: result.moveOutRequestNo, permitDate, validUntil: body?.moveOutDate || result?.moveOutDate } })
+                    });
+                } catch (e) { }
+
+                // Generate and store Move-Out Permit PDF, then email to user (with attachment) and MOP recipients (no attachment)
+                try {
+                    const unitInfo: any = await getUnitInformation(result.unitId);
+                    const addressLine = [unitInfo?.unitName, unitInfo?.unitNumber].filter(Boolean).join(', ');
+                    const communityName = unitInfo?.community?.name || '';
+                    const occupantName = `${result?.firstName || ''} ${result?.lastName || ''}`.trim();
+                    const permit = await this.createAndStoreMoveOutPermit({
+                        requestId: result.id,
+                        requestNo: result.moveOutRequestNo,
+                        occupantName,
+                        addressLine,
+                        communityName,
+                        moveOutDateISO: body?.moveOutDate || result?.moveOutDate,
+                        masterCommunityId: Number(unitInfo?.masterCommunity?.id) || 0,
+                        communityId: Number(unitInfo?.community?.id) || 0,
+                        towerId: unitInfo?.tower?.id ? Number(unitInfo?.tower?.id) : null
+                    });
+
+                    // Send templated approval email to requester (with PDF)
+                    try {
+                        const userEmailRow = await MoveOutRequests.getRepository()
+                            .createQueryBuilder('mor')
+                            .leftJoin('mor.user', 'user')
+                            .select(['mor.id', 'user.email', 'user.firstName', 'user.lastName'])
+                            .where('mor.id = :id', { id: result.id })
+                            .getRawOne();
+                        const userEmail = userEmailRow?.user_email;
+                        if (userEmail) {
+                            const content = this.composeRequesterEmail(result.requestType as MOVE_IN_USER_TYPES, result.moveOutRequestNo);
+                            await this.emailService.sendEmail(userEmail, content.subject, content.html, permit ? [permit.attachment] : []);
+                        }
+                    } catch (e) { }
+
+                    // Email official recipients (MOP Approved) - without PDF attachment
+                    const emails = await this.getMopRecipients(
+                        Number(unitInfo?.masterCommunity?.id),
+                        Number(unitInfo?.community?.id),
+                        unitInfo?.tower?.id ? Number(unitInfo?.tower?.id) : null
+                    );
+                    if (emails.length > 0) {
+                        const uniqueEmails = Array.from(new Set(
+                            emails.filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+                        ));
+                        if (uniqueEmails.length > 0) {
+                            const propertyDetails = [
+                                unitInfo?.unitName,
+                                unitInfo?.unitNumber,
+                                unitInfo?.tower?.name,
+                                unitInfo?.community?.name,
+                                unitInfo?.masterCommunity?.name,
+                            ].filter(Boolean).join(', ');
+                            const userType = userRoleResult?.slug || '';
+                            const moveOutDateDisp = (body?.moveOutDate || result?.moveOutDate) ? new Date(body?.moveOutDate || result?.moveOutDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' }) : '';
+                            const endDateLease = '';
+                            const dateOfIssueDisp = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' });
+                            const subject = `Move Out Permit Issued - ${result.moveOutRequestNo}`;
+                            const html = [
+                                'Dear Team,',
+                                'This is to notify you that a Move Out Permit has been issued.',
+                                '',
+                                `Move Out Permit reference no. - ${result.moveOutRequestNo}`,
+                                `User type - ${userType}`,
+                                `Property details - ${propertyDetails}`,
+                                `Occupant name - ${occupantName}`,
+                                `Move out date - ${moveOutDateDisp}`,
+                                `End date (lease) - ${endDateLease}`,
+                                `Move Out Permit date of issue - ${dateOfIssueDisp}`,
+                                '',
+                                'Kind regards,',
+                                'Sobha Community Management'
+                            ].map(l => `<div>${l}</div>`).join('');
+                            await this.emailService.sendEmail(uniqueEmails, subject, html, []);
+                        }
+                    }
+                } catch (e) { logger.error(`Error generating/sending Move-Out permit emails: ${e}`); }
+                // History
+                try {
+                    const hist = new MoveOutHistories();
+                    (hist as any).request = { id: result.id };
+                    hist.action = 'approved';
+                    hist.actionByType = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+                    hist.remarks = body?.reason || '';
+                    hist.createdBy = user.id;
+                    await hist.save();
+                } catch (e) { }
             } else {
-                addNotification(userId, 'move_out_request_cancel_to_user', { "<request_no>": result.moveOutRequestNo })
+                try {
+                    const details = await this.buildMoveOutDetailsPayload(result.unitId, result.moveOutRequestNo, result.moveOutDate, result.requestType);
+                    await addNotification(userId, 'move_out_admin_cancelled_to_user', { ...details, "<comment_from_admin>": body?.reason || '' });
+                } catch (e) { }
+                try {
+                    const hist = new MoveOutHistories();
+                    (hist as any).request = { id: result.id };
+                    hist.action = 'cancelled';
+                    hist.actionByType = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+                    hist.remarks = body?.reason || '';
+                    hist.createdBy = user.id;
+                    await hist.save();
+                } catch (e) { }
             }
 
             return result;
@@ -668,6 +814,14 @@ export class MoveOutService {
             moveOutRequest.comments = body.reason;
             moveOutRequest.updatedBy = userId;
             await moveOutRequest.save();
+            // Notify user and admin on cancellation
+            try {
+                const details = await this.buildMoveOutDetailsPayload(moveOutRequest.unit.id, moveOutRequest.moveOutRequestNo, moveOutRequest.moveOutDate, moveOutRequest.requestType);
+                await addNotification(userId, 'move_out_customer_cancelled_to_user', details);
+            } catch (e) { }
+            try {
+                await addAdminNotification(userId, 'move_out_request_cancelled_by_user_to_admin', { "<request_no>": moveOutRequest.moveOutRequestNo, "<move_out_date>": moveOutRequest.moveOutDate }, { unit_id: moveOutRequest.unit.id });
+            } catch (e) { }
             return moveOutRequest;
         } catch (error) {
             logger.error(`Error in cancelMoveOutRequestByUser : ${JSON.stringify(error)}`);
@@ -699,13 +853,29 @@ export class MoveOutService {
                 throw new ApiError(httpStatus.BAD_REQUEST, APICodes.APPROVAL_NOT_POSSIBLE.message, APICodes.APPROVAL_NOT_POSSIBLE.code);
             }
 
+            // Only close the request here; the nightly job handles deallocation
             moveOutRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED;
             moveOutRequest.moveOutDate = body.moveOutDate;
             moveOutRequest.comments = body?.reason;
             moveOutRequest.updatedBy = user.id;
             await moveOutRequest.save();
             const userId = moveOutRequest.user.id;
-            addNotification(userId, 'move_out_request_closure_to_user', { "<request_no>": moveOutRequest.moveOutRequestNo });
+            try {
+                const details = await this.buildMoveOutDetailsPayload(moveOutRequest.unit.id, moveOutRequest.moveOutRequestNo, moveOutRequest.moveOutDate, moveOutRequest.requestType);
+                await addNotification(userId, 'move_out_request_closure_to_user', details);
+            } catch (e) { }
+            try {
+                await addAdminNotification(user.id, 'move_out_request_closed_by_security_to_admin', { "<request_no>": moveOutRequest.moveOutRequestNo, "<move_out_date>": moveOutRequest.moveOutDate }, { unit_id: moveOutRequest.unit.id });
+            } catch (e) { }
+            try {
+                const hist = new MoveOutHistories();
+                (hist as any).request = { id: moveOutRequest.id };
+                hist.action = 'closed';
+                hist.actionByType = TransitionRequestActionByTypes.SECURITY;
+                hist.remarks = body?.reason || '';
+                hist.createdBy = user.id;
+                await hist.save();
+            } catch (e) { }
             return moveOutRequest;
         } catch (error) {
             logger.error(`Error in closeMoveOutRequestBySecurity : ${JSON.stringify(error)}`);
@@ -717,22 +887,13 @@ export class MoveOutService {
     async getUnitById(id: number): Promise<Units | null> {
         try {
             return await Units.getRepository()
-                .createQueryBuilder("u")
-                .leftJoinAndMapOne("u.tower", "u.tower", "t", "t.isActive = 1")
-                .leftJoinAndMapOne("u.community", "u.community", "c", "c.isActive = 1")
-                .leftJoinAndMapOne(
-                    "u.masterCommunity",
-                    "u.masterCommunity",
-                    "mc",
-                    "mc.isActive = 1"
-                )
-                .leftJoinAndMapOne(
-                    "u.unitRestriction",
-                    "u.unitRestriction",
-                    "ut",
-                    "ut.isActive = 1"
-                )
-                .where({ id })
+                .createQueryBuilder('u')
+                .innerJoinAndSelect('u.masterCommunity', 'mc', 'mc.isActive = true')
+                .innerJoinAndSelect('u.community', 'c', 'c.isActive = true')
+                .leftJoinAndSelect('u.tower', 't', 't.isActive = true')
+                .leftJoinAndSelect('u.unitRestriction', 'ut', 'ut.isActive = true')
+                .where('u.id = :id', { id })
+                .andWhere('u.isActive = true')
                 .getOne();
         } catch (error) {
             logger.error(`Error in getUnitById : ${JSON.stringify(error)}`);
@@ -747,32 +908,57 @@ export class MoveOutService {
             const requestUserId = Number(user.id);
             const targetUnitId = Number(body.unitId);
 
+            await this.ensureUnitHandoverCompleted(targetUnitId);
             const userRoleSlug = await this.getUserRoleSlugForUnit(requestUserId, targetUnitId);
             const { moveInRequest, accountRenewalRequest } = await this.getMoveInAndRenewalRequests(requestUserId, targetUnitId);
-            const moveOutRequestNo = await this.generateMoveOutRequestNo();
-            const moveOutRequest = new MoveOutRequests();
-            moveOutRequest.moveOutRequestNo = moveOutRequestNo;
-            moveOutRequest.requestType = userRoleSlug;
-            moveOutRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
-            moveOutRequest.moveOutDate = body.moveOutDate;
-            moveOutRequest.comments = body.comments;
-            moveOutRequest.createdBy = user.id;
-            moveOutRequest.updatedBy = user.id;
-            moveOutRequest.user = { id: requestUserId } as any;
-            moveOutRequest.unit = { id: targetUnitId } as any;
-            moveOutRequest.moveInRequest = { id: moveInRequest.id } as any;
-            if (accountRenewalRequest) {
-                moveOutRequest.accountRenewalRequest = { id: accountRenewalRequest.id } as any;
-            }
-            await moveOutRequest.save();
+
+            // Allow multiple active move-out requests for same user+unit (business decision)
+
+            let moveOutRequest!: MoveOutRequests;
+            await executeInTransaction(async (qr: any) => {
+                const manager: EntityManager = qr.manager;
+                const moveOutRequestNo = await this.generateUnitScopedMoveOutRequestNo(manager, targetUnitId);
+                const req = new MoveOutRequests();
+                req.moveOutRequestNo = moveOutRequestNo;
+                req.requestType = userRoleSlug;
+                req.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
+                req.moveOutDate = body.moveOutDate;
+                req.comments = body.comments;
+                req.createdBy = user.id;
+                req.updatedBy = user.id;
+                // set relations by id without extra fetches
+                (req as any).user = { id: requestUserId };
+                (req as any).unit = { id: targetUnitId };
+                (req as any).moveInRequest = { id: moveInRequest.id };
+                if (accountRenewalRequest) {
+                    (req as any).accountRenewalRequest = { id: accountRenewalRequest.id };
+                }
+                await manager.save(MoveOutRequests, req);
+                moveOutRequest = req;
+            });
             // Notify Community Admins on submission (non-blocking)
             try {
+                const details = await this.buildMoveOutDetailsPayload(targetUnitId, moveOutRequest.moveOutRequestNo, body.moveOutDate, userRoleSlug);
                 await addAdminNotification(
                     user.id,
                     'move_out_request_submission_admin',
-                    { "<request_no>": moveOutRequest.moveOutRequestNo },
+                    details,
                     { unit_id: targetUnitId }
                 );
+            } catch (e) { }
+            // Notify User (submission confirmation)
+            try {
+                const details = await this.buildMoveOutDetailsPayload(targetUnitId, moveOutRequest.moveOutRequestNo, body.moveOutDate, userRoleSlug);
+                await addNotification(user.id, 'move_out_request_submitted_to_user', details);
+            } catch (e) { }
+            try {
+                const hist = new MoveOutHistories();
+                (hist as any).request = { id: moveOutRequest.id };
+                hist.action = 'created';
+                hist.actionByType = TransitionRequestActionByTypes.USER;
+                hist.remarks = body?.comments || '';
+                hist.createdBy = user.id;
+                await hist.save();
             } catch (e) { }
             return moveOutRequest;
         } catch (error) {
@@ -797,26 +983,126 @@ export class MoveOutService {
             const occupantUserId = Number(userId);
             const targetUnitId = Number(unitId);
 
+            await this.ensureUnitHandoverCompleted(targetUnitId);
             const userRoleSlug = await this.getUserRoleSlugForUnit(occupantUserId, targetUnitId);
             const { moveInRequest, accountRenewalRequest } = await this.getMoveInAndRenewalRequests(occupantUserId, targetUnitId);
 
-            const moveOutRequestNo = await this.generateMoveOutRequestNo();
-            const moveOutRequest = new MoveOutRequests();
-            moveOutRequest.moveOutRequestNo = moveOutRequestNo;
-            moveOutRequest.requestType = userRoleSlug;
-            moveOutRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
-            moveOutRequest.moveOutDate = moveOutDate;
-            moveOutRequest.comments = comments;
-            moveOutRequest.createdBy = adminUser.id;
-            moveOutRequest.updatedBy = adminUser.id;
-            moveOutRequest.user = { id: occupantUserId } as any;
-            moveOutRequest.unit = { id: targetUnitId } as any;
-            moveOutRequest.moveInRequest = { id: moveInRequest.id } as any;
-            if (accountRenewalRequest) {
-                moveOutRequest.accountRenewalRequest = { id: accountRenewalRequest.id } as any;
-            }
+            // Allow multiple active move-out requests for same user+unit (business decision)
 
-            await moveOutRequest.save();
+            let moveOutRequest!: MoveOutRequests;
+            await executeInTransaction(async (qr: any) => {
+                const manager: EntityManager = qr.manager;
+                const moveOutRequestNo = await this.generateUnitScopedMoveOutRequestNo(manager, targetUnitId);
+                const req = new MoveOutRequests();
+                req.moveOutRequestNo = moveOutRequestNo;
+                req.requestType = userRoleSlug;
+                req.status = MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED;
+                req.moveOutDate = moveOutDate;
+                req.comments = comments;
+                req.createdBy = adminUser.id;
+                req.updatedBy = adminUser.id;
+                (req as any).user = { id: occupantUserId };
+                (req as any).unit = { id: targetUnitId };
+                (req as any).moveInRequest = { id: moveInRequest.id };
+                if (accountRenewalRequest) {
+                    (req as any).accountRenewalRequest = { id: accountRenewalRequest.id };
+                }
+                await manager.save(MoveOutRequests, req);
+                moveOutRequest = req;
+            });
+            // Auto-approval style messaging to customer (admin-created flow)
+            try {
+                const details = await this.buildMoveOutDetailsPayload(targetUnitId, moveOutRequest.moveOutRequestNo, moveOutDate, userRoleSlug);
+                await addNotification(occupantUserId, 'move_out_request_approved', details);
+                await addNotification(occupantUserId, 'move_out_approval_email_to_user', details);
+            } catch (e) { }
+            // Inform Admins the request has been created (auto-approved flow)
+            try {
+                const details = await this.buildMoveOutDetailsPayload(targetUnitId, moveOutRequest.moveOutRequestNo, moveOutDate, userRoleSlug);
+                await addAdminNotification(adminUser.id, 'move_out_auto_approved_created_to_admin', details, { unit_id: targetUnitId });
+            } catch (e) { }
+            try {
+                const hist = new MoveOutHistories();
+                (hist as any).request = { id: moveOutRequest.id };
+                hist.action = 'created';
+                hist.actionByType = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+                hist.remarks = comments || '';
+                hist.createdBy = adminUser.id;
+                await hist.save();
+            } catch (e) { }
+
+            // Generate, store, and email Move-Out Permit (admin-created auto-approved)
+            try {
+                const unitInfo: any = await getUnitInformation(targetUnitId);
+                const addressLine = [unitInfo?.unitName, unitInfo?.unitNumber].filter(Boolean).join(', ');
+                const communityName = unitInfo?.community?.name || '';
+                // fetch occupant name + email
+                const userRow = await MoveOutRequests.getRepository()
+                    .createQueryBuilder('mor')
+                    .leftJoin('mor.user', 'user')
+                    .select(['mor.id', 'user.firstName', 'user.lastName', 'user.email'])
+                    .where('mor.id = :id', { id: moveOutRequest.id })
+                    .getRawOne();
+                const occupantName = `${userRow?.user_firstName || ''} ${userRow?.user_lastName || ''}`.trim();
+                const userEmail = userRow?.user_email;
+                const permit = await this.createAndStoreMoveOutPermit({
+                    requestId: moveOutRequest.id,
+                    requestNo: moveOutRequest.moveOutRequestNo,
+                    occupantName,
+                    addressLine,
+                    communityName,
+                    moveOutDateISO: moveOutDate,
+                    masterCommunityId: Number(unitInfo?.masterCommunity?.id) || 0,
+                    communityId: Number(unitInfo?.community?.id) || 0,
+                    towerId: unitInfo?.tower?.id ? Number(unitInfo?.tower?.id) : null
+                });
+                if (userEmail) {
+                    const content = this.composeRequesterEmail(moveOutRequest.requestType as MOVE_IN_USER_TYPES, moveOutRequest.moveOutRequestNo);
+                    await this.emailService.sendEmail(userEmail, content.subject, content.html, permit ? [permit.attachment] : []);
+                }
+
+                // official recipients (no PDF attachment)
+                const emails = await this.getMopRecipients(
+                    Number(unitInfo?.masterCommunity?.id),
+                    Number(unitInfo?.community?.id),
+                    unitInfo?.tower?.id ? Number(unitInfo?.tower?.id) : null
+                );
+                if (emails.length > 0) {
+                    const uniqueEmails = Array.from(new Set(
+                        emails.filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+                    ));
+                    if (uniqueEmails.length > 0) {
+                        const propertyDetails = [
+                            unitInfo?.unitName,
+                            unitInfo?.unitNumber,
+                            unitInfo?.tower?.name,
+                            unitInfo?.community?.name,
+                            unitInfo?.masterCommunity?.name,
+                        ].filter(Boolean).join(', ');
+                        const userType = userRoleSlug || '';
+                        const moveOutDateDisp = new Date(moveOutDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' });
+                        const endDateLease = '';
+                        const dateOfIssueDisp = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' });
+                        const subject = `Move Out Permit Issued - ${moveOutRequest.moveOutRequestNo}`;
+                        const html = [
+                            'Dear Team,',
+                            'This is to notify you that a Move Out Permit has been issued.',
+                            '',
+                            `Move Out Permit reference no. - ${moveOutRequest.moveOutRequestNo}`,
+                            `User type - ${userType}`,
+                            `Property details - ${propertyDetails}`,
+                            `Occupant name - ${occupantName}`,
+                            `Move out date - ${moveOutDateDisp}`,
+                            `End date (lease) - ${endDateLease}`,
+                            `Move Out Permit date of issue - ${dateOfIssueDisp}`,
+                            '',
+                            'Kind regards,',
+                            'Sobha Community Management'
+                        ].map(l => `<div>${l}</div>`).join('');
+                        await this.emailService.sendEmail(uniqueEmails, subject, html, []);
+                    }
+                }
+            } catch (e) { logger.error(`Error generating/sending Move-Out permit (admin create): ${e}`); }
             return moveOutRequest;
         } catch (error) {
             logger.error(`Error in createMoveOutRequestByAdmin : ${JSON.stringify(error)}`);
@@ -825,11 +1111,62 @@ export class MoveOutService {
         }
     }
 
-    private async generateMoveOutRequestNo(): Promise<string> {
-        const repository = MoveOutRequests.getRepository();
-        const totalRequests = await repository.count();
-        const nextRequestNumber = totalRequests + 1;
-        return `MOP-${nextRequestNumber}`;
+    async getMoveOutHistory(requestId: number, user: any) {
+        try {
+            const rows = await MoveOutHistories.getRepository().createQueryBuilder('h')
+                .innerJoin('h.request', 'mor')
+                .where('mor.id = :requestId', { requestId })
+                .orderBy('h.createdAt', 'DESC')
+                .getMany();
+            return rows;
+        } catch (error) {
+            logger.error(`Error in getMoveOutHistory : ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
+        }
+    }
+
+    async getMoveOutPermit(requestId: number, user: any) {
+        try {
+            const req = await MoveOutRequests.getRepository().findOne({ where: { id: requestId } });
+            if (!req) return null;
+            let payload: any = {};
+            try { payload = req.additionalInfo ? JSON.parse(req.additionalInfo) : {}; } catch { payload = {}; }
+            return payload?.permit || null;
+        } catch (error) {
+            logger.error(`Error in getMoveOutPermit : ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
+        }
+    }
+
+    // Generates a request no like MOP-<unit_number>-<n> safely under concurrency
+    private async generateUnitScopedMoveOutRequestNo(manager: EntityManager, unitId: number): Promise<string> {
+        // Lock the unit row to serialize per-unit numbering
+        const lockedUnit = await manager.getRepository(Units)
+            .createQueryBuilder('u')
+            .setLock('pessimistic_write')
+            .where('u.id = :unitId', { unitId })
+            .getOne();
+        if (!lockedUnit) {
+            throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND?.message || 'Unit not found', (APICodes as any).UNIT_NOT_FOUND?.code || 'UNIT_NOT_FOUND');
+        }
+
+        const unitNumber = lockedUnit.unitNumber;
+        const prefix = `MOP-${unitNumber}-`;
+
+        // Get the current max sequence for this unit
+        const raw = await manager.getRepository(MoveOutRequests)
+            .createQueryBuilder('mor')
+            .innerJoin('mor.unit', 'u')
+            .select("MAX(CAST(SUBSTRING_INDEX(mor.moveOutRequestNo, '-', -1) AS UNSIGNED))", 'max')
+            .where('u.id = :unitId', { unitId })
+            .andWhere('mor.moveOutRequestNo LIKE :prefix', { prefix: `${prefix}%` })
+            .getRawOne();
+
+        const currentMax = Number(raw?.max) || 0;
+        const next = currentMax + 1;
+        return `${prefix}${next}`;
     }
 
     private async getUserRoleSlugForUnit(userId: number, unitId: number): Promise<MOVE_IN_USER_TYPES> {
@@ -884,4 +1221,65 @@ export class MoveOutService {
         return { moveInRequest, accountRenewalRequest };
     }
 
+    // Admin helper: return occupant user details for a unit and ensure a closed move-in exists for same user
+    async getMoveOutUserDetailsByUnit(unitId: number, user: any) {
+        try {
+            // basic unit check
+            const unit = await this.getUnitById(unitId);
+            if (!unit) {
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
+            }
+
+            // 1) Try current occupant mapping via helper (does not over-restrict joins)
+            const currentOcc = await getCurrentOccupancyRoleForUnit(unitId);
+
+            if (currentOcc?.user?.id) {
+                // ensure a CLOSED move-in exists for the same user + unit
+                await this.getMoveInAndRenewalRequests(Number(currentOcc.user.id), unitId);
+                return {
+                    userId: Number(currentOcc.user.id),
+                    firstName: currentOcc.user.firstName || null,
+                    middleName: currentOcc.user.middleName || null,
+                    lastName: currentOcc.user.lastName || null,
+                    email: currentOcc.user.email || null,
+                    mobile: currentOcc.user.mobile || null,
+                    dialCode: (currentOcc.user as any)?.dialCode?.dialCode || (currentOcc.user as any)?.dialCode || null,
+                    residencyType: (currentOcc as any)?.role?.slug || unit.occupancyStatus || null,
+                };
+            }
+
+            // 2) Fallback: use the latest CLOSED Move-In for this unit to derive user
+            const lastClosedMoveIn = await MoveInRequests.getRepository()
+                .createQueryBuilder('mir')
+                .innerJoinAndSelect('mir.unit', 'u', 'u.isActive = true')
+                .innerJoinAndSelect('mir.user', 'usr', 'usr.isActive = true')
+                .leftJoinAndSelect('usr.dialCode', 'dc')
+                .where('mir.isActive = true')
+                .andWhere('u.id = :unitId', { unitId })
+                .andWhere('mir.status = :closed', { closed: MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED })
+                .orderBy('mir.updatedAt', 'DESC')
+                .getOne();
+
+            if (!lastClosedMoveIn?.user?.id) {
+                // No occupant and no closed move-in → nothing to return for this unit
+                throw new ApiError(httpStatus.NOT_FOUND, APICodes.MOVE_IN_REQUEST_NOT_FOUND.message, APICodes.MOVE_IN_REQUEST_NOT_FOUND.code);
+            }
+
+            return {
+                userId: Number(lastClosedMoveIn.user.id),
+                firstName: lastClosedMoveIn.user.firstName || null,
+                middleName: lastClosedMoveIn.user.middleName || null,
+                lastName: lastClosedMoveIn.user.lastName || null,
+                email: lastClosedMoveIn.user.email || null,
+                mobile: lastClosedMoveIn.user.mobile || null,
+                dialCode: (lastClosedMoveIn.user as any)?.dialCode?.dialCode || (lastClosedMoveIn.user as any)?.dialCode || null,
+                residencyType: lastClosedMoveIn.requestType || null,
+            };
+        } catch (error) {
+            if (error instanceof ApiError) throw error;
+            logger.error(`Error in getMoveOutUserDetailsByUnit : ${JSON.stringify(error)}`);
+            const apiCode = Object.values(APICodes).find((item: any) => item.code === (error as any).code) || APICodes['UNKNOWN_ERROR'];
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message, apiCode.code);
+        }
+    }
 }
