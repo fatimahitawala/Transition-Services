@@ -28,6 +28,7 @@ export class MoveOutService {
     private emailService = new EmailService();
 
     // Build absolute blob URL from stored relative path
+    //
     private buildBlobUrl(relativePath: string): string {
         return `https://${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/application/${relativePath}`;
     }
