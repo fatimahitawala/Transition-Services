@@ -16,13 +16,6 @@ router.post('/create-request', authMiddleware.auth(), validate(moveOutValidation
 router.put('/update-status/:action/:requestId', authMiddleware.auth(), validate(moveOutValidation.adminApproveOrCancelRequest), catchAsync(moveOutController.adminApproveOrCancelRequest));
 router.put('/close-request/:requestId', authMiddleware.auth(), validate(moveOutValidation.closeMoveOutRequestBySecurity), catchAsync(moveOutController.closeMoveOutRequestBySecurity));
 
-// History and permit
-router.get('/request-history/:requestId', authMiddleware.auth(), validate(moveOutValidation.getMoveOutRequestById), catchAsync(moveOutController.getMoveOutHistory));
-router.get('/permit/:requestId', authMiddleware.auth(), validate(moveOutValidation.getMoveOutRequestById), catchAsync(moveOutController.getMoveOutPermit));
-
-// Fetch occupant user details for selected unit (with move-in closed validation)
-router.get('/user-details/:unitId', authMiddleware.auth(), validate(moveOutValidation.getUserDetailsByUnitParams), catchAsync(moveOutController.getMoveOutUserDetailsByUnit));
-
 export default router;
 
 // Swagger documentation
@@ -193,34 +186,4 @@ export default router;
  *     responses:
  *       200:
  *         description: Move out request closed
- */
-
-/**
- * @swagger
- * /admin/move-out/request-history/{requestId}:
- *   get:
- *     summary: Get move out request history
- *     tags: [MoveOut]
- *     parameters:
- *       - in: path
- *         name: requestId
- *         required: true
- *     responses:
- *       200:
- *         description: History events
- */
-
-/**
- * @swagger
- * /admin/move-out/permit/{requestId}:
- *   get:
- *     summary: Get move out permit details
- *     tags: [MoveOut]
- *     parameters:
- *       - in: path
- *         name: requestId
- *         required: true
- *     responses:
- *       200:
- *         description: Permit details
  */

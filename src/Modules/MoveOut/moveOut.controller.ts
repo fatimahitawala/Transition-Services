@@ -83,26 +83,4 @@ export class MoveOutController {
         if (!moveOutRequest) return notFoundResponse(res, APICodes.NOT_FOUND)
         return successResponseWithData(res, APICodes.CREATE_SUCCESS, moveOutRequest);
     }
-
-    async getMoveOutHistory(req: Request, res: Response) {
-        const { user }: Record<string, any> = req;
-        const { requestId } = req.params;
-        const history = await moveOutService.getMoveOutHistory(Number(requestId), user);
-        return successResponseWithData(res, APICodes.COMMON_SUCCESS, { history });
-    }
-
-    async getMoveOutPermit(req: Request, res: Response) {
-        const { user }: Record<string, any> = req;
-        const { requestId } = req.params;
-        const permit = await moveOutService.getMoveOutPermit(Number(requestId), user);
-        if (!permit) return notFoundResponse(res, APICodes.NOT_FOUND);
-        return successResponseWithData(res, APICodes.COMMON_SUCCESS, permit);
-    }
-
-    async getMoveOutUserDetailsByUnit(req: Request, res: Response) {
-        const { user }: Record<string, any> = req;
-        const unitId = Number((req.params as any)?.unitId ?? (req.query as any)?.unitId);
-        const details = await moveOutService.getMoveOutUserDetailsByUnit(unitId, user);
-        return successResponseWithData(res, APICodes.COMMON_SUCCESS, details);
-    }
 }
