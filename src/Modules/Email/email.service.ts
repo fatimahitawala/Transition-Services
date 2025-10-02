@@ -98,9 +98,18 @@ export interface MoveInEmailData {
  * Initialize nodemailer transport using SMTP configuration from environment
  * Includes connection verification for non-test environments
  */
-// Use the exact same pattern as User-Services
-const transport = nodemailer.createTransport(config.email.smtp);
-if (config.env !== 'test') {
+// Use the exact same pattern as User-Services with added timeouts
+const smtpOptions: any = {
+    ...config.email.smtp,
+    // Timeouts to prevent long stalls on connection issues
+    connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT) || 10000,
+    greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT) || 10000,
+    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT) || 10000,
+};
+
+const transport = nodemailer.createTransport(smtpOptions);
+const hasSmtpHost = !!(config?.email?.smtp?.host && String(config.email.smtp.host).trim());
+if (config.env !== 'test' && hasSmtpHost) {
     transport
         .verify()
         .then(() => logger.info('Connected to email server'))
@@ -108,6 +117,8 @@ if (config.env !== 'test') {
             logger.error(e);
             logger.warn('Unable to connect to email server. Make sure you have configured the SMTP options in .env');
         });
+} else if (!hasSmtpHost) {
+    logger.warn('SMTP host not configured; emails will fail fast until SMTP is set');
 }
 
 /**
@@ -148,6 +159,24 @@ export class EmailService {
      */
     async sendEmail(to: string | string[], subject: string, text: string, attachments: EmailAttachment[] = [], cc: string[] = []) {
         try {
+            // Fast-fail when SMTP is not configured properly
+            const host = config?.email?.smtp?.host ? String(config.email.smtp.host).trim() : '';
+            const fromAddress = config?.email?.from ? String(config.email.from).trim() : '';
+            const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+            const allowLocal = String(process.env.ALLOW_LOCAL_SMTP || '').toLowerCase() === 'true';
+
+            if (!host) {
+                logger.error('SMTP_HOST is not configured. Please set SMTP_* env vars in Transition-Services/.env');
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.EMAIL_ERROR?.message || 'Email error', APICodes.EMAIL_ERROR?.code || 'EMAIL_ERROR');
+            }
+            if (isLocalHost && !allowLocal) {
+                logger.error('SMTP_HOST points to localhost but ALLOW_LOCAL_SMTP is not true. Preventing email send.');
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.EMAIL_ERROR?.message || 'Email error', APICodes.EMAIL_ERROR?.code || 'EMAIL_ERROR');
+            }
+            if (!fromAddress) {
+                logger.error('EMAIL_FROM is not configured. Please set EMAIL_FROM in Transition-Services/.env');
+                throw new ApiError(httpStatus.BAD_REQUEST, APICodes.EMAIL_ERROR?.message || 'Email error', APICodes.EMAIL_ERROR?.code || 'EMAIL_ERROR');
+            }
             logger.info(`=== SENDING EMAIL ===`);
             logger.info(`To: ${Array.isArray(to) ? to.join(', ') : to}`);
             logger.info(`CC: ${cc.length > 0 ? cc.join(', ') : 'None'}`);
@@ -197,7 +226,10 @@ export class EmailService {
                 host: config.email.smtp.host,
                 port: config.email.smtp.port,
                 secure: config.email.smtp.secure,
-                hasAuth: !!(config.email.smtp.auth.user && config.email.smtp.auth.pass)
+                hasAuth: !!(config.email.smtp.auth.user && config.email.smtp.auth.pass),
+                connectionTimeout: (smtpOptions as any)?.connectionTimeout,
+                greetingTimeout: (smtpOptions as any)?.greetingTimeout,
+                socketTimeout: (smtpOptions as any)?.socketTimeout,
             })}`);
             logger.error("******************Email Service Error******************");
             throw new ApiError(httpStatus.BAD_REQUEST, APICodes.EMAIL_ERROR?.message || 'Email error', APICodes.EMAIL_ERROR?.code || 'EMAIL_ERROR');
