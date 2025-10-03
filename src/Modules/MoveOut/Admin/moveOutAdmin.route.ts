@@ -16,6 +16,13 @@ router.post('/create-request', authMiddleware.auth(), validate(moveOutValidation
 router.put('/update-status/:action/:requestId', authMiddleware.auth(), validate(moveOutValidation.adminApproveOrCancelRequest), catchAsync(moveOutController.adminApproveOrCancelRequest));
 router.put('/close-request/:requestId', authMiddleware.auth(), validate(moveOutValidation.closeMoveOutRequestBySecurity), catchAsync(moveOutController.closeMoveOutRequestBySecurity));
 
+// History and permit
+router.get('/request-history/:requestId', authMiddleware.auth(), validate(moveOutValidation.getMoveOutRequestById), catchAsync(moveOutController.getMoveOutHistory));
+router.get('/permit/:requestId', authMiddleware.auth(), validate(moveOutValidation.getMoveOutRequestById), catchAsync(moveOutController.getMoveOutPermit));
+
+// Fetch occupant user details for selected unit (with move-in closed validation)
+router.get('/user-details/:unitId', authMiddleware.auth(), validate(moveOutValidation.getUserDetailsByUnitParams), catchAsync(moveOutController.getMoveOutUserDetailsByUnit));
+
 export default router;
 
 // Swagger documentation
@@ -28,10 +35,34 @@ export default router;
 
 /**
  * @swagger
+ * /admin/move-out/user-details/{unitId}:
+ *   get:
+ *     summary: Get occupant user details for a unit (Move-Out)
+ *     tags: [MoveOut]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: unitId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Unit ID for which to fetch current occupant details
+ *     responses:
+ *       200:
+ *         description: Occupant user details for the given unit
+ *       404:
+ *         description: Not found
+ */
+
+/**
+ * @swagger
  * /admin/move-out/request-list:
  *   get:
  *     summary: Get all move out requests
  *     tags: [MoveOut]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: page
@@ -102,21 +133,33 @@ export default router;
 
 /**
  * @swagger
- * /admin/move-out/createRequest:
+ * /admin/move-out/create-request:
  *   post:
  *     summary: Create a new move out request
  *     tags: [MoveOut]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - unitId
+ *               - userId
+ *               - moveOutDate
  *             properties:
+ *               unitId:
+ *                 type: integer
+ *                 description: Unit ID for which to create the request
+ *               userId:
+ *                 type: integer
+ *                 description: Requester user ID
  *               moveOutDate:
  *                 type: string
  *                 format: date
- *               reason:
+ *               comments:
  *                 type: string
  *     responses:
  *       201:
@@ -129,11 +172,15 @@ export default router;
  *   get:
  *     summary: Get move out request details
  *     tags: [MoveOut]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: requestId
  *         required: true
  *         description: The ID of the move out request
+ *         schema:
+ *           type: integer
  *     responses:
  *       200:
  *         description: Move out request details
@@ -145,6 +192,8 @@ export default router;
  *   put:
  *     summary: Update move out request status
  *     tags: [MoveOut]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: action
@@ -154,6 +203,22 @@ export default router;
  *         name: requestId
  *         required: true
  *         description: The ID of the move out request
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               moveOutDate:
+ *                 type: string
+ *                 format: date
+ *                 description: Required when action is approve
+ *               reason:
+ *                 type: string
+ *                 description: Optional; used when action is cancel
  *     responses:
  *       200:
  *         description: Move out request status updated
@@ -165,11 +230,15 @@ export default router;
  *   put:
  *     summary: Close a move out request
  *     tags: [MoveOut]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: requestId
  *         required: true
  *         description: The ID of the move out request
+ *         schema:
+ *           type: integer
  *     requestBody:
  *       required: true
  *       content:
@@ -186,4 +255,42 @@ export default router;
  *     responses:
  *       200:
  *         description: Move out request closed
+ */
+
+/**
+ * @swagger
+ * /admin/move-out/request-history/{requestId}:
+ *   get:
+ *     summary: Get move out request history
+ *     tags: [MoveOut]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: History events
+ */
+
+/**
+ * @swagger
+ * /admin/move-out/permit/{requestId}:
+ *   get:
+ *     summary: Get move out permit details
+ *     tags: [MoveOut]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Permit details
  */

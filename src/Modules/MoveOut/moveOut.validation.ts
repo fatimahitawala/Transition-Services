@@ -14,7 +14,9 @@ export class MoveOutValidation {
             requestId: Joi.number().required()
         }),
         body: Joi.object().keys({
-            moveOutDate: Joi.date().required(),
+            // Required when action=approve (enforced in service to keep middleware simple)
+            moveOutDate: Joi.date().optional(),
+            // Required when action=cancel (enforced in service)
             reason: Joi.string().allow('', null).optional().default("N/A")
         })
     }
@@ -52,6 +54,12 @@ export class MoveOutValidation {
             userId: Joi.number().required(),
             moveOutDate: Joi.date().required(),
             comments: Joi.string().allow('', null).optional().default("N/A")
+        })
+    }
+
+    public getUserDetailsByUnitParams = {
+        params: Joi.object().keys({
+            unitId: Joi.number().required(),
         })
     }
 }
