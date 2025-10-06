@@ -287,9 +287,10 @@ export class RenewalValidation {
       requestId: Joi.number().required(),
     }),
     body: Joi.object().keys({
-      rfiReason: Joi.string().required(),
-      comments: Joi.string().allow('').optional(),
-    })
+      comments: Joi.string().optional().allow('').messages({
+        'string.base': 'Comments must be a string'
+      }),
+    }).required(),
   };
 
   public cancelRequest = {

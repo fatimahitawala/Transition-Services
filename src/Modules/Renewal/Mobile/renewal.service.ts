@@ -1218,4 +1218,69 @@ export class RenewalService {
       throw error;
     }
   }
+
+  /**
+   * Submit RFI response for renewal request (Mobile)
+   */
+  async submitRFI(requestId: number, rfiData: { comments: string; additionalInfo?: string }, user: any) {
+    try {
+      // Get the renewal request
+      const renewalRequest = await AccountRenewalRequests.getRepository()
+        .createQueryBuilder("arr")
+        .leftJoinAndSelect("arr.user", "user")
+        .where("arr.id = :requestId AND arr.isActive = true", { requestId })
+        .getOne();
+
+      if (!renewalRequest) {
+        throw new ApiError(httpStatus.NOT_FOUND, APICodes.RENEWAL_REQUEST_NOT_FOUND.message, APICodes.RENEWAL_REQUEST_NOT_FOUND.code);
+      }
+
+      // Check if request belongs to the user
+      if (renewalRequest.user.id !== user.id) {
+        throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
+      }
+
+      // Check if request is in RFI pending status
+      if (renewalRequest.status !== MOVE_REQUEST_STATUS.RFI_PENDING) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Renewal request is not in RFI pending status. Only requests with RFI pending status can be submitted.',
+          'INVALID_STATUS_FOR_RFI_SUBMISSION'
+        );
+      }
+
+      // Update request status to RFI submitted
+      renewalRequest.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+      renewalRequest.updatedBy = user.id;
+      renewalRequest.updatedAt = new Date();
+
+      await renewalRequest.save();
+
+      // Create log entry
+      await this.createRenewalLog(
+        renewalRequest,
+        renewalRequest.status,
+        TransitionRequestActionByTypes.USER,
+        user,
+        'RFI response submitted by customer',
+        JSON.stringify({ 
+          comments: rfiData.comments, 
+          additionalInfo: rfiData.additionalInfo || '',
+          previousStatus: MOVE_REQUEST_STATUS.RFI_PENDING,
+          newStatus: MOVE_REQUEST_STATUS.RFI_SUBMITTED
+        })
+      );
+
+      logger.info(`RENEWAL | RFI SUBMITTED | REQUEST: ${requestId} | USER: ${user.id}`);
+
+      return {
+        requestId,
+        status: renewalRequest.status,
+        message: 'RFI response submitted successfully. Admin will review your submission.'
+      };
+    } catch (error: any) {
+      logger.error(`RENEWAL | SUBMIT RFI ERROR: ${error.message}`);
+      throw error;
+    }
+  }
 }

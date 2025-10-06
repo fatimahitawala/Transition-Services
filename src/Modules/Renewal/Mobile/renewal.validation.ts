@@ -280,5 +280,18 @@ export class RenewalValidation {
       [`${TRANSITION_DOCUMENT_TYPES.OTHER}-file`]: Joi.number().optional(),
     })
   };
+
+  public submitRFI = {
+    params: Joi.object().keys({
+      requestId: Joi.number().required(),
+    }),
+    body: Joi.object().keys({
+      comments: Joi.string().required().messages({
+        'string.empty': 'Comments are required when submitting RFI response',
+        'any.required': 'Comments are required when submitting RFI response'
+      }),
+      additionalInfo: Joi.string().allow('').optional(),
+    })
+  };
 }
 

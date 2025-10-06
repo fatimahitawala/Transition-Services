@@ -1144,8 +1144,8 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(renewalValidation.up
  * @swagger
  * /admin/renewal/request/{requestId}/approve:
  *   put:
- *     summary: Approve renewal request
- *     description: Admin approves a renewal request
+ *     summary: Approve renewal request (Admin)
+ *     description: Admin approves a renewal request. Only requests in 'submitted' or 'rfi-submitted' status can be approved.
  *     tags: [Renewal (Backoffice)]
  *     security:
  *       - bearerAuth: []
@@ -1155,7 +1155,9 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(renewalValidation.up
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *         description: Renewal request ID
+ *         example: 123
  *     requestBody:
  *       required: false
  *       content:
@@ -1165,22 +1167,89 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(renewalValidation.up
  *             properties:
  *               comments:
  *                 type: string
- *                 example: "Approved after verification"
+ *                 description: Admin's approval comments
+ *                 example: "All documents verified and approved for renewal"
+ *               approvalNotes:
+ *                 type: string
+ *                 description: Additional approval notes
+ *                 example: "Renewal approved for 12 months from current expiry date"
  *     responses:
  *       200:
  *         description: Renewal request approved successfully
- *       404:
- *         description: Renewal request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: "SC022"
+ *                 message:
+ *                   type: string
+ *                   example: "Renewal request approved successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     requestId:
+ *                       type: integer
+ *                       example: 123
+ *                     status:
+ *                       type: string
+ *                       example: "approved"
+ *                     approvedBy:
+ *                       type: string
+ *                       example: "admin@example.com"
+ *                     approvedAt:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2024-01-15T10:30:00Z"
+ *       400:
+ *         description: Bad request - Invalid status for approval
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 code:
+ *                   type: string
+ *                   example: "EC212"
+ *                 message:
+ *                   type: string
+ *                   example: "Renewal request approval is not allowed in current status"
  *       401:
  *         description: Unauthorized
+ *       404:
+ *         description: Renewal request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 code:
+ *                   type: string
+ *                   example: "EC208"
+ *                 message:
+ *                   type: string
+ *                   example: "Renewal request not found"
+ *       500:
+ *         description: Internal server error
  */
 
 /**
  * @swagger
  * /admin/renewal/request/{requestId}/rfi:
  *   put:
- *     summary: Mark renewal request as RFI
- *     description: Admin marks a renewal request as Request For Information
+ *     summary: Mark renewal request as RFI (Admin)
+ *     description: Admin marks a renewal request as Request For Information (RFI). Only requests in 'submitted' status can be marked as RFI. This changes status to 'rfi-pending' and notifies the user. Optional comments can be provided.
  *     tags: [Renewal (Backoffice)]
  *     security:
  *       - bearerAuth: []
@@ -1190,29 +1259,92 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(renewalValidation.up
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *         description: Renewal request ID
+ *         example: 123
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - rfiReason
  *             properties:
- *               rfiReason:
- *                 type: string
- *                 example: "Missing documents"
  *               comments:
  *                 type: string
- *                 example: "Please upload Emirates ID"
+ *                 description: Comments for the user about what is needed
+ *                 example: "Please upload clear copies of Emirates ID front and back, and valid Ejari document"
  *     responses:
  *       200:
  *         description: Renewal request marked as RFI successfully
- *       404:
- *         description: Renewal request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: "SC023"
+ *                 message:
+ *                   type: string
+ *                   example: "Renewal request marked as RFI successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     requestId:
+ *                       type: integer
+ *                       example: 123
+ *                     status:
+ *                       type: string
+ *                       example: "rfi-pending"
+ *                     comments:
+ *                       type: string
+ *                       example: "Please upload clear copies of Emirates ID front and back, and valid Ejari document"
+ *                     markedBy:
+ *                       type: string
+ *                       example: "admin@example.com"
+ *                     markedAt:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2024-01-15T10:30:00Z"
+ *       400:
+ *         description: Bad request - Invalid status for RFI or missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 code:
+ *                   type: string
+ *                   example: "EC213"
+ *                 message:
+ *                   type: string
+ *                   example: "Invalid renewal request status for this operation"
  *       401:
  *         description: Unauthorized
+ *       404:
+ *         description: Renewal request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 code:
+ *                   type: string
+ *                   example: "EC208"
+ *                 message:
+ *                   type: string
+ *                   example: "Renewal request not found"
+ *       500:
+ *         description: Internal server error
  */
 
 /**
@@ -1220,7 +1352,7 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(renewalValidation.up
  * /admin/renewal/request/{requestId}/cancel:
  *   put:
  *     summary: Cancel renewal request (Admin)
- *     description: Admin cancels a renewal request
+ *     description: Admin cancels a renewal request. Only requests in 'submitted', 'rfi-submitted', or 'approved' status can be cancelled.
  *     tags: [Renewal (Backoffice)]
  *     security:
  *       - bearerAuth: []
@@ -1230,7 +1362,9 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(renewalValidation.up
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *         description: Renewal request ID
+ *         example: 123
  *     requestBody:
  *       required: true
  *       content:
@@ -1242,17 +1376,89 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(renewalValidation.up
  *             properties:
  *               reason:
  *                 type: string
+ *                 description: Reason for cancellation
  *                 example: "Policy violation"
  *               comments:
  *                 type: string
- *                 example: "Request cancelled by admin"
+ *                 description: Additional cancellation comments
+ *                 example: "Request cancelled due to non-compliance with community policies"
+ *               cancellationType:
+ *                 type: string
+ *                 enum: ["policy-violation", "document-fraud", "user-request", "system-error", "other"]
+ *                 description: Type of cancellation
+ *                 example: "policy-violation"
  *     responses:
  *       200:
  *         description: Renewal request cancelled successfully
- *       404:
- *         description: Renewal request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: "SC024"
+ *                 message:
+ *                   type: string
+ *                   example: "Renewal request cancelled successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     requestId:
+ *                       type: integer
+ *                       example: 123
+ *                     status:
+ *                       type: string
+ *                       example: "cancelled"
+ *                     reason:
+ *                       type: string
+ *                       example: "Policy violation"
+ *                     cancelledBy:
+ *                       type: string
+ *                       example: "admin@example.com"
+ *                     cancelledAt:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2024-01-15T10:30:00Z"
+ *       400:
+ *         description: Bad request - Invalid status for cancellation or missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 code:
+ *                   type: string
+ *                   example: "EC210"
+ *                 message:
+ *                   type: string
+ *                   example: "Renewal request cancellation is not allowed in current status"
  *       401:
  *         description: Unauthorized
+ *       404:
+ *         description: Renewal request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 code:
+ *                   type: string
+ *                   example: "EC208"
+ *                 message:
+ *                   type: string
+ *                   example: "Renewal request not found"
+ *       500:
+ *         description: Internal server error
  */
 
 // Note: Close operation is NOT APPLICABLE for renewals as per BRD

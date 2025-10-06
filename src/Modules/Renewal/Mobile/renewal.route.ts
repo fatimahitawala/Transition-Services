@@ -37,6 +37,8 @@ router.post('/request/:requestId/documents',
   catchAsync(renewalController.uploadDocuments)
 );
 
+router.put('/request/:requestId/rfi-submit', auth.auth(), validate(renewalValidation.submitRFI), catchAsync(renewalController.submitRFI));
+
 /**
  * @swagger
  * tags:
@@ -1248,6 +1250,108 @@ router.post('/request/:requestId/documents',
  *         description: Unauthorized
  *       404:
  *         description: Renewal request not found
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /renewal/request/{requestId}/rfi-submit:
+ *   put:
+ *     summary: Submit RFI response for renewal request (Mobile)
+ *     description: User submits response to RFI (Request For Information) raised by admin. This changes status from 'rfi-pending' to 'rfi-submitted'.
+ *     tags: [Renewal (Mobile)]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Renewal request ID
+ *         example: 123
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - comments
+ *             properties:
+ *               comments:
+ *                 type: string
+ *                 description: User's response to the RFI raised by admin
+ *                 example: "I have uploaded the required Emirates ID documents as requested"
+ *               additionalInfo:
+ *                 type: string
+ *                 description: Any additional information or clarification
+ *                 example: "The documents are valid until 2025-12-31"
+ *     responses:
+ *       200:
+ *         description: RFI response submitted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: "SC001"
+ *                 message:
+ *                   type: string
+ *                   example: "Success."
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     requestId:
+ *                       type: integer
+ *                       example: 123
+ *                     status:
+ *                       type: string
+ *                       example: "rfi-submitted"
+ *                     message:
+ *                       type: string
+ *                       example: "RFI response submitted successfully. Admin will review your submission."
+ *       400:
+ *         description: Bad request - Invalid data or request not in RFI pending status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 code:
+ *                   type: string
+ *                   example: "EC209"
+ *                 message:
+ *                   type: string
+ *                   example: "Renewal request is not in RFI pending status"
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Renewal request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 code:
+ *                   type: string
+ *                   example: "EC208"
+ *                 message:
+ *                   type: string
+ *                   example: "Renewal request not found"
  *       500:
  *         description: Internal server error
  */
