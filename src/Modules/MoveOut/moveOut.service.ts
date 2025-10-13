@@ -33,6 +33,60 @@ export class MoveOutService {
         return `https://${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/application/${relativePath}`;
     }
 
+    // Build absolute blob URL for public content (no "/application/" prefix)
+    private buildContentBlobUrl(relativePath: string): string {
+        return `https://${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/${relativePath}`;
+    }
+
+    // Build address line using unit name/number + tower/community, avoiding duplicates
+    private buildAddressLine(unitInfo: any): string {
+        const candidateParts = [
+            unitInfo?.unitName,
+            unitInfo?.unitNumber,
+            unitInfo?.tower?.name || unitInfo?.community?.name || unitInfo?.masterCommunity?.name
+        ];
+        const parts = candidateParts
+            .map(p => (p ?? '').toString().trim())
+            .filter(Boolean);
+        return Array.from(new Set(parts)).join(', ');
+    }
+
+    // Fetch minimal unit data for display (names + IDs) without changing shared helpers
+    private async getUnitDisplayInfo(unitId: number): Promise<{
+        unitName: string; unitNumber: string;
+        masterCommunityId: number; masterCommunityName: string;
+        communityId: number; communityName: string;
+        towerId: number | null; towerName: string | null;
+    } | null> {
+        const row = await Units.getRepository().createQueryBuilder('u')
+            .leftJoin('u.masterCommunity', 'mc')
+            .leftJoin('u.community', 'c')
+            .leftJoin('u.tower', 't')
+            .select([
+                'u.unitName AS unitName',
+                'u.unitNumber AS unitNumber',
+                'mc.id AS masterCommunityId',
+                'mc.name AS masterCommunityName',
+                'c.id AS communityId',
+                'c.name AS communityName',
+                't.id AS towerId',
+                't.name AS towerName',
+            ])
+            .where('u.id = :unitId AND u.isActive = true', { unitId })
+            .getRawOne();
+        if (!row) return null;
+        return {
+            unitName: row.unitName || '',
+            unitNumber: row.unitNumber || '',
+            masterCommunityId: Number(row.masterCommunityId) || 0,
+            masterCommunityName: row.masterCommunityName || '',
+            communityId: Number(row.communityId) || 0,
+            communityName: row.communityName || '',
+            towerId: row.towerId != null ? Number(row.towerId) : null,
+            towerName: row.towerName || null,
+        };
+    }
+
     // Render Move-Out Permit HTML (placeholders are already sanitized at source)
     private renderMoveOutPermitHtml(tpl: {
         headerImageUrl: string;
@@ -175,7 +229,7 @@ export class MoveOutService {
 
     // Create, upload and persist permit; returns attachment info for email
     private async createAndStoreMoveOutPermit(req: { requestId: number; requestNo: string; occupantName: string; addressLine: string; communityName: string; moveOutDateISO: string; headerImageUrl?: string; masterCommunityId: number; communityId: number; towerId?: number | null }): Promise<{ fileUrl: string; filename: string; attachment: { filename: string; content: Buffer; contentType: string } } | null> {
-        const headerImageUrl = req.headerImageUrl || 'https://srmapp01.blob.core.windows.net/sit-onesobha/content/move-out/mop_pdf_header.png?sp=r&st=2025-10-01T08:55:55Z&se=2025-10-01T17:10:55Z&spr=https&sv=2024-11-04&sr=b&sig=J4sYRHTeDR8WoFN3t%2BVBhQaoNWmOknt7rFu7gdhDvDU%3D';
+        const headerImageUrl = req.headerImageUrl || this.buildContentBlobUrl('content/move-out/mop_pdf_header.png');
         const dateOfIssue = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: '2-digit' });
         const moveOutStartDate = req.moveOutDateISO ? new Date(req.moveOutDateISO).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: '2-digit' }) : '';
 
@@ -583,9 +637,15 @@ export class MoveOutService {
 
                 // Generate and store Move-Out Permit PDF, then email to user (with attachment) and MOP recipients (no attachment)
                 try {
-                    const unitInfo: any = await getUnitInformation(result.unitId);
-                    const addressLine = [unitInfo?.unitName, unitInfo?.unitNumber].filter(Boolean).join(', ');
-                    const communityName = unitInfo?.community?.name || '';
+                    const unitDisp = await this.getUnitDisplayInfo(result.unitId);
+                    const addressLine = this.buildAddressLine({
+                        unitName: unitDisp?.unitName,
+                        unitNumber: unitDisp?.unitNumber,
+                        tower: { name: unitDisp?.towerName },
+                        community: { name: unitDisp?.communityName },
+                        masterCommunity: { name: unitDisp?.masterCommunityName },
+                    });
+                    const communityName = unitDisp?.communityName || '';
                     const occupantName = `${result?.firstName || ''} ${result?.lastName || ''}`.trim();
                     const permit = await this.createAndStoreMoveOutPermit({
                         requestId: result.id,
@@ -594,9 +654,10 @@ export class MoveOutService {
                         addressLine,
                         communityName,
                         moveOutDateISO: body?.moveOutDate || result?.moveOutDate,
-                        masterCommunityId: Number(unitInfo?.masterCommunity?.id) || 0,
-                        communityId: Number(unitInfo?.community?.id) || 0,
-                        towerId: unitInfo?.tower?.id ? Number(unitInfo?.tower?.id) : null
+                        headerImageUrl: 'https://srmapp01.blob.core.windows.net/sit-onesobha/content/move-out/mop_pdf_header.png?sp=r&st=2025-10-02T11:04:31Z&se=2025-10-02T19:19:31Z&spr=https&sv=2024-11-04&sr=b&sig=wpYoaU%2B72QPmvU6AgwZhygLxuGas62%2F64CYczGkqRv0%3D',
+                        masterCommunityId: unitDisp?.masterCommunityId || 0,
+                        communityId: unitDisp?.communityId || 0,
+                        towerId: unitDisp?.towerId ?? null
                     });
 
                     // Send templated approval email to requester (with PDF)
@@ -616,9 +677,9 @@ export class MoveOutService {
 
                     // Email official recipients (MOP Approved) - without PDF attachment
                     const emails = await this.getMopRecipients(
-                        Number(unitInfo?.masterCommunity?.id),
-                        Number(unitInfo?.community?.id),
-                        unitInfo?.tower?.id ? Number(unitInfo?.tower?.id) : null
+                        unitDisp?.masterCommunityId || 0,
+                        unitDisp?.communityId || 0,
+                        unitDisp?.towerId ?? null
                     );
                     if (emails.length > 0) {
                         const uniqueEmails = Array.from(new Set(
@@ -626,11 +687,11 @@ export class MoveOutService {
                         ));
                         if (uniqueEmails.length > 0) {
                             const propertyDetails = [
-                                unitInfo?.unitName,
-                                unitInfo?.unitNumber,
-                                unitInfo?.tower?.name,
-                                unitInfo?.community?.name,
-                                unitInfo?.masterCommunity?.name,
+                                unitDisp?.unitName,
+                                unitDisp?.unitNumber,
+                                unitDisp?.towerName,
+                                unitDisp?.communityName,
+                                unitDisp?.masterCommunityName,
                             ].filter(Boolean).join(', ');
                             const userType = userRoleResult?.slug || '';
                             const moveOutDateDisp = (body?.moveOutDate || result?.moveOutDate) ? new Date(body?.moveOutDate || result?.moveOutDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' }) : '';
@@ -1033,9 +1094,16 @@ export class MoveOutService {
 
             // Generate, store, and email Move-Out Permit (admin-created auto-approved)
             try {
-                const unitInfo: any = await getUnitInformation(targetUnitId);
-                const addressLine = [unitInfo?.unitName, unitInfo?.unitNumber].filter(Boolean).join(', ');
-                const communityName = unitInfo?.community?.name || '';
+                const unitDisp = await this.getUnitDisplayInfo(targetUnitId);
+                // Address: include Tower/Community and avoid duplicates
+                const addressLine = this.buildAddressLine({
+                    unitName: unitDisp?.unitName,
+                    unitNumber: unitDisp?.unitNumber,
+                    tower: { name: unitDisp?.towerName },
+                    community: { name: unitDisp?.communityName },
+                    masterCommunity: { name: unitDisp?.masterCommunityName },
+                });
+                const communityName = unitDisp?.communityName || '';
                 // fetch occupant name + email
                 const userRow = await MoveOutRequests.getRepository()
                     .createQueryBuilder('mor')
@@ -1043,7 +1111,12 @@ export class MoveOutService {
                     .select(['mor.id', 'user.firstName', 'user.lastName', 'user.email'])
                     .where('mor.id = :id', { id: moveOutRequest.id })
                     .getRawOne();
-                const occupantName = `${userRow?.user_firstName || ''} ${userRow?.user_lastName || ''}`.trim();
+                // Log full row in a single message so our logger prints it
+                try { logger.info(`[Permit] User row for permit email: ${JSON.stringify(userRow)}`); } catch (_) { }
+                // TypeORM raw aliasing can be snake_case or camelCase; support both
+                const occupantFirst = (userRow?.user_firstName ?? userRow?.user_first_name ?? '').toString();
+                const occupantLast = (userRow?.user_lastName ?? userRow?.user_last_name ?? '').toString();
+                const occupantName = `${occupantFirst} ${occupantLast}`.trim();
                 const userEmail = userRow?.user_email;
                 const permit = await this.createAndStoreMoveOutPermit({
                     requestId: moveOutRequest.id,
@@ -1052,9 +1125,10 @@ export class MoveOutService {
                     addressLine,
                     communityName,
                     moveOutDateISO: moveOutDate,
-                    masterCommunityId: Number(unitInfo?.masterCommunity?.id) || 0,
-                    communityId: Number(unitInfo?.community?.id) || 0,
-                    towerId: unitInfo?.tower?.id ? Number(unitInfo?.tower?.id) : null
+                    headerImageUrl: 'https://srmapp01.blob.core.windows.net/sit-onesobha/content/move-out/mop_pdf_header.png?sp=r&st=2025-10-02T11:04:31Z&se=2025-10-02T19:19:31Z&spr=https&sv=2024-11-04&sr=b&sig=wpYoaU%2B72QPmvU6AgwZhygLxuGas62%2F64CYczGkqRv0%3D',
+                    masterCommunityId: unitDisp?.masterCommunityId || 0,
+                    communityId: unitDisp?.communityId || 0,
+                    towerId: unitDisp?.towerId ?? null
                 });
                 if (userEmail) {
                     const content = this.composeRequesterEmail(moveOutRequest.requestType as MOVE_IN_USER_TYPES, moveOutRequest.moveOutRequestNo);
@@ -1063,9 +1137,9 @@ export class MoveOutService {
 
                 // official recipients (no PDF attachment)
                 const emails = await this.getMopRecipients(
-                    Number(unitInfo?.masterCommunity?.id),
-                    Number(unitInfo?.community?.id),
-                    unitInfo?.tower?.id ? Number(unitInfo?.tower?.id) : null
+                    unitDisp?.masterCommunityId || 0,
+                    unitDisp?.communityId || 0,
+                    unitDisp?.towerId ?? null
                 );
                 if (emails.length > 0) {
                     const uniqueEmails = Array.from(new Set(
@@ -1073,11 +1147,11 @@ export class MoveOutService {
                     ));
                     if (uniqueEmails.length > 0) {
                         const propertyDetails = [
-                            unitInfo?.unitName,
-                            unitInfo?.unitNumber,
-                            unitInfo?.tower?.name,
-                            unitInfo?.community?.name,
-                            unitInfo?.masterCommunity?.name,
+                            unitDisp?.unitName,
+                            unitDisp?.unitNumber,
+                            unitDisp?.towerName,
+                            unitDisp?.communityName,
+                            unitDisp?.masterCommunityName,
                         ].filter(Boolean).join(', ');
                         const userType = userRoleSlug || '';
                         const moveOutDateDisp = new Date(moveOutDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' });

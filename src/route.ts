@@ -2,7 +2,8 @@ import express from 'express';
 
 import swaggerRoute from './Docs/swagger.route';
 import config from './Common/Config/config';
-import renewalRoutes from './Modules/Renewal/renewal.route';
+import renewalMobileRoutes from './Modules/Renewal/Mobile/renewal.route';
+import renewalAdminRoutes from './Modules/Renewal/Admin/renewal.route';
 import documentsRoutes from './Modules/Documents/documents.route';
 import integrationRoutes from './Modules/Integration/integration.route';
 import webhookRoutes from './Modules/Webhook/webhook.route';
@@ -11,6 +12,7 @@ import MoveInAdmin from './Modules/MoveIn/Admin/moveIn.route';
 import moveOutRoutes from './Modules/MoveOut/Mobile/moveOut.route';
 import moveOutAdminRoutes from './Modules/MoveOut/Admin/moveOutAdmin.route';
 import emailRoutes from './Modules/Email/email.route';
+import activeResidentsAdminRoutes from './Modules/ActiveResidents/Admin/activeResidents.route';
 const router = express.Router();
 
 const defaultRoutes = [
@@ -18,7 +20,9 @@ const defaultRoutes = [
     { path: '/admin/move-in', route: MoveInAdmin },
     { path: '/move-out', route: moveOutRoutes },
     { path: '/admin/move-out', route: moveOutAdminRoutes },
-    { path: '/account-renewal', route: renewalRoutes },
+    { path: '/admin/active-residents', route: activeResidentsAdminRoutes },
+    { path: '/renewal', route: renewalMobileRoutes },
+    { path: '/admin/renewal', route: renewalAdminRoutes },
     { path: '/documents', route: documentsRoutes },
     { path: '/integration', route: integrationRoutes },
     { path: '/webhook', route: webhookRoutes },
