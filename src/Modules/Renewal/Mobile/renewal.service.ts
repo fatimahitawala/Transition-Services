@@ -396,22 +396,12 @@ export class RenewalService {
           children, 
           householdStaffs, 
           pets, 
-          peopleOfDetermination, 
-          peopleOfDeterminationDetails,
-          acceptTerms,
-          files
+          determinationComments
         } = body;
 
         logger.info(`RENEWAL | CREATE TENANT | MOBILE | USER: ${user.id} | UNIT: ${unitId}`);
 
-        // Validate terms acceptance
-        if (!acceptTerms) {
-          throw new ApiError(
-            httpStatus.BAD_REQUEST,
-            APICodes.RENEWAL_TERMS_NOT_ACCEPTED.message,
-            APICodes.RENEWAL_TERMS_NOT_ACCEPTED.code
-          );
-        }
+        // No terms acceptance validation needed for simplified flow
 
         // Validations
         await this.validateUnitLinkage(unitId, user.id);
@@ -437,31 +427,20 @@ export class RenewalService {
 
         const savedRequest = await renewalRequest.save();
 
-        // Create tenant-specific details
+        // Create tenant-specific details with only required fields
         const tenantDetails = AccountRenewalRequestDetailsTenant.create({
           accountRenewalRequest: savedRequest,
           tenancyContractEndDate,
-          adults: adults || 1,
-          children: children || 0,
-          householdStaffs: householdStaffs || 0,
-          pets: pets || 0,
-          peopleOfDetermination: peopleOfDetermination || false,
-          peopleOfDeterminationDetails: peopleOfDeterminationDetails || '',
-          firstName: user.firstName || '',
-          lastName: user.lastName || '',
-          email: user.email || '',
-          dialCode: user.dialCode || '',
-          phoneNumber: user.phoneNumber || '',
+          adults: adults.toString(),
+          children: children.toString(),
+          householdStaffs: householdStaffs.toString(),
+          pets: pets.toString(),
+          peopleOfDeterminationDetails: determinationComments || '',
           createdBy: user.id,
           updatedBy: user.id
         });
 
         await tenantDetails.save();
-
-        // Handle document uploads inline
-        if (files) {
-          await this.handleDocumentUploads(savedRequest.id, files, user.id, queryRunner);
-        }
 
         // Create log entry
         await this.createRenewalLog(
@@ -502,26 +481,12 @@ export class RenewalService {
       try {
         const { 
           unitId, 
-          dtcmExpiryDate,
-          adults,
-          children,
-          householdStaffs,
-          pets,
-          peopleOfDetermination,
-          acceptTerms,
-          files
+          dtcmPermitEndDate
         } = body;
 
         logger.info(`RENEWAL | CREATE HHO OWNER | MOBILE | USER: ${user.id} | UNIT: ${unitId}`);
 
-        // Validate terms acceptance
-        if (!acceptTerms) {
-          throw new ApiError(
-            httpStatus.BAD_REQUEST,
-            APICodes.RENEWAL_TERMS_NOT_ACCEPTED.message,
-            APICodes.RENEWAL_TERMS_NOT_ACCEPTED.code
-          );
-        }
+        // No terms acceptance validation needed for simplified flow
 
         // Validations
         await this.validateUnitLinkage(unitId, user.id);
@@ -539,7 +504,7 @@ export class RenewalService {
           user: { id: user.id } as any,
           unit: { id: unitId } as any,
           status: MOVE_REQUEST_STATUS.OPEN,
-          moveInDate: dtcmExpiryDate,
+          moveInDate: dtcmPermitEndDate,
           createdBy: user.id,
           updatedBy: user.id,
           isActive: true
@@ -547,30 +512,15 @@ export class RenewalService {
 
         const savedRequest = await renewalRequest.save();
 
-        // Create HHO owner-specific details
+        // Create HHO owner-specific details with only required fields
         const hhoOwnerDetails = AccountRenewalRequestDetailsHhoOwner.create({
           accountRenewalRequest: savedRequest,
-          dtcmExpiryDate,
-          adults: adults || 0,
-          children: children || 0,
-          householdStaffs: householdStaffs || 0,
-          pets: pets || 0,
-          ownerFirstName: user.firstName || '',
-          ownerLastName: user.lastName || '',
-          email: user.email || '',
-          dialCode: user.dialCode || '',
-          phoneNumber: user.phoneNumber || '',
-          nationality: user.nationality || '',
+          dtcmExpiryDate: dtcmPermitEndDate,
           createdBy: user.id,
           updatedBy: user.id
         });
 
         await hhoOwnerDetails.save();
-
-        // Handle document uploads
-        if (files) {
-          await this.handleDocumentUploads(savedRequest.id, files, user.id, queryRunner);
-        }
 
         // Create log entry
         await this.createRenewalLog(
@@ -612,26 +562,13 @@ export class RenewalService {
         const { 
           unitId, 
           leaseContractEndDate, 
-          dtcmExpiryDate, 
-          tradeLicenseExpiryDate,
-          adults,
-          children,
-          householdStaffs,
-          pets,
-          acceptTerms,
-          files
+          dtcmPermitEndDate, 
+          permitExpiry
         } = body;
 
         logger.info(`RENEWAL | CREATE HHC COMPANY | MOBILE | USER: ${user.id} | UNIT: ${unitId}`);
 
-        // Validate terms acceptance
-        if (!acceptTerms) {
-          throw new ApiError(
-            httpStatus.BAD_REQUEST,
-            APICodes.RENEWAL_TERMS_NOT_ACCEPTED.message,
-            APICodes.RENEWAL_TERMS_NOT_ACCEPTED.code
-          );
-        }
+        // No terms acceptance validation needed for simplified flow
 
         // Validations
         await this.validateUnitLinkage(unitId, user.id);
@@ -657,25 +594,17 @@ export class RenewalService {
 
         const savedRequest = await renewalRequest.save();
 
-        // Create HHC company-specific details
+        // Create HHC company-specific details with only required fields
         const hhcCompanyDetails = AccountRenewalRequestDetailsHhoCompany.create({
           accountRenewalRequest: savedRequest,
           leaseContractEndDate,
-          dtcmExpiryDate,
-          tradeLicenseExpiryDate,
-          companyName: body.companyName || user.companyName || '',
-          companyEmail: body.companyEmail || user.email || '',
-          tradeLicenseNumber: body.tradeLicenseNumber || '',
+          dtcmExpiryDate: dtcmPermitEndDate,
+          tradeLicenseExpiryDate: permitExpiry,
           createdBy: user.id,
           updatedBy: user.id
         });
 
         await hhcCompanyDetails.save();
-
-        // Handle document uploads
-        if (files) {
-          await this.handleDocumentUploads(savedRequest.id, files, user.id, queryRunner);
-        }
 
         // Create log entry
         await this.createRenewalLog(
@@ -1074,10 +1003,8 @@ export class RenewalService {
       const isHhcCompanyRenewal = renewalRequest.requestType === ACCOUNT_RENEWAL_USER_TYPES.HHO_COMPANY;
 
       if (isTenantRenewal) {
-        // For Tenant Renewal, only allow the 3 required documents
+        // For Tenant Renewal, only allow Ejari document (required)
         const allowedDocumentTypes = [
-          TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT,
-          TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK,
           TRANSITION_DOCUMENT_TYPES.EJARI
         ];
 
@@ -1094,14 +1021,9 @@ export class RenewalService {
       }
 
       if (isHhoOwnerRenewal) {
-        // For HHO Owner Renewal, allow more document types similar to move-in
+        // For HHO Owner Renewal, only allow DTCM permit (required)
         const allowedDocumentTypes = [
-          TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT,
-          TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK,
-          TRANSITION_DOCUMENT_TYPES.EJARI,
-          TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT,
-          TRANSITION_DOCUMENT_TYPES.TITLE_DEED,
-          TRANSITION_DOCUMENT_TYPES.OTHER
+          TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT
         ];
 
         const uploadedTypes = Object.keys(files || {});
@@ -1117,27 +1039,12 @@ export class RenewalService {
       }
 
       if (isHhcCompanyRenewal) {
-        // For HHC Company Renewal, allow more document types
-        const allowedDocumentTypes = [
-          TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT,
-          TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK,
-          TRANSITION_DOCUMENT_TYPES.EJARI,
-          TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE,
-          TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT,
-          TRANSITION_DOCUMENT_TYPES.TITLE_DEED,
-          TRANSITION_DOCUMENT_TYPES.OTHER
-        ];
-
-        const uploadedTypes = Object.keys(files || {});
-        const invalidTypes = uploadedTypes.filter(type => !allowedDocumentTypes.includes(type as TRANSITION_DOCUMENT_TYPES));
-        
-        if (invalidTypes.length > 0) {
-          throw new ApiError(
-            httpStatus.BAD_REQUEST,
-            `Invalid document types for HHC company renewal: ${invalidTypes.join(', ')}. Allowed types: ${allowedDocumentTypes.join(', ')}`,
-            'INVALID_DOCUMENT_TYPES'
-          );
-        }
+        // For HHC Company Renewal, no documents are required or allowed
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Document upload is not allowed for HHC company renewal. No documents are required for this renewal type.',
+          'DOCUMENT_UPLOAD_NOT_ALLOWED'
+        );
       }
 
       const uploadedDocuments: any[] = [];
@@ -1215,6 +1122,71 @@ export class RenewalService {
       };
     } catch (error: any) {
       logger.error(`RENEWAL | UPLOAD DOCUMENTS ERROR: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Submit RFI response for renewal request (Mobile)
+   */
+  async submitRFI(requestId: number, rfiData: { comments: string; additionalInfo?: string }, user: any) {
+    try {
+      // Get the renewal request
+      const renewalRequest = await AccountRenewalRequests.getRepository()
+        .createQueryBuilder("arr")
+        .leftJoinAndSelect("arr.user", "user")
+        .where("arr.id = :requestId AND arr.isActive = true", { requestId })
+        .getOne();
+
+      if (!renewalRequest) {
+        throw new ApiError(httpStatus.NOT_FOUND, APICodes.RENEWAL_REQUEST_NOT_FOUND.message, APICodes.RENEWAL_REQUEST_NOT_FOUND.code);
+      }
+
+      // Check if request belongs to the user
+      if (renewalRequest.user.id !== user.id) {
+        throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
+      }
+
+      // Check if request is in RFI pending status
+      if (renewalRequest.status !== MOVE_REQUEST_STATUS.RFI_PENDING) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          'Renewal request is not in RFI pending status. Only requests with RFI pending status can be submitted.',
+          'INVALID_STATUS_FOR_RFI_SUBMISSION'
+        );
+      }
+
+      // Update request status to RFI submitted
+      renewalRequest.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+      renewalRequest.updatedBy = user.id;
+      renewalRequest.updatedAt = new Date();
+
+      await renewalRequest.save();
+
+      // Create log entry
+      await this.createRenewalLog(
+        renewalRequest,
+        renewalRequest.status,
+        TransitionRequestActionByTypes.USER,
+        user,
+        'RFI response submitted by customer',
+        JSON.stringify({ 
+          comments: rfiData.comments, 
+          additionalInfo: rfiData.additionalInfo || '',
+          previousStatus: MOVE_REQUEST_STATUS.RFI_PENDING,
+          newStatus: MOVE_REQUEST_STATUS.RFI_SUBMITTED
+        })
+      );
+
+      logger.info(`RENEWAL | RFI SUBMITTED | REQUEST: ${requestId} | USER: ${user.id}`);
+
+      return {
+        requestId,
+        status: renewalRequest.status,
+        message: 'RFI response submitted successfully. Admin will review your submission.'
+      };
+    } catch (error: any) {
+      logger.error(`RENEWAL | SUBMIT RFI ERROR: ${error.message}`);
       throw error;
     }
   }

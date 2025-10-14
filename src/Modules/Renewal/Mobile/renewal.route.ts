@@ -26,16 +26,13 @@ router.post('/request/:requestId/documents',
   auth.auth(),
   validate(renewalValidation.uploadDocuments),
   fileUploads.fields([
-    { name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_FRONT, maxCount: 1 },
-    { name: TRANSITION_DOCUMENT_TYPES.EMIRATES_ID_BACK, maxCount: 1 },
     { name: TRANSITION_DOCUMENT_TYPES.EJARI, maxCount: 1 },
-    { name: TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, maxCount: 1 },
-    { name: TRANSITION_DOCUMENT_TYPES.COMPANY_TRADE_LICENSE, maxCount: 1 },
-    { name: TRANSITION_DOCUMENT_TYPES.TITLE_DEED, maxCount: 1 },
-    { name: TRANSITION_DOCUMENT_TYPES.OTHER, maxCount: 4 }
+    { name: TRANSITION_DOCUMENT_TYPES.UNIT_PEMIT, maxCount: 1 }
   ]),
   catchAsync(renewalController.uploadDocuments)
 );
+
+router.put('/request/:requestId/rfi-submit', auth.auth(), validate(renewalValidation.submitRFI), catchAsync(renewalController.submitRFI));
 
 /**
  * @swagger
@@ -118,7 +115,7 @@ router.post('/request/:requestId/documents',
  * /renewal/request/tenant:
  *   post:
  *     summary: Create tenant renewal request
- *     description: Submit a renewal request for a tenant. The request will be validated to ensure no approved move-out request exists for the same unit.
+ *     description: Submit a simplified renewal request for a tenant containing only essential occupancy details. The request will be validated to ensure no approved move-out request exists for the same unit.
  *     tags: [Renewal (Mobile)]
  *     security:
  *       - bearerAuth: []
@@ -131,7 +128,10 @@ router.post('/request/:requestId/documents',
  *             required:
  *               - unitId
  *               - tenancyContractEndDate
- *               - acceptTerms
+ *               - adults
+ *               - children
+ *               - householdStaffs
+ *               - pets
  *             properties:
  *               unitId:
  *                 type: integer
@@ -166,113 +166,13 @@ router.post('/request/:requestId/documents',
  *                 maximum: 6
  *                 description: Number of pets
  *                 example: 0
- *               peopleOfDetermination:
- *                 type: boolean
- *                 description: Whether any household member is a person of determination
- *                 example: false
- *               peopleOfDeterminationDetails:
+ *               determinationComments:
  *                 type: string
- *                 description: Details about people of determination (if applicable)
- *                 example: ""
- *               acceptTerms:
- *                 type: boolean
- *                 enum: [true]
- *                 description: Must be true to accept terms and conditions
- *                 example: true
- *               firstName:
- *                 type: string
- *                 description: First name of the tenant
- *                 example: "John"
- *               lastName:
- *                 type: string
- *                 description: Last name of the tenant
- *                 example: "Doe"
- *               email:
- *                 type: string
- *                 format: email
- *                 description: Email address of the tenant
- *                 example: "john.doe@example.com"
- *               dialCode:
- *                 type: string
- *                 description: Phone dial code
- *                 example: "+971"
- *               phoneNumber:
- *                 type: string
- *                 description: Phone number
- *                 example: "501234567"
- *               nationality:
- *                 type: string
- *                 description: Nationality of the tenant
- *                 example: "UAE"
- *               dateOfBirth:
- *                 type: string
- *                 format: date
- *                 description: Date of birth
- *                 example: "1990-01-01"
- *               emiratesIdNumber:
- *                 type: string
- *                 description: Emirates ID number
- *                 example: "784-1990-12345678-1"
- *               emiratesIdExpiryDate:
- *                 type: string
- *                 format: date
- *                 description: Emirates ID expiry date
- *                 example: "2025-12-31"
- *               passportNumber:
- *                 type: string
- *                 description: Passport number
- *                 example: "A1234567"
- *               visaNumber:
- *                 type: string
- *                 description: Visa number
- *                 example: "V1234567"
- *               ejariNumber:
- *                 type: string
- *                 description: Ejari number
- *                 example: "EJ123456"
- *               dtcmPermitNumber:
- *                 type: string
- *                 description: DTCM permit number
- *                 example: "DTCM123456"
- *               emergencyContactName:
- *                 type: string
- *                 description: Emergency contact name
- *                 example: "Jane Doe"
- *               emergencyContactDialCode:
- *                 type: string
- *                 description: Emergency contact dial code
- *                 example: "+971"
- *               emergencyContactNumber:
- *                 type: string
- *                 description: Emergency contact number
- *                 example: "501234567"
- *               relationship:
- *                 type: string
- *                 description: Relationship with emergency contact
- *                 example: "Spouse"
- *               comments:
- *                 type: string
- *                 description: Additional comments
- *                 example: "Additional information"
- *               monthlyRent:
- *                 type: number
- *                 description: Monthly rent amount
- *                 example: 5000
- *               securityDeposit:
- *                 type: number
- *                 description: Security deposit amount
- *                 example: 10000
- *               maintenanceFee:
- *                 type: number
- *                 description: Maintenance fee amount
- *                 example: 500
- *               currency:
- *                 type: string
- *                 description: Currency code
- *                 example: "AED"
+ *                 description: Optional comments about people of determination accessibility requirements
+ *                 example: "Additional accessibility requirements"
  *           examples:
- *             without_special_needs:
- *               summary: Tenant renewal without special needs
+ *             basic_renewal:
+ *               summary: Basic tenant renewal request
  *               value:
  *                 unitId: 123
  *                 tenancyContractEndDate: "2026-01-01"
@@ -280,33 +180,8 @@ router.post('/request/:requestId/documents',
  *                 children: 1
  *                 householdStaffs: 0
  *                 pets: 0
- *                 peopleOfDetermination: false
- *                 peopleOfDeterminationDetails: ""
- *                 acceptTerms: true
- *                 firstName: "John"
- *                 lastName: "Doe"
- *                 email: "john.doe@example.com"
- *                 dialCode: "+971"
- *                 phoneNumber: "501234567"
- *                 nationality: "UAE"
- *                 dateOfBirth: "1990-01-01"
- *                 emiratesIdNumber: "784-1990-12345678-1"
- *                 emiratesIdExpiryDate: "2025-12-31"
- *                 passportNumber: "A1234567"
- *                 visaNumber: "V1234567"
- *                 ejariNumber: "EJ123456"
- *                 dtcmPermitNumber: "DTCM123456"
- *                 emergencyContactName: "Jane Doe"
- *                 emergencyContactDialCode: "+971"
- *                 emergencyContactNumber: "501234567"
- *                 relationship: "Spouse"
- *                 comments: "Additional information"
- *                 monthlyRent: 5000
- *                 securityDeposit: 10000
- *                 maintenanceFee: 500
- *                 currency: "AED"
- *             with_special_needs:
- *               summary: Tenant renewal with special needs
+ *             with_determination_comments:
+ *               summary: Tenant renewal with determination comments
  *               value:
  *                 unitId: 123
  *                 tenancyContractEndDate: "2026-01-01"
@@ -314,31 +189,7 @@ router.post('/request/:requestId/documents',
  *                 children: 1
  *                 householdStaffs: 1
  *                 pets: 1
- *                 peopleOfDetermination: true
- *                 peopleOfDeterminationDetails: "Need wheelchair assistance for elderly or people of determination during renewal process"
- *                 acceptTerms: true
- *                 firstName: "John"
- *                 lastName: "Doe"
- *                 email: "john.doe@example.com"
- *                 dialCode: "+971"
- *                 phoneNumber: "501234567"
- *                 nationality: "UAE"
- *                 dateOfBirth: "1990-01-01"
- *                 emiratesIdNumber: "784-1990-12345678-1"
- *                 emiratesIdExpiryDate: "2025-12-31"
- *                 passportNumber: "A1234567"
- *                 visaNumber: "V1234567"
- *                 ejariNumber: "EJ123456"
- *                 dtcmPermitNumber: "DTCM123456"
- *                 emergencyContactName: "Jane Doe"
- *                 emergencyContactDialCode: "+971"
- *                 emergencyContactNumber: "501234567"
- *                 relationship: "Spouse"
- *                 comments: "Additional information"
- *                 monthlyRent: 5000
- *                 securityDeposit: 10000
- *                 maintenanceFee: 500
- *                 currency: "AED"
+ *                 determinationComments: "Need wheelchair assistance for elderly or people of determination during renewal process"
  *     responses:
  *       200:
  *         description: Tenant renewal request created successfully
@@ -401,7 +252,7 @@ router.post('/request/:requestId/documents',
  * /renewal/request/hho-unit:
  *   post:
  *     summary: Create HHO owner renewal request
- *     description: Submit a renewal request for a holiday home owner. The request will be validated to ensure no approved move-out request exists for the same unit.
+ *     description: Submit a simplified renewal request for a holiday home owner containing only essential permit information. The request will be validated to ensure no approved move-out request exists for the same unit.
  *     tags: [Renewal (Mobile)]
  *     security:
  *       - bearerAuth: []
@@ -413,254 +264,23 @@ router.post('/request/:requestId/documents',
  *             type: object
  *             required:
  *               - unitId
- *               - dtcmExpiryDate
- *               - acceptTerms
- *               - ownerFirstName
- *               - ownerLastName
- *               - email
- *               - dialCode
- *               - phoneNumber
- *               - nationality
+ *               - dtcmPermitEndDate
  *             properties:
  *               unitId:
  *                 type: integer
  *                 description: ID of the unit for renewal
  *                 example: 123
- *               dtcmExpiryDate:
+ *               dtcmPermitEndDate:
  *                 type: string
  *                 format: date
- *                 description: DTCM permit expiry date
+ *                 description: DTCM permit end date
  *                 example: "2026-12-31"
- *               adults:
- *                 type: integer
- *                 minimum: 0
- *                 maximum: 6
- *                 description: Number of adults
- *                 example: 0
- *               children:
- *                 type: integer
- *                 minimum: 0
- *                 maximum: 6
- *                 description: Number of children
- *                 example: 0
- *               householdStaffs:
- *                 type: integer
- *                 minimum: 0
- *                 maximum: 4
- *                 description: Number of household staff
- *                 example: 0
- *               pets:
- *                 type: integer
- *                 minimum: 0
- *                 maximum: 6
- *                 description: Number of pets
- *                 example: 0
- *               peopleOfDetermination:
- *                 type: boolean
- *                 description: Whether any household member is a person of determination
- *                 example: false
- *               peopleOfDeterminationDetails:
- *                 type: string
- *                 description: Details about people of determination (if applicable)
- *                 example: ""
- *               acceptTerms:
- *                 type: boolean
- *                 enum: [true]
- *                 description: Must be true to accept terms and conditions
- *                 example: true
- *               ownerFirstName:
- *                 type: string
- *                 description: Owner's first name
- *                 example: "John"
- *               ownerLastName:
- *                 type: string
- *                 description: Owner's last name
- *                 example: "Doe"
- *               email:
- *                 type: string
- *                 format: email
- *                 description: Owner's email address
- *                 example: "john.doe@example.com"
- *               dialCode:
- *                 type: string
- *                 description: Phone dial code
- *                 example: "+971"
- *               phoneNumber:
- *                 type: string
- *                 description: Phone number
- *                 example: "501234567"
- *               nationality:
- *                 type: string
- *                 description: Owner's nationality
- *                 example: "UAE"
- *               dateOfBirth:
- *                 type: string
- *                 format: date
- *                 description: Date of birth
- *                 example: "1990-01-01"
- *               emiratesIdNumber:
- *                 type: string
- *                 description: Emirates ID number
- *                 example: "784-1990-12345678-1"
- *               passportNumber:
- *                 type: string
- *                 description: Passport number
- *                 example: "A1234567"
- *               visaNumber:
- *                 type: string
- *                 description: Visa number
- *                 example: "V1234567"
- *               unitPermitNumber:
- *                 type: string
- *                 description: Unit permit number
- *                 example: "UP123456"
- *               unitPermitStartDate:
- *                 type: string
- *                 format: date
- *                 description: Unit permit start date
- *                 example: "2025-01-01"
- *               unitPermitExpiryDate:
- *                 type: string
- *                 format: date
- *                 description: Unit permit expiry date
- *                 example: "2026-01-01"
- *               dtcmPermitNumber:
- *                 type: string
- *                 description: DTCM permit number
- *                 example: "DTCM123456"
- *               ejariNumber:
- *                 type: string
- *                 description: Ejari number
- *                 example: "EJ123456"
- *               powerOfAttorneyNumber:
- *                 type: string
- *                 description: Power of attorney number
- *                 example: "POA123456"
- *               attorneyFirstName:
- *                 type: string
- *                 description: Attorney's first name
- *                 example: "Jane"
- *               attorneyLastName:
- *                 type: string
- *                 description: Attorney's last name
- *                 example: "Smith"
- *               attorneyName:
- *                 type: string
- *                 description: Attorney's full name
- *                 example: "Jane Smith"
- *               attorneyPhone:
- *                 type: string
- *                 description: Attorney's phone number
- *                 example: "501234567"
- *               emergencyContactName:
- *                 type: string
- *                 description: Emergency contact name
- *                 example: "Jane Doe"
- *               emergencyContactDialCode:
- *                 type: string
- *                 description: Emergency contact dial code
- *                 example: "+971"
- *               emergencyContactNumber:
- *                 type: string
- *                 description: Emergency contact number
- *                 example: "501234567"
- *               relationship:
- *                 type: string
- *                 description: Relationship with emergency contact
- *                 example: "Spouse"
- *               comments:
- *                 type: string
- *                 description: Additional comments
- *                 example: "Additional information"
- *               monthlyRent:
- *                 type: number
- *                 description: Monthly rent amount
- *                 example: 5000
- *               securityDeposit:
- *                 type: number
- *                 description: Security deposit amount
- *                 example: 10000
- *               maintenanceFee:
- *                 type: number
- *                 description: Maintenance fee amount
- *                 example: 500
- *               currency:
- *                 type: string
- *                 description: Currency code
- *                 example: "AED"
  *           examples:
- *             without_special_needs:
- *               summary: HHO owner renewal without special needs
+ *             basic_hho_renewal:
+ *               summary: Basic HHO owner renewal request
  *               value:
  *                 unitId: 123
- *                 dtcmExpiryDate: "2026-12-31"
- *                 adults: 0
- *                 children: 0
- *                 householdStaffs: 0
- *                 pets: 0
- *                 peopleOfDetermination: false
- *                 peopleOfDeterminationDetails: ""
- *                 acceptTerms: true
- *                 ownerFirstName: "John"
- *                 ownerLastName: "Doe"
- *                 email: "john.doe@example.com"
- *                 dialCode: "+971"
- *                 phoneNumber: "501234567"
- *                 nationality: "UAE"
- *                 dateOfBirth: "1990-01-01"
- *                 emiratesIdNumber: "784-1990-12345678-1"
- *                 passportNumber: "A1234567"
- *                 visaNumber: "V1234567"
- *                 unitPermitNumber: "UP123456"
- *                 unitPermitStartDate: "2025-01-01"
- *                 unitPermitExpiryDate: "2026-01-01"
- *                 dtcmPermitNumber: "DTCM123456"
- *                 ejariNumber: "EJ123456"
- *                 emergencyContactName: "Jane Doe"
- *                 emergencyContactDialCode: "+971"
- *                 emergencyContactNumber: "501234567"
- *                 relationship: "Spouse"
- *                 comments: "Additional information"
- *                 monthlyRent: 5000
- *                 securityDeposit: 10000
- *                 maintenanceFee: 500
- *                 currency: "AED"
- *             with_special_needs:
- *               summary: HHO owner renewal with special needs
- *               value:
- *                 unitId: 123
- *                 dtcmExpiryDate: "2026-12-31"
- *                 adults: 1
- *                 children: 0
- *                 householdStaffs: 1
- *                 pets: 1
- *                 peopleOfDetermination: true
- *                 peopleOfDeterminationDetails: "Need wheelchair assistance for elderly or people of determination during renewal process"
- *                 acceptTerms: true
- *                 ownerFirstName: "John"
- *                 ownerLastName: "Doe"
- *                 email: "john.doe@example.com"
- *                 dialCode: "+971"
- *                 phoneNumber: "501234567"
- *                 nationality: "UAE"
- *                 dateOfBirth: "1990-01-01"
- *                 emiratesIdNumber: "784-1990-12345678-1"
- *                 passportNumber: "A1234567"
- *                 visaNumber: "V1234567"
- *                 unitPermitNumber: "UP123456"
- *                 unitPermitStartDate: "2025-01-01"
- *                 unitPermitExpiryDate: "2026-01-01"
- *                 dtcmPermitNumber: "DTCM123456"
- *                 ejariNumber: "EJ123456"
- *                 emergencyContactName: "Jane Doe"
- *                 emergencyContactDialCode: "+971"
- *                 emergencyContactNumber: "501234567"
- *                 relationship: "Spouse"
- *                 comments: "Additional information"
- *                 monthlyRent: 5000
- *                 securityDeposit: 10000
- *                 maintenanceFee: 500
- *                 currency: "AED"
+ *                 dtcmPermitEndDate: "2026-12-31"
  *     responses:
  *       200:
  *         description: HHO owner renewal request created successfully
@@ -723,7 +343,7 @@ router.post('/request/:requestId/documents',
  * /renewal/request/hhc-company:
  *   post:
  *     summary: Create HHC company renewal request
- *     description: Submit a renewal request for a holiday home company. The request will be validated to ensure no approved move-out request exists for the same unit.
+ *     description: Submit a simplified renewal request for a holiday home company containing only essential permit and contract dates. The request will be validated to ensure no approved move-out request exists for the same unit.
  *     tags: [Renewal (Mobile)]
  *     security:
  *       - bearerAuth: []
@@ -736,15 +356,8 @@ router.post('/request/:requestId/documents',
  *             required:
  *               - unitId
  *               - leaseContractEndDate
- *               - dtcmExpiryDate
- *               - tradeLicenseExpiryDate
- *               - acceptTerms
- *               - name
- *               - companyName
- *               - companyEmail
- *               - countryCode
- *               - operatorOfficeNumber
- *               - tradeLicenseNumber
+ *               - dtcmPermitEndDate
+ *               - permitExpiry
  *             properties:
  *               unitId:
  *                 type: integer
@@ -755,216 +368,24 @@ router.post('/request/:requestId/documents',
  *                 format: date
  *                 description: Lease contract end date
  *                 example: "2026-12-31"
- *               dtcmExpiryDate:
+ *               dtcmPermitEndDate:
  *                 type: string
  *                 format: date
- *                 description: DTCM permit expiry date
+ *                 description: DTCM permit end date
  *                 example: "2026-12-31"
- *               tradeLicenseExpiryDate:
+ *               permitExpiry:
  *                 type: string
  *                 format: date
- *                 description: Trade license expiry date
+ *                 description: Trade license permit expiry date
  *                 example: "2026-12-31"
- *               adults:
- *                 type: integer
- *                 minimum: 0
- *                 maximum: 6
- *                 description: Number of adults
- *                 example: 0
- *               children:
- *                 type: integer
- *                 minimum: 0
- *                 maximum: 6
- *                 description: Number of children
- *                 example: 0
- *               householdStaffs:
- *                 type: integer
- *                 minimum: 0
- *                 maximum: 4
- *                 description: Number of household staff
- *                 example: 0
- *               pets:
- *                 type: integer
- *                 minimum: 0
- *                 maximum: 6
- *                 description: Number of pets
- *                 example: 0
- *               peopleOfDetermination:
- *                 type: boolean
- *                 description: Whether any household member is a person of determination
- *                 example: false
- *               peopleOfDeterminationDetails:
- *                 type: string
- *                 description: Details about people of determination (if applicable)
- *                 example: ""
- *               acceptTerms:
- *                 type: boolean
- *                 enum: [true]
- *                 description: Must be true to accept terms and conditions
- *                 example: true
- *               name:
- *                 type: string
- *                 description: Company representative's name
- *                 example: "John Doe"
- *               companyName:
- *                 type: string
- *                 description: Company name
- *                 example: "ABC Holiday Homes LLC"
- *               companyEmail:
- *                 type: string
- *                 format: email
- *                 description: Company email address
- *                 example: "info@abcholidays.com"
- *               countryCode:
- *                 type: string
- *                 description: Country dial code
- *                 example: "+971"
- *               operatorOfficeNumber:
- *                 type: string
- *                 description: Operator office number
- *                 example: "043334444"
- *               tradeLicenseNumber:
- *                 type: string
- *                 description: Trade license number
- *                 example: "TL123456"
- *               nationality:
- *                 type: string
- *                 description: Representative's nationality
- *                 example: "UAE"
- *               emiratesIdNumber:
- *                 type: string
- *                 description: Emirates ID number
- *                 example: "784-1990-12345678-1"
- *               emiratesIdExpiryDate:
- *                 type: string
- *                 format: date
- *                 description: Emirates ID expiry date
- *                 example: "2025-12-31"
- *               companyAddress:
- *                 type: string
- *                 description: Company address
- *                 example: "Dubai, UAE"
- *               companyPhone:
- *                 type: string
- *                 description: Company phone number
- *                 example: "043334444"
- *               powerOfAttorneyNumber:
- *                 type: string
- *                 description: Power of attorney number
- *                 example: "POA123456"
- *               attorneyName:
- *                 type: string
- *                 description: Attorney's name
- *                 example: "Jane Smith"
- *               attorneyPhone:
- *                 type: string
- *                 description: Attorney's phone number
- *                 example: "501234567"
- *               ejariNumber:
- *                 type: string
- *                 description: Ejari number
- *                 example: "EJ123456"
- *               dtcmPermitNumber:
- *                 type: string
- *                 description: DTCM permit number
- *                 example: "DTCM123456"
- *               emergencyContactName:
- *                 type: string
- *                 description: Emergency contact name
- *                 example: "Jane Doe"
- *               relationship:
- *                 type: string
- *                 description: Relationship with emergency contact
- *                 example: "Manager"
- *               comments:
- *                 type: string
- *                 description: Additional comments
- *                 example: "Additional information"
- *               monthlyRent:
- *                 type: number
- *                 description: Monthly rent amount
- *                 example: 5000
- *               securityDeposit:
- *                 type: number
- *                 description: Security deposit amount
- *                 example: 10000
- *               maintenanceFee:
- *                 type: number
- *                 description: Maintenance fee amount
- *                 example: 500
- *               currency:
- *                 type: string
- *                 description: Currency code
- *                 example: "AED"
  *           examples:
- *             without_special_needs:
- *               summary: HHC company renewal without special needs
+ *             basic_hhc_renewal:
+ *               summary: Basic HHC company renewal request
  *               value:
  *                 unitId: 123
  *                 leaseContractEndDate: "2026-12-31"
- *                 dtcmExpiryDate: "2026-12-31"
- *                 tradeLicenseExpiryDate: "2026-12-31"
- *                 adults: 0
- *                 children: 0
- *                 householdStaffs: 0
- *                 pets: 0
- *                 peopleOfDetermination: false
- *                 peopleOfDeterminationDetails: ""
- *                 acceptTerms: true
- *                 name: "John Doe"
- *                 companyName: "ABC Holiday Homes LLC"
- *                 companyEmail: "info@abcholidays.com"
- *                 countryCode: "+971"
- *                 operatorOfficeNumber: "043334444"
- *                 tradeLicenseNumber: "TL123456"
- *                 nationality: "UAE"
- *                 emiratesIdNumber: "784-1990-12345678-1"
- *                 emiratesIdExpiryDate: "2025-12-31"
- *                 companyAddress: "Dubai, UAE"
- *                 companyPhone: "043334444"
- *                 ejariNumber: "EJ123456"
- *                 dtcmPermitNumber: "DTCM123456"
- *                 emergencyContactName: "Jane Doe"
- *                 relationship: "Manager"
- *                 comments: "Additional information"
- *                 monthlyRent: 5000
- *                 securityDeposit: 10000
- *                 maintenanceFee: 500
- *                 currency: "AED"
- *             with_special_needs:
- *               summary: HHC company renewal with special needs
- *               value:
- *                 unitId: 123
- *                 leaseContractEndDate: "2026-12-31"
- *                 dtcmExpiryDate: "2026-12-31"
- *                 tradeLicenseExpiryDate: "2026-12-31"
- *                 adults: 1
- *                 children: 0
- *                 householdStaffs: 1
- *                 pets: 1
- *                 peopleOfDetermination: true
- *                 peopleOfDeterminationDetails: "Need wheelchair assistance for elderly or people of determination during renewal process"
- *                 acceptTerms: true
- *                 name: "John Doe"
- *                 companyName: "ABC Holiday Homes LLC"
- *                 companyEmail: "info@abcholidays.com"
- *                 countryCode: "+971"
- *                 operatorOfficeNumber: "043334444"
- *                 tradeLicenseNumber: "TL123456"
- *                 nationality: "UAE"
- *                 emiratesIdNumber: "784-1990-12345678-1"
- *                 emiratesIdExpiryDate: "2025-12-31"
- *                 companyAddress: "Dubai, UAE"
- *                 companyPhone: "043334444"
- *                 ejariNumber: "EJ123456"
- *                 dtcmPermitNumber: "DTCM123456"
- *                 emergencyContactName: "Jane Doe"
- *                 relationship: "Manager"
- *                 comments: "Additional information"
- *                 monthlyRent: 5000
- *                 securityDeposit: 10000
- *                 maintenanceFee: 500
- *                 currency: "AED"
+ *                 dtcmPermitEndDate: "2026-12-31"
+ *                 permitExpiry: "2026-12-31"
  *     responses:
  *       200:
  *         description: HHC company renewal request created successfully
@@ -1159,7 +580,11 @@ router.post('/request/:requestId/documents',
  * /renewal/request/{requestId}/documents:
  *   post:
  *     summary: Upload renewal documents
- *     description: Upload documents for a renewal request. Supports multiple document types including Emirates ID, Ejari, Unit Permit, etc.
+ *     description: |
+ *       Upload documents for a renewal request based on renewal type:
+ *       - **Tenant Renewal**: Only Ejari document (required)
+ *       - **HHO Owner Renewal**: Only DTCM permit/Unit Permit (required)
+ *       - **HHC Company Renewal**: No documents allowed - document upload is disabled for this type
  *     tags: [Renewal (Mobile)]
  *     security:
  *       - bearerAuth: []
@@ -1177,34 +602,14 @@ router.post('/request/:requestId/documents',
  *           schema:
  *             type: object
  *             properties:
- *               emirates-id-front:
- *                 type: string
- *                 format: binary
- *                 description: Emirates ID front image
- *               emirates-id-back:
- *                 type: string
- *                 format: binary
- *                 description: Emirates ID back image
  *               ejari:
  *                 type: string
  *                 format: binary
- *                 description: Ejari document
+ *                 description: Ejari document (Required for Tenant Renewal only)
  *               unit-permit:
  *                 type: string
  *                 format: binary
- *                 description: Unit permit document
- *               company-trade-license:
- *                 type: string
- *                 format: binary
- *                 description: Company trade license (for HHC companies)
- *               title-deed:
- *                 type: string
- *                 format: binary
- *                 description: Title deed document
- *               other:
- *                 type: string
- *                 format: binary
- *                 description: Other supporting documents (max 4 files)
+ *                 description: DTCM permit/Unit permit document (Required for HHO Owner Renewal only)
  *     responses:
  *       200:
  *         description: Documents uploaded successfully
@@ -1248,6 +653,108 @@ router.post('/request/:requestId/documents',
  *         description: Unauthorized
  *       404:
  *         description: Renewal request not found
+ *       500:
+ *         description: Internal server error
+ */
+
+/**
+ * @swagger
+ * /renewal/request/{requestId}/rfi-submit:
+ *   put:
+ *     summary: Submit RFI response for renewal request (Mobile)
+ *     description: User submits response to RFI (Request For Information) raised by admin. This changes status from 'rfi-pending' to 'rfi-submitted'.
+ *     tags: [Renewal (Mobile)]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: requestId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Renewal request ID
+ *         example: 123
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - comments
+ *             properties:
+ *               comments:
+ *                 type: string
+ *                 description: User's response to the RFI raised by admin
+ *                 example: "I have uploaded the required Emirates ID documents as requested"
+ *               additionalInfo:
+ *                 type: string
+ *                 description: Any additional information or clarification
+ *                 example: "The documents are valid until 2025-12-31"
+ *     responses:
+ *       200:
+ *         description: RFI response submitted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: "SC001"
+ *                 message:
+ *                   type: string
+ *                   example: "Success."
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     requestId:
+ *                       type: integer
+ *                       example: 123
+ *                     status:
+ *                       type: string
+ *                       example: "rfi-submitted"
+ *                     message:
+ *                       type: string
+ *                       example: "RFI response submitted successfully. Admin will review your submission."
+ *       400:
+ *         description: Bad request - Invalid data or request not in RFI pending status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 code:
+ *                   type: string
+ *                   example: "EC209"
+ *                 message:
+ *                   type: string
+ *                   example: "Renewal request is not in RFI pending status"
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Renewal request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: boolean
+ *                   example: false
+ *                 code:
+ *                   type: string
+ *                   example: "EC208"
+ *                 message:
+ *                   type: string
+ *                   example: "Renewal request not found"
  *       500:
  *         description: Internal server error
  */

@@ -97,5 +97,16 @@ export class RenewalController {
     const result = await renewalService.uploadDocuments(Number(requestId), files, body, user);
     return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
   }
+
+  async submitRFI(req: Request, res: Response) {
+    const { user }: Record<string, any> = req;
+    const { requestId } = req.params;
+    const { comments, additionalInfo } = req.body;
+
+    logger.debug(`RENEWAL | SUBMIT RFI | REQUEST ID: ${requestId} | USER: ${user?.id} | COMMENTS: ${comments}`);
+
+    const result = await renewalService.submitRFI(Number(requestId), { comments, additionalInfo }, user);
+    return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+  }
 }
 
