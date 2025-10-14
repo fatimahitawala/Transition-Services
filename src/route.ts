@@ -12,6 +12,7 @@ import MoveInAdmin from './Modules/MoveIn/Admin/moveIn.route';
 import moveOutRoutes from './Modules/MoveOut/Mobile/moveOut.route';
 import moveOutAdminRoutes from './Modules/MoveOut/Admin/moveOutAdmin.route';
 import emailRoutes from './Modules/Email/email.route';
+import activeResidentsAdminRoutes from './Modules/ActiveResidents/Admin/activeResidents.route';
 const router = express.Router();
 
 const defaultRoutes = [
@@ -19,6 +20,7 @@ const defaultRoutes = [
     { path: '/admin/move-in', route: MoveInAdmin },
     { path: '/move-out', route: moveOutRoutes },
     { path: '/admin/move-out', route: moveOutAdminRoutes },
+    { path: '/admin/active-residents', route: activeResidentsAdminRoutes },
     { path: '/renewal', route: renewalMobileRoutes },
     { path: '/admin/renewal', route: renewalAdminRoutes },
     { path: '/documents', route: documentsRoutes },
