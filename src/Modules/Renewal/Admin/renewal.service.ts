@@ -449,7 +449,7 @@ export class RenewalService {
   async createTenantRenewal(body: any, user: any) {
     return executeInTransaction(async (qr: any) => {
       try {
-        const { unitId, userId, tenancyContractEndDate, adults, children, householdStaffs, pets, peopleOfDetermination, peopleOfDeterminationDetails } = body;
+        const { unitId, userId, tenancyContractEndDate, adults, children, householdStaffs, pets, determinationComments } = body;
 
         logger.info(`RENEWAL | CREATE TENANT | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
 
@@ -477,16 +477,15 @@ export class RenewalService {
 
         const savedRequest = await renewalRequest.save();
 
-        // Create tenant-specific details
+        // Create tenant-specific details with only required fields
         const tenantDetails = AccountRenewalRequestDetailsTenant.create({
           accountRenewalRequest: savedRequest,
           tenancyContractEndDate,
-          adults: adults || 1,
-          children: children || 0,
-          householdStaffs: householdStaffs || 0,
-          pets: pets || 0,
-          peopleOfDetermination: peopleOfDetermination || false,
-          peopleOfDeterminationDetails: peopleOfDeterminationDetails || '',
+          adults: adults.toString(),
+          children: children.toString(),
+          householdStaffs: householdStaffs.toString(),
+          pets: pets.toString(),
+          peopleOfDeterminationDetails: determinationComments || '',
           createdBy: user.id,
           updatedBy: user.id
         });
@@ -532,7 +531,7 @@ export class RenewalService {
   async createHhoOwnerRenewal(body: any, user: any) {
     return executeInTransaction(async (qr: any) => {
       try {
-        const { unitId, userId, dtcmExpiryDate } = body;
+        const { unitId, userId, dtcmPermitEndDate } = body;
 
         logger.info(`RENEWAL | CREATE HHO OWNER | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
 
@@ -552,7 +551,7 @@ export class RenewalService {
           user: { id: userId } as any,
           unit: { id: unitId } as any,
           status: MOVE_REQUEST_STATUS.APPROVED,
-          moveInDate: dtcmExpiryDate,
+          moveInDate: dtcmPermitEndDate,
           createdBy: user.id,
           updatedBy: user.id,
           isActive: true
@@ -560,17 +559,10 @@ export class RenewalService {
 
         const savedRequest = await renewalRequest.save();
 
-        // Create HHO owner-specific details
+        // Create HHO owner-specific details with only required fields
         const hhoOwnerDetails = AccountRenewalRequestDetailsHhoOwner.create({
           accountRenewalRequest: savedRequest,
-          dtcmExpiryDate,
-          dubaITourismUnitPermitExpiryDate: body.dubaITourismUnitPermitExpiryDate,
-          ownerFirstName: body.ownerFirstName || '',
-          ownerLastName: body.ownerLastName || '',
-          email: body.email || '',
-          dialCode: body.dialCode || '',
-          phoneNumber: body.phoneNumber || '',
-          nationality: body.nationality || '',
+          dtcmExpiryDate: dtcmPermitEndDate,
           createdBy: user.id,
           updatedBy: user.id
         });
@@ -616,7 +608,7 @@ export class RenewalService {
   async createHhcCompanyRenewal(body: any, user: any) {
     return executeInTransaction(async (qr: any) => {
       try {
-        const { unitId, userId, leaseContractEndDate, dtcmExpiryDate, tradeLicenseExpiryDate } = body;
+        const { unitId, userId, leaseContractEndDate, dtcmPermitEndDate, permitExpiry } = body;
 
         logger.info(`RENEWAL | CREATE HHC COMPANY | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
 
@@ -644,15 +636,12 @@ export class RenewalService {
 
         const savedRequest = await renewalRequest.save();
 
-        // Create HHC company-specific details
+        // Create HHC company-specific details with only required fields
         const hhcCompanyDetails = AccountRenewalRequestDetailsHhoCompany.create({
           accountRenewalRequest: savedRequest,
           leaseContractEndDate,
-          dtcmExpiryDate,
-          tradeLicenseExpiryDate,
-          companyName: body.companyName || '',
-          companyEmail: body.companyEmail || '',
-          tradeLicenseNumber: body.tradeLicenseNumber || '',
+          dtcmExpiryDate: dtcmPermitEndDate,
+          tradeLicenseExpiryDate: permitExpiry,
           createdBy: user.id,
           updatedBy: user.id
         });
