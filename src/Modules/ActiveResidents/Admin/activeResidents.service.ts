@@ -451,7 +451,7 @@ export class ActiveResidentsService {
         .innerJoin('od.accountRenewalRequest', 'arr')
         .where('arr.id = :id', { id: accountRenewalId })
         .getOne();
-      if (hho?.dubaITourismUnitPermitExpiryDate) return hho.dubaITourismUnitPermitExpiryDate as any;
+      if (hho?.dtcmPermitEndDate) return hho.dtcmPermitEndDate as any;
       if ((hho as any)?.dtcmExpiryDate) return (hho as any).dtcmExpiryDate as any;
 
       return null;
