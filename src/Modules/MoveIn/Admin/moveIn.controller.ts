@@ -191,4 +191,30 @@ export class MoveInController {
     return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
   }
 
+    /**
+   * Process Smart FM move-in ticket (Admin)
+   */
+  async moveInUnitAllocation(req: AuthenticatedRequest, res: Response) {
+    const { user, body } = req;
+    
+    logger.info(`=== MOVE-IN UNIT ALLOCATION CONTROLLER START ===`);
+    logger.info(`MOVE-IN | PROCESS | ADMIN REQUEST | USER: ${user?.id} | BODY: ${JSON.stringify(body)}`);
+    
+    try {
+      const result = await moveInService.moveInUnitAllocation(body);
+      
+      logger.info(`=== MOVE-IN UNIT ALLOCATION CONTROLLER SUCCESS ===`);
+      logger.info(`Controller response:`, result);
+      
+      return successResponseWithData(res, APICodes.UPDATE_SUCCESS, result);
+    } catch (error: any) {
+      logger.error(`=== MOVE-IN UNIT ALLOCATION CONTROLLER ERROR ===`);
+      logger.error(`Controller error: ${error.message}`);
+      logger.error(`Controller error stack: ${error.stack}`);
+      
+      throw error;
+    }
+  }
+
+
 }

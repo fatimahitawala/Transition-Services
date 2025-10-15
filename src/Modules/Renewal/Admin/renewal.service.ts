@@ -7,6 +7,7 @@ import { AccountRenewalRequestLogs } from '../../../Entities/AccountRenewalReque
 import { MoveInRequests } from '../../../Entities/MoveInRequests.entity';
 import { MoveOutRequests } from '../../../Entities/MoveOutRequests.entity';
 import { UnitBookings } from '../../../Entities/UnitBookings.entity';
+import { UserRoles } from '../../../Entities/UserRoles.entity';
 import { Users } from '../../../Entities/Users.entity';
 import { Units } from '../../../Entities/Units.entity';
 import { OccupancyRequestTemplates } from '../../../Entities/OccupancyRequestTemplates.entity';
@@ -213,30 +214,30 @@ export class RenewalService {
       let requestDetails: any = null;
       switch (renewalRequest.requestType) {
         case ACCOUNT_RENEWAL_USER_TYPES.TENANT:
-          requestDetails = await AccountRenewalRequestDetailsTenant.findOne({ 
+          requestDetails = await AccountRenewalRequestDetailsTenant.getRepository().findOne({ 
             where: { accountRenewalRequest: { id: requestId } } 
           });
           break;
         case ACCOUNT_RENEWAL_USER_TYPES.HHO_OWNER:
-          requestDetails = await AccountRenewalRequestDetailsHhoOwner.findOne({ 
+          requestDetails = await AccountRenewalRequestDetailsHhoOwner.getRepository().findOne({ 
             where: { accountRenewalRequest: { id: requestId } } 
           });
           break;
         case ACCOUNT_RENEWAL_USER_TYPES.HHO_COMPANY:
-          requestDetails = await AccountRenewalRequestDetailsHhoCompany.findOne({ 
+          requestDetails = await AccountRenewalRequestDetailsHhoCompany.getRepository().findOne({ 
             where: { accountRenewalRequest: { id: requestId } } 
           });
           break;
       }
 
       // Get documents
-      const documents = await AccountRenewalRequestDocuments.find({
+      const documents = await AccountRenewalRequestDocuments.getRepository().find({
         where: { accountRenewalRequest: { id: requestId }, isActive: true },
         relations: ['file']
       });
 
       // Get logs (history)
-      const logs = await AccountRenewalRequestLogs.find({
+      const logs = await AccountRenewalRequestLogs.getRepository().find({
         where: { accountRenewalRequest: { id: requestId } },
         relations: ['user'],
         order: { timestamp: 'DESC' }
@@ -258,7 +259,7 @@ export class RenewalService {
    * Generate unique account renewal request number
    */
   private async generateRenewalRequestNumber(): Promise<string> {
-    const count = await AccountRenewalRequests.count();
+    const count = await AccountRenewalRequests.getRepository().count();
     const requestNumber = `ARR-${String(count + 1).padStart(6, '0')}`;
     return requestNumber;
   }
@@ -267,7 +268,7 @@ export class RenewalService {
    * Validate unit is occupied and linked to user
    */
   private async validateUnitLinkage(unitId: number, userId: number): Promise<void> {
-    const unitBooking = await UnitBookings.findOne({
+    const userRole = await UserRoles.getRepository().findOne({
       where: {
         unit: { id: unitId },
         user: { id: userId },
@@ -275,7 +276,7 @@ export class RenewalService {
       }
     });
 
-    if (!unitBooking) {
+    if (!userRole) {
       throw new ApiError(
         httpStatus.BAD_REQUEST,
         APICodes.RENEWAL_UNIT_NOT_LINKED.message,
@@ -288,7 +289,7 @@ export class RenewalService {
    * Check for duplicate active renewal
    */
   private async checkDuplicateRenewal(unitId: number, userId: number): Promise<void> {
-    const existingRenewal = await AccountRenewalRequests.findOne({
+    const existingRenewal = await AccountRenewalRequests.getRepository().findOne({
       where: {
         unit: { id: unitId },
         user: { id: userId },
@@ -310,7 +311,7 @@ export class RenewalService {
    * Check for move-out conflict
    */
   private async checkMoveOutConflict(unitId: number, userId: number): Promise<void> {
-    const moveOutRequest = await MoveOutRequests.findOne({
+    const moveOutRequest = await MoveOutRequests.getRepository().findOne({
       where: {
         unit: { id: unitId },
         user: { id: userId },
@@ -332,7 +333,7 @@ export class RenewalService {
    * Validate MIP template exists for the unit
    */
   private async validateMIPTemplate(unitId: number): Promise<void> {
-    const unit = await Units.findOne({
+    const unit = await Units.getRepository().findOne({
       where: { id: unitId },
       relations: ['tower', 'community', 'masterCommunity']
     });
@@ -345,7 +346,7 @@ export class RenewalService {
       );
     }
 
-    const mipTemplate = await OccupancyRequestTemplates.findOne({
+    const mipTemplate = await OccupancyRequestTemplates.getRepository().findOne({
       where: {
         masterCommunity: unit.masterCommunity ? { id: unit.masterCommunity.id } : IsNull(),
         community: unit.community ? { id: unit.community.id } : IsNull(),
@@ -364,34 +365,6 @@ export class RenewalService {
     }
   }
 
-  /**
-   * Create audit log for renewal action
-   */
-  private async createRenewalLog(
-    renewalRequest: AccountRenewalRequests,
-    status: MOVE_REQUEST_STATUS,
-    actionBy: TransitionRequestActionByTypes,
-    user: any,
-    comments?: string,
-    changes?: string
-  ): Promise<void> {
-    try {
-      const log = AccountRenewalRequestLogs.create({
-        moveInRequest: renewalRequest.moveInRequest,
-        accountRenewalRequest: renewalRequest,
-        requestType: renewalRequest.requestType,
-        status,
-        actionBy,
-        user: user,
-        comments: comments || '',
-        changes: changes || '',
-        details: JSON.stringify({ actionBy, timestamp: new Date() })
-      });
-      await AccountRenewalRequestLogs.save(log);
-    } catch (error) {
-      logger.error(`Failed to create renewal log: ${error}`);
-    }
-  }
 
   /**
    * Update user Emirates ID if empty
@@ -400,9 +373,9 @@ export class RenewalService {
     if (!emiratesId) return;
 
     try {
-      const user = await Users.findOne({ where: { id: userId } });
+      const user = await Users.getRepository().findOne({ where: { id: userId } });
       if (user && !user.eidNumber) {
-        await Users.update({ id: userId }, { eidNumber: emiratesId });
+        await Users.getRepository().update({ id: userId }, { eidNumber: emiratesId });
         logger.info(`Updated Emirates ID for user ${userId}`);
       }
     } catch (error) {
@@ -413,9 +386,10 @@ export class RenewalService {
   /**
    * Mark parent move-in as renewed
    */
-  private async markMoveInAsRenewed(unitId: number, userId: number): Promise<void> {
+  private async markMoveInAsRenewed(qr: any, unitId: number, userId: number): Promise<void> {
     try {
-      await MoveInRequests.update(
+      await qr.manager.update(
+        MoveInRequests,
         {
           unit: { id: unitId },
           user: { id: userId },
@@ -447,62 +421,77 @@ export class RenewalService {
    * Create tenant renewal request
    */
   async createTenantRenewal(body: any, user: any) {
-    return executeInTransaction(async (qr: any) => {
-      try {
-        const { unitId, userId, tenancyContractEndDate, adults, children, householdStaffs, pets, determinationComments } = body;
+    try {
+      const { unitId, userId, tenancyContractEndDate, adults, children, householdStaffs, pets, determinationComments, ejariNumber } = body;
 
-        logger.info(`RENEWAL | CREATE TENANT | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
+      logger.info(`RENEWAL | CREATE TENANT | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
 
-        // Validations as per BRD
-        await this.validateUnitLinkage(unitId, userId);
-        await this.checkDuplicateRenewal(unitId, userId);
-        await this.checkMoveOutConflict(unitId, userId);
-        await this.validateMIPTemplate(unitId);
+      // Validations as per BRD - BEFORE transaction (like move-in pattern)
+      await this.validateUnitLinkage(unitId, userId);
+      await this.checkDuplicateRenewal(unitId, userId);
+      await this.checkMoveOutConflict(unitId, userId);
+      await this.validateMIPTemplate(unitId);
 
-        // Generate request number
-        const requestNumber = await this.generateRenewalRequestNumber();
+      // Generate request number
+      const requestNumber = await this.generateRenewalRequestNumber();
+
+      let savedRequest: any;
+      let tenantDetails: any;
+
+      await executeInTransaction(async (qr: any) => {
 
         // Create main renewal request with AUTO-APPROVED status (as per BRD)
-        const renewalRequest = AccountRenewalRequests.create({
-          accountRenewalRequestNo: requestNumber,
-          requestType: ACCOUNT_RENEWAL_USER_TYPES.TENANT,
-          user: { id: userId } as any,
-          unit: { id: unitId } as any,
-          status: MOVE_REQUEST_STATUS.APPROVED, // Auto-approved as per BRD
-          moveInDate: tenancyContractEndDate, // Store end date as moveInDate
-          createdBy: user.id,
-          updatedBy: user.id,
-          isActive: true
-        });
+        const renewalRequest = new AccountRenewalRequests();
+        renewalRequest.accountRenewalRequestNo = requestNumber;
+        renewalRequest.requestType = ACCOUNT_RENEWAL_USER_TYPES.TENANT;
+        renewalRequest.user = { id: userId } as any;
+        renewalRequest.unit = { id: unitId } as any;
+        renewalRequest.status = MOVE_REQUEST_STATUS.APPROVED; // Auto-approved as per BRD
+        renewalRequest.moveInDate = tenancyContractEndDate; // Store end date as moveInDate
+        renewalRequest.createdBy = user.id;
+        renewalRequest.updatedBy = user.id;
+        renewalRequest.isActive = true;
 
-        const savedRequest = await renewalRequest.save();
+        savedRequest = await qr.manager.save(AccountRenewalRequests, renewalRequest);
 
-        // Create tenant-specific details with only required fields
-        const tenantDetails = AccountRenewalRequestDetailsTenant.create({
-          accountRenewalRequest: savedRequest,
-          tenancyContractEndDate,
-          adults: adults.toString(),
-          children: children.toString(),
-          householdStaffs: householdStaffs.toString(),
-          pets: pets.toString(),
-          peopleOfDeterminationDetails: determinationComments || '',
-          createdBy: user.id,
-          updatedBy: user.id
-        });
+        // Create tenant-specific details - use saved entity instance directly (like move-in pattern)
+        tenantDetails = new AccountRenewalRequestDetailsTenant();
+        tenantDetails.accountRenewalRequest = savedRequest; // Use entity instance, not ID
+        tenantDetails.tenancyContractEndDate = tenancyContractEndDate;
+        tenantDetails.adults = adults;
+        tenantDetails.children = children;
+        tenantDetails.householdStaffs = householdStaffs;
+        tenantDetails.pets = pets;
+        if (determinationComments) {
+          tenantDetails.determinationComments = determinationComments;
+        }
+        if (ejariNumber) {
+          tenantDetails.ejariNumber = ejariNumber;
+        }
+        tenantDetails.createdBy = user.id;
+        tenantDetails.updatedBy = user.id;
+        tenantDetails.isActive = true;
 
-        await tenantDetails.save();
+        await qr.manager.save(AccountRenewalRequestDetailsTenant, tenantDetails);
 
         // Create log entry
-        await this.createRenewalLog(
-          savedRequest,
-          MOVE_REQUEST_STATUS.APPROVED,
-          TransitionRequestActionByTypes.COMMUNITY_ADMIN,
-          user,
-          'Renewal request created and auto-approved by admin'
-        );
+        const log = new AccountRenewalRequestLogs();
+        log.accountRenewalRequest = savedRequest; // Use entity instance
+        log.requestType = ACCOUNT_RENEWAL_USER_TYPES.TENANT;
+        log.status = MOVE_REQUEST_STATUS.APPROVED;
+        log.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        log.user = { id: user.id } as any;
+        log.changes = "";
+        log.comments = APICodes.RENEWAL_REQUEST_CREATED_SUCCESS.message;
+        log.details = JSON.stringify({
+          actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
+          timestamp: new Date().toISOString()
+        });
+
+        await qr.manager.save(AccountRenewalRequestLogs, log);
 
         // Mark parent move-in as renewed
-        await this.markMoveInAsRenewed(unitId, userId);
+        await this.markMoveInAsRenewed(qr, unitId, userId);
 
         // Send notification - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(userId, 'account_renewal_created', {
@@ -511,75 +500,94 @@ export class RenewalService {
         // });
 
         logger.info(`RENEWAL | TENANT CREATED | REQUEST: ${requestNumber}`);
+      });
 
-        return {
-          id: savedRequest.id,
-          accountRenewalRequestNo: requestNumber,
-          status: savedRequest.status,
-          requestType: savedRequest.requestType
-        };
-      } catch (error: any) {
-        logger.error(`RENEWAL | CREATE TENANT ERROR: ${error.message}`);
+      // Return clean object with selected properties (like move-in pattern)
+      return {
+        id: savedRequest.id,
+        accountRenewalRequestNo: requestNumber,
+        status: savedRequest.status,
+        requestType: savedRequest.requestType,
+        moveInDate: savedRequest.moveInDate,
+        unit: savedRequest.unit,
+        details: tenantDetails
+      };
+    } catch (error: any) {
+      logger.error(`RENEWAL | CREATE TENANT ERROR: ${error.message}`);
+      // Re-throw as clean error to avoid circular references
+      if (error instanceof ApiError) {
         throw error;
       }
-    });
+      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+    }
   }
 
   /**
    * Create HHO owner renewal request
    */
   async createHhoOwnerRenewal(body: any, user: any) {
-    return executeInTransaction(async (qr: any) => {
-      try {
-        const { unitId, userId, dtcmPermitEndDate } = body;
+    try {
+      const { unitId, userId, dtcmPermitEndDate } = body;
 
-        logger.info(`RENEWAL | CREATE HHO OWNER | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
+      logger.info(`RENEWAL | CREATE HHO OWNER | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
 
-        // Validations as per BRD
-        await this.validateUnitLinkage(unitId, userId);
-        await this.checkDuplicateRenewal(unitId, userId);
-        await this.checkMoveOutConflict(unitId, userId);
-        await this.validateMIPTemplate(unitId);
+      // Validations as per BRD - BEFORE transaction (like move-in pattern)
+      await this.validateUnitLinkage(unitId, userId);
+      await this.checkDuplicateRenewal(unitId, userId);
+      await this.checkMoveOutConflict(unitId, userId);
+      await this.validateMIPTemplate(unitId);
 
-        // Generate request number
-        const requestNumber = await this.generateRenewalRequestNumber();
+      // Generate request number
+      const requestNumber = await this.generateRenewalRequestNumber();
+
+      let savedRequest: any;
+      let hhoOwnerDetails: any;
+
+      await executeInTransaction(async (qr: any) => {
 
         // Create main renewal request with AUTO-APPROVED status
-        const renewalRequest = AccountRenewalRequests.create({
-          accountRenewalRequestNo: requestNumber,
-          requestType: ACCOUNT_RENEWAL_USER_TYPES.HHO_OWNER,
-          user: { id: userId } as any,
-          unit: { id: unitId } as any,
-          status: MOVE_REQUEST_STATUS.APPROVED,
-          moveInDate: dtcmPermitEndDate,
-          createdBy: user.id,
-          updatedBy: user.id,
-          isActive: true
-        });
+        const renewalRequest = new AccountRenewalRequests();
+        renewalRequest.accountRenewalRequestNo = requestNumber;
+        renewalRequest.requestType = ACCOUNT_RENEWAL_USER_TYPES.HHO_OWNER;
+        renewalRequest.user = { id: userId } as any;
+        renewalRequest.unit = { id: unitId } as any;
+        renewalRequest.status = MOVE_REQUEST_STATUS.APPROVED;
+        renewalRequest.moveInDate = dtcmPermitEndDate;
+        renewalRequest.createdBy = user.id;
+        renewalRequest.updatedBy = user.id;
+        renewalRequest.isActive = true;
 
-        const savedRequest = await renewalRequest.save();
+        savedRequest = await qr.manager.save(AccountRenewalRequests, renewalRequest);
 
         // Create HHO owner-specific details with only required fields
-        const hhoOwnerDetails = AccountRenewalRequestDetailsHhoOwner.create({
-          accountRenewalRequest: savedRequest,
-          dtcmExpiryDate: dtcmPermitEndDate,
-          createdBy: user.id,
-          updatedBy: user.id
-        });
+        hhoOwnerDetails = new AccountRenewalRequestDetailsHhoOwner();
+        hhoOwnerDetails.accountRenewalRequest = savedRequest;
+        hhoOwnerDetails.dtcmPermitEndDate = dtcmPermitEndDate;
+        hhoOwnerDetails.createdBy = user.id;
+        hhoOwnerDetails.updatedBy = user.id;
+        hhoOwnerDetails.isActive = true;
 
-        await hhoOwnerDetails.save();
+        await qr.manager.save(AccountRenewalRequestDetailsHhoOwner, hhoOwnerDetails);
 
         // Create log entry
-        await this.createRenewalLog(
-          savedRequest,
-          MOVE_REQUEST_STATUS.APPROVED,
-          TransitionRequestActionByTypes.COMMUNITY_ADMIN,
-          user,
-          'Renewal request created and auto-approved by admin'
-        );
+        const log = new AccountRenewalRequestLogs();
+        log.accountRenewalRequest = savedRequest;
+        log.requestType = ACCOUNT_RENEWAL_USER_TYPES.HHO_OWNER;
+        log.status = MOVE_REQUEST_STATUS.APPROVED;
+        log.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        log.user = { id: user.id } as any;
+        log.changes = "";
+        log.comments = APICodes.RENEWAL_REQUEST_CREATED_SUCCESS.message;
+        log.details = JSON.stringify({
+          actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
+          timestamp: new Date().toISOString()
+        });
+
+        await qr.manager.save(AccountRenewalRequestLogs, log);
 
         // Mark parent move-in as renewed
-        await this.markMoveInAsRenewed(unitId, userId);
+        await this.markMoveInAsRenewed(qr, unitId, userId);
 
         // Send notification - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(userId, 'account_renewal_created', {
@@ -588,77 +596,96 @@ export class RenewalService {
         // });
 
         logger.info(`RENEWAL | HHO OWNER CREATED | REQUEST: ${requestNumber}`);
+      });
 
-        return {
-          id: savedRequest.id,
-          accountRenewalRequestNo: requestNumber,
-          status: savedRequest.status,
-          requestType: savedRequest.requestType
-        };
-      } catch (error: any) {
-        logger.error(`RENEWAL | CREATE HHO OWNER ERROR: ${error.message}`);
+      // Return clean object with selected properties (like move-in pattern)
+      return {
+        id: savedRequest.id,
+        accountRenewalRequestNo: requestNumber,
+        status: savedRequest.status,
+        requestType: savedRequest.requestType,
+        moveInDate: savedRequest.moveInDate,
+        unit: savedRequest.unit,
+        details: hhoOwnerDetails
+      };
+    } catch (error: any) {
+      logger.error(`RENEWAL | CREATE HHO OWNER ERROR: ${error.message}`);
+      // Re-throw as clean error to avoid circular references
+      if (error instanceof ApiError) {
         throw error;
       }
-    });
+      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+    }
   }
 
   /**
    * Create HHC company renewal request
    */
   async createHhcCompanyRenewal(body: any, user: any) {
-    return executeInTransaction(async (qr: any) => {
-      try {
-        const { unitId, userId, leaseContractEndDate, dtcmPermitEndDate, permitExpiry } = body;
+    try {
+      const { unitId, userId, leaseContractEndDate, dtcmPermitEndDate, permitExpiry } = body;
 
-        logger.info(`RENEWAL | CREATE HHC COMPANY | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
+      logger.info(`RENEWAL | CREATE HHC COMPANY | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
 
-        // Validations as per BRD
-        await this.validateUnitLinkage(unitId, userId);
-        await this.checkDuplicateRenewal(unitId, userId);
-        await this.checkMoveOutConflict(unitId, userId);
-        await this.validateMIPTemplate(unitId);
+      // Validations as per BRD - BEFORE transaction (like move-in pattern)
+      await this.validateUnitLinkage(unitId, userId);
+      await this.checkDuplicateRenewal(unitId, userId);
+      await this.checkMoveOutConflict(unitId, userId);
+      await this.validateMIPTemplate(unitId);
 
-        // Generate request number
-        const requestNumber = await this.generateRenewalRequestNumber();
+      // Generate request number
+      const requestNumber = await this.generateRenewalRequestNumber();
+
+      let savedRequest: any;
+      let hhcCompanyDetails: any;
+
+      await executeInTransaction(async (qr: any) => {
 
         // Create main renewal request with AUTO-APPROVED status
-        const renewalRequest = AccountRenewalRequests.create({
-          accountRenewalRequestNo: requestNumber,
-          requestType: ACCOUNT_RENEWAL_USER_TYPES.HHO_COMPANY,
-          user: { id: userId } as any,
-          unit: { id: unitId } as any,
-          status: MOVE_REQUEST_STATUS.APPROVED,
-          moveInDate: leaseContractEndDate,
-          createdBy: user.id,
-          updatedBy: user.id,
-          isActive: true
-        });
+        const renewalRequest = new AccountRenewalRequests();
+        renewalRequest.accountRenewalRequestNo = requestNumber;
+        renewalRequest.requestType = ACCOUNT_RENEWAL_USER_TYPES.HHO_COMPANY;
+        renewalRequest.user = { id: userId } as any;
+        renewalRequest.unit = { id: unitId } as any;
+        renewalRequest.status = MOVE_REQUEST_STATUS.APPROVED;
+        renewalRequest.moveInDate = leaseContractEndDate;
+        renewalRequest.createdBy = user.id;
+        renewalRequest.updatedBy = user.id;
+        renewalRequest.isActive = true;
 
-        const savedRequest = await renewalRequest.save();
+        savedRequest = await qr.manager.save(AccountRenewalRequests, renewalRequest);
 
         // Create HHC company-specific details with only required fields
-        const hhcCompanyDetails = AccountRenewalRequestDetailsHhoCompany.create({
-          accountRenewalRequest: savedRequest,
-          leaseContractEndDate,
-          dtcmExpiryDate: dtcmPermitEndDate,
-          tradeLicenseExpiryDate: permitExpiry,
-          createdBy: user.id,
-          updatedBy: user.id
-        });
+        hhcCompanyDetails = new AccountRenewalRequestDetailsHhoCompany();
+        hhcCompanyDetails.accountRenewalRequest = savedRequest;
+        hhcCompanyDetails.leaseContractEndDate = leaseContractEndDate;
+        hhcCompanyDetails.dtcmPermitEndDate = dtcmPermitEndDate;
+        hhcCompanyDetails.permitExpiry = permitExpiry;
+        hhcCompanyDetails.createdBy = user.id;
+        hhcCompanyDetails.updatedBy = user.id;
+        hhcCompanyDetails.isActive = true;
 
-        await hhcCompanyDetails.save();
+        await qr.manager.save(AccountRenewalRequestDetailsHhoCompany, hhcCompanyDetails);
 
         // Create log entry
-        await this.createRenewalLog(
-          savedRequest,
-          MOVE_REQUEST_STATUS.APPROVED,
-          TransitionRequestActionByTypes.COMMUNITY_ADMIN,
-          user,
-          'Renewal request created and auto-approved by admin'
-        );
+        const log = new AccountRenewalRequestLogs();
+        log.accountRenewalRequest = savedRequest;
+        log.requestType = ACCOUNT_RENEWAL_USER_TYPES.HHO_COMPANY;
+        log.status = MOVE_REQUEST_STATUS.APPROVED;
+        log.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        log.user = { id: user.id } as any;
+        log.changes = "";
+        log.comments = APICodes.RENEWAL_REQUEST_CREATED_SUCCESS.message;
+        log.details = JSON.stringify({
+          actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
+          timestamp: new Date().toISOString()
+        });
+
+        await qr.manager.save(AccountRenewalRequestLogs, log);
 
         // Mark parent move-in as renewed
-        await this.markMoveInAsRenewed(unitId, userId);
+        await this.markMoveInAsRenewed(qr, unitId, userId);
 
         // Send notification - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(userId, 'account_renewal_created', {
@@ -667,18 +694,27 @@ export class RenewalService {
         // });
 
         logger.info(`RENEWAL | HHC COMPANY CREATED | REQUEST: ${requestNumber}`);
+      });
 
-        return {
-          id: savedRequest.id,
-          accountRenewalRequestNo: requestNumber,
-          status: savedRequest.status,
-          requestType: savedRequest.requestType
-        };
-      } catch (error: any) {
-        logger.error(`RENEWAL | CREATE HHC COMPANY ERROR: ${error.message}`);
+      // Return clean object with selected properties (like move-in pattern)
+      return {
+        id: savedRequest.id,
+        accountRenewalRequestNo: requestNumber,
+        status: savedRequest.status,
+        requestType: savedRequest.requestType,
+        moveInDate: savedRequest.moveInDate,
+        unit: savedRequest.unit,
+        details: hhcCompanyDetails
+      };
+    } catch (error: any) {
+      logger.error(`RENEWAL | CREATE HHC COMPANY ERROR: ${error.message}`);
+      // Re-throw as clean error to avoid circular references
+      if (error instanceof ApiError) {
         throw error;
       }
-    });
+      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+    }
   }
 
   /**
@@ -690,7 +726,7 @@ export class RenewalService {
         logger.info(`RENEWAL | UPDATE TENANT | REQUEST: ${requestId} | ADMIN: ${user.id}`);
 
         // Get existing renewal request
-        const renewalRequest = await AccountRenewalRequests.findOne({
+        const renewalRequest = await AccountRenewalRequests.getRepository().findOne({
           where: { id: requestId, isActive: true }
         });
 
@@ -712,7 +748,7 @@ export class RenewalService {
         }
 
         // Update tenant details
-        const tenantDetails = await AccountRenewalRequestDetailsTenant.findOne({
+        const tenantDetails = await AccountRenewalRequestDetailsTenant.getRepository().findOne({
           where: { accountRenewalRequest: { id: requestId } }
         });
 
@@ -721,36 +757,45 @@ export class RenewalService {
             ...body,
             updatedBy: user.id
           });
-          await tenantDetails.save();
+          await qr.manager.save(AccountRenewalRequestDetailsTenant, tenantDetails);
         }
 
         // Update main request if tenancy end date changed
         if (body.tenancyContractEndDate) {
           renewalRequest.moveInDate = body.tenancyContractEndDate;
           renewalRequest.updatedBy = user.id;
-          await renewalRequest.save();
+          await qr.manager.save(AccountRenewalRequests, renewalRequest);
         }
 
         // Create log
-        await this.createRenewalLog(
-          renewalRequest,
-          renewalRequest.status,
-          TransitionRequestActionByTypes.COMMUNITY_ADMIN,
-          user,
-          body.comments || 'Renewal request updated by admin',
-          JSON.stringify(body)
-        );
+        const log = new AccountRenewalRequestLogs();
+        log.accountRenewalRequest = renewalRequest;
+        log.requestType = renewalRequest.requestType;
+        log.status = renewalRequest.status;
+        log.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        log.user = { id: user.id } as any;
+        log.changes = JSON.stringify(body);
+        log.comments = body.comments || APICodes.RENEWAL_REQUEST_UPDATED_SUCCESS.message;
+        log.details = JSON.stringify({
+          actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
+          timestamp: new Date().toISOString()
+        });
+        await qr.manager.save(AccountRenewalRequestLogs, log);
 
         logger.info(`RENEWAL | TENANT UPDATED | REQUEST: ${requestId}`);
 
         return {
-          id: renewalRequest.id,
-          accountRenewalRequestNo: renewalRequest.accountRenewalRequestNo,
-          status: renewalRequest.status
+          id: Number(renewalRequest.id),
+          accountRenewalRequestNo: String(renewalRequest.accountRenewalRequestNo),
+          status: String(renewalRequest.status)
         };
       } catch (error: any) {
         logger.error(`RENEWAL | UPDATE TENANT ERROR: ${error.message}`);
-        throw error;
+        if (error instanceof ApiError) {
+          throw error;
+        }
+        const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
       }
     });
   }
@@ -763,7 +808,7 @@ export class RenewalService {
       try {
         logger.info(`RENEWAL | UPDATE HHO OWNER | REQUEST: ${requestId} | ADMIN: ${user.id}`);
 
-        const renewalRequest = await AccountRenewalRequests.findOne({
+        const renewalRequest = await AccountRenewalRequests.getRepository().findOne({
           where: { id: requestId, isActive: true }
         });
 
@@ -783,7 +828,7 @@ export class RenewalService {
           );
         }
 
-        const hhoOwnerDetails = await AccountRenewalRequestDetailsHhoOwner.findOne({
+        const hhoOwnerDetails = await AccountRenewalRequestDetailsHhoOwner.getRepository().findOne({
           where: { accountRenewalRequest: { id: requestId } }
         });
 
@@ -792,34 +837,44 @@ export class RenewalService {
             ...body,
             updatedBy: user.id
           });
-          await hhoOwnerDetails.save();
+          await qr.manager.save(AccountRenewalRequestDetailsHhoOwner, hhoOwnerDetails);
         }
 
-        if (body.dtcmExpiryDate) {
-          renewalRequest.moveInDate = body.dtcmExpiryDate;
+        if (body.dtcmPermitEndDate) {
+          renewalRequest.moveInDate = body.dtcmPermitEndDate;
           renewalRequest.updatedBy = user.id;
-          await renewalRequest.save();
+          await qr.manager.save(AccountRenewalRequests, renewalRequest);
         }
 
-        await this.createRenewalLog(
-          renewalRequest,
-          renewalRequest.status,
-          TransitionRequestActionByTypes.COMMUNITY_ADMIN,
-          user,
-          body.comments || 'Renewal request updated by admin',
-          JSON.stringify(body)
-        );
+        // Create log
+        const log = new AccountRenewalRequestLogs();
+        log.accountRenewalRequest = renewalRequest;
+        log.requestType = renewalRequest.requestType;
+        log.status = renewalRequest.status;
+        log.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        log.user = { id: user.id } as any;
+        log.changes = JSON.stringify(body);
+        log.comments = body.comments || APICodes.RENEWAL_REQUEST_UPDATED_SUCCESS.message;
+        log.details = JSON.stringify({
+          actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
+          timestamp: new Date().toISOString()
+        });
+        await qr.manager.save(AccountRenewalRequestLogs, log);
 
         logger.info(`RENEWAL | HHO OWNER UPDATED | REQUEST: ${requestId}`);
 
         return {
-          id: renewalRequest.id,
-          accountRenewalRequestNo: renewalRequest.accountRenewalRequestNo,
-          status: renewalRequest.status
+          id: Number(renewalRequest.id),
+          accountRenewalRequestNo: String(renewalRequest.accountRenewalRequestNo),
+          status: String(renewalRequest.status)
         };
       } catch (error: any) {
         logger.error(`RENEWAL | UPDATE HHO OWNER ERROR: ${error.message}`);
-        throw error;
+        if (error instanceof ApiError) {
+          throw error;
+        }
+        const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
       }
     });
   }
@@ -832,7 +887,7 @@ export class RenewalService {
       try {
         logger.info(`RENEWAL | UPDATE HHC COMPANY | REQUEST: ${requestId} | ADMIN: ${user.id}`);
 
-        const renewalRequest = await AccountRenewalRequests.findOne({
+        const renewalRequest = await AccountRenewalRequests.getRepository().findOne({
           where: { id: requestId, isActive: true }
         });
 
@@ -852,7 +907,7 @@ export class RenewalService {
           );
         }
 
-        const hhcCompanyDetails = await AccountRenewalRequestDetailsHhoCompany.findOne({
+        const hhcCompanyDetails = await AccountRenewalRequestDetailsHhoCompany.getRepository().findOne({
           where: { accountRenewalRequest: { id: requestId } }
         });
 
@@ -861,34 +916,44 @@ export class RenewalService {
             ...body,
             updatedBy: user.id
           });
-          await hhcCompanyDetails.save();
+          await qr.manager.save(AccountRenewalRequestDetailsHhoCompany, hhcCompanyDetails);
         }
 
         if (body.leaseContractEndDate) {
           renewalRequest.moveInDate = body.leaseContractEndDate;
           renewalRequest.updatedBy = user.id;
-          await renewalRequest.save();
+          await qr.manager.save(AccountRenewalRequests, renewalRequest);
         }
 
-        await this.createRenewalLog(
-          renewalRequest,
-          renewalRequest.status,
-          TransitionRequestActionByTypes.COMMUNITY_ADMIN,
-          user,
-          body.comments || 'Renewal request updated by admin',
-          JSON.stringify(body)
-        );
+        // Create log
+        const log = new AccountRenewalRequestLogs();
+        log.accountRenewalRequest = renewalRequest;
+        log.requestType = renewalRequest.requestType;
+        log.status = renewalRequest.status;
+        log.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        log.user = { id: user.id } as any;
+        log.changes = JSON.stringify(body);
+        log.comments = body.comments || APICodes.RENEWAL_REQUEST_UPDATED_SUCCESS.message;
+        log.details = JSON.stringify({
+          actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
+          timestamp: new Date().toISOString()
+        });
+        await qr.manager.save(AccountRenewalRequestLogs, log);
 
         logger.info(`RENEWAL | HHC COMPANY UPDATED | REQUEST: ${requestId}`);
 
         return {
-          id: renewalRequest.id,
-          accountRenewalRequestNo: renewalRequest.accountRenewalRequestNo,
-          status: renewalRequest.status
+          id: Number(renewalRequest.id),
+          accountRenewalRequestNo: String(renewalRequest.accountRenewalRequestNo),
+          status: String(renewalRequest.status)
         };
       } catch (error: any) {
         logger.error(`RENEWAL | UPDATE HHC COMPANY ERROR: ${error.message}`);
-        throw error;
+        if (error instanceof ApiError) {
+          throw error;
+        }
+        const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
       }
     });
   }
@@ -901,7 +966,7 @@ export class RenewalService {
       try {
         logger.info(`RENEWAL | APPROVE REQUEST | REQUEST: ${requestId} | ADMIN: ${user.id}`);
 
-        const renewalRequest = await AccountRenewalRequests.findOne({
+        const renewalRequest = await AccountRenewalRequests.getRepository().findOne({
           where: { id: requestId, isActive: true },
           relations: ['user', 'unit']
         });
@@ -913,6 +978,11 @@ export class RenewalService {
             APICodes.RENEWAL_REQUEST_NOT_FOUND.code
           );
         }
+        
+        // Extract primitive values immediately to avoid circular references
+        const requestUserId = renewalRequest.user.id;
+        const requestUnitId = renewalRequest.unit.id;
+        const requestTypeValue = renewalRequest.requestType;
 
         // Can only approve requests in NEW or RFI_SUBMITTED status
         if (![MOVE_REQUEST_STATUS.OPEN, MOVE_REQUEST_STATUS.RFI_SUBMITTED].includes(renewalRequest.status)) {
@@ -927,44 +997,45 @@ export class RenewalService {
         renewalRequest.status = MOVE_REQUEST_STATUS.APPROVED;
         renewalRequest.comments = body.comments || '';
         renewalRequest.updatedBy = user.id;
-        await renewalRequest.save();
+        await qr.manager.save(AccountRenewalRequests, renewalRequest);
 
-        // Get details for Emirates ID update
+        // Get details for Emirates ID update (only for HHO_OWNER)
         let emiratesId = '';
-        switch (renewalRequest.requestType) {
-          case ACCOUNT_RENEWAL_USER_TYPES.TENANT:
-            const tenantDetails = await AccountRenewalRequestDetailsTenant.findOne({
-              where: { accountRenewalRequest: { id: requestId } }
-            });
-            emiratesId = tenantDetails?.emiratesIdNumber || '';
-            break;
+        switch (requestTypeValue) {
           case ACCOUNT_RENEWAL_USER_TYPES.HHO_OWNER:
-            const hhoDetails = await AccountRenewalRequestDetailsHhoOwner.findOne({
+            const hhoDetails = await AccountRenewalRequestDetailsHhoOwner.getRepository().findOne({
               where: { accountRenewalRequest: { id: requestId } }
             });
-            emiratesId = hhoDetails?.emiratesIdNumber || '';
+            emiratesId = hhoDetails?.dtcmPermitEndDate ? hhoDetails.dtcmPermitEndDate.toISOString() : '';
+            
+            // Update user Emirates ID if provided (as per BRD)
+            if (emiratesId) {
+              await this.updateUserEmiratesId(requestUserId, emiratesId);
+            }
             break;
+          case ACCOUNT_RENEWAL_USER_TYPES.TENANT:
           case ACCOUNT_RENEWAL_USER_TYPES.HHO_COMPANY:
-            // HHC Company doesn't have emiratesIdNumber field
+            // Tenant and HHC Company renewals don't require Emirates ID updates
             break;
-        }
-
-        // Update user Emirates ID if empty (as per BRD)
-        if (emiratesId) {
-          await this.updateUserEmiratesId(renewalRequest.user.id, emiratesId);
         }
 
         // Mark parent move-in as renewed
-        await this.markMoveInAsRenewed(renewalRequest.unit.id, renewalRequest.user.id);
+        await this.markMoveInAsRenewed(qr, requestUnitId, requestUserId);
 
         // Create log
-        await this.createRenewalLog(
-          renewalRequest,
-          MOVE_REQUEST_STATUS.APPROVED,
-          TransitionRequestActionByTypes.COMMUNITY_ADMIN,
-          user,
-          body.comments || 'Renewal request approved by admin'
-        );
+        const log = new AccountRenewalRequestLogs();
+        log.accountRenewalRequest = renewalRequest;
+        log.requestType = renewalRequest.requestType;
+        log.status = MOVE_REQUEST_STATUS.APPROVED;
+        log.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        log.user = { id: user.id } as any;
+        log.changes = "";
+        log.comments = body.comments || APICodes.RENEWAL_REQUEST_APPROVED_SUCCESS.message;
+        log.details = JSON.stringify({
+          actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
+          timestamp: new Date().toISOString()
+        });
+        await qr.manager.save(AccountRenewalRequestLogs, log);
 
         // Send notification - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(renewalRequest.user.id, 'account_renewal_approved', {
@@ -974,13 +1045,17 @@ export class RenewalService {
         logger.info(`RENEWAL | APPROVED | REQUEST: ${renewalRequest.accountRenewalRequestNo}`);
 
         return {
-          id: renewalRequest.id,
-          accountRenewalRequestNo: renewalRequest.accountRenewalRequestNo,
-          status: renewalRequest.status
+          id: Number(renewalRequest.id),
+          accountRenewalRequestNo: String(renewalRequest.accountRenewalRequestNo),
+          status: String(renewalRequest.status)
         };
       } catch (error: any) {
         logger.error(`RENEWAL | APPROVE ERROR: ${error.message}`);
-        throw error;
+        if (error instanceof ApiError) {
+          throw error;
+        }
+        const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
       }
     });
   }
@@ -995,7 +1070,7 @@ export class RenewalService {
         
         logger.info(`RENEWAL | MARK AS RFI | REQUEST: ${requestId} | ADMIN: ${user.id}`);
 
-        const renewalRequest = await AccountRenewalRequests.findOne({
+        const renewalRequest = await AccountRenewalRequests.getRepository().findOne({
           where: { id: requestId, isActive: true },
           relations: ['user']
         });
@@ -1021,17 +1096,22 @@ export class RenewalService {
         renewalRequest.status = MOVE_REQUEST_STATUS.RFI_PENDING;
         renewalRequest.comments = `${rfiReason}. ${comments || ''}`.trim();
         renewalRequest.updatedBy = user.id;
-        await renewalRequest.save();
+        await qr.manager.save(AccountRenewalRequests, renewalRequest);
 
         // Create log
-        await this.createRenewalLog(
-          renewalRequest,
-          MOVE_REQUEST_STATUS.RFI_PENDING,
-          TransitionRequestActionByTypes.COMMUNITY_ADMIN,
-          user,
-          renewalRequest.comments,
-          `RFI Reason: ${rfiReason}`
-        );
+        const log = new AccountRenewalRequestLogs();
+        log.accountRenewalRequest = renewalRequest;
+        log.requestType = renewalRequest.requestType;
+        log.status = MOVE_REQUEST_STATUS.RFI_PENDING;
+        log.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        log.user = { id: user.id } as any;
+        log.changes = `RFI Reason: ${rfiReason}`;
+        log.comments = APICodes.RENEWAL_REQUEST_RFI_SUCCESS.message;
+        log.details = JSON.stringify({
+          actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
+          timestamp: new Date().toISOString()
+        });
+        await qr.manager.save(AccountRenewalRequestLogs, log);
 
         // Send notification to user - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(renewalRequest.user.id, 'account_renewal_rfi_pending', {
@@ -1042,13 +1122,17 @@ export class RenewalService {
         logger.info(`RENEWAL | MARKED AS RFI | REQUEST: ${renewalRequest.accountRenewalRequestNo}`);
 
         return {
-          id: renewalRequest.id,
-          accountRenewalRequestNo: renewalRequest.accountRenewalRequestNo,
-          status: renewalRequest.status
+          id: Number(renewalRequest.id),
+          accountRenewalRequestNo: String(renewalRequest.accountRenewalRequestNo),
+          status: String(renewalRequest.status)
         };
       } catch (error: any) {
         logger.error(`RENEWAL | MARK AS RFI ERROR: ${error.message}`);
-        throw error;
+        if (error instanceof ApiError) {
+          throw error;
+        }
+        const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
       }
     });
   }
@@ -1063,7 +1147,7 @@ export class RenewalService {
         
         logger.info(`RENEWAL | CANCEL REQUEST | REQUEST: ${requestId} | ADMIN: ${user.id}`);
 
-        const renewalRequest = await AccountRenewalRequests.findOne({
+        const renewalRequest = await AccountRenewalRequests.getRepository().findOne({
           where: { id: requestId, isActive: true },
           relations: ['user', 'unit']
         });
@@ -1089,21 +1173,26 @@ export class RenewalService {
         renewalRequest.status = MOVE_REQUEST_STATUS.CANCELLED;
         renewalRequest.comments = `${reason}. ${comments || ''}`.trim();
         renewalRequest.updatedBy = user.id;
-        await renewalRequest.save();
+        await qr.manager.save(AccountRenewalRequests, renewalRequest);
 
         // Create log
-        await this.createRenewalLog(
-          renewalRequest,
-          MOVE_REQUEST_STATUS.CANCELLED,
-          TransitionRequestActionByTypes.COMMUNITY_ADMIN,
-          user,
-          renewalRequest.comments,
-          `Cancellation Reason: ${reason}`
-        );
+        const log = new AccountRenewalRequestLogs();
+        log.accountRenewalRequest = renewalRequest;
+        log.requestType = renewalRequest.requestType;
+        log.status = MOVE_REQUEST_STATUS.CANCELLED;
+        log.actionBy = TransitionRequestActionByTypes.COMMUNITY_ADMIN;
+        log.user = { id: user.id } as any;
+        log.changes = `Cancellation Reason: ${reason}`;
+        log.comments = APICodes.RENEWAL_REQUEST_CANCELLED_SUCCESS.message;
+        log.details = JSON.stringify({
+          actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
+          timestamp: new Date().toISOString()
+        });
+        await qr.manager.save(AccountRenewalRequestLogs, log);
 
         // Mark parent move-in as expired (as per BRD - cancelled renewal means expired move-in)
         try {
-          await MoveInRequests.update(
+          await MoveInRequests.getRepository().update(
             {
               unit: { id: renewalRequest.unit.id },
               user: { id: renewalRequest.user.id },
@@ -1125,13 +1214,17 @@ export class RenewalService {
         logger.info(`RENEWAL | CANCELLED | REQUEST: ${renewalRequest.accountRenewalRequestNo}`);
 
         return {
-          id: renewalRequest.id,
-          accountRenewalRequestNo: renewalRequest.accountRenewalRequestNo,
-          status: renewalRequest.status
+          id: Number(renewalRequest.id),
+          accountRenewalRequestNo: String(renewalRequest.accountRenewalRequestNo),
+          status: String(renewalRequest.status)
         };
       } catch (error: any) {
         logger.error(`RENEWAL | CANCEL ERROR: ${error.message}`);
-        throw error;
+        if (error instanceof ApiError) {
+          throw error;
+        }
+        const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
       }
     });
   }
@@ -1274,7 +1367,7 @@ export class RenewalService {
               docRecord.updatedBy = user.id;
               docRecord.isActive = true;
 
-              const savedDoc = await docRecord.save();
+              const savedDoc = await AccountRenewalRequestDocuments.save(docRecord);
               
               uploadedDocuments.push({
                 id: savedDoc.id,
@@ -1301,14 +1394,19 @@ export class RenewalService {
       }
 
       // Create log entry
-      await this.createRenewalLog(
-        renewalRequest,
-        renewalRequest.status,
-        TransitionRequestActionByTypes.SUPER_ADMIN,
-        user,
-        'Documents uploaded by admin',
-        JSON.stringify({ uploadedDocuments: uploadedDocuments.map(doc => ({ type: doc.documentType, fileName: doc.fileName })) })
-      );
+      const log = new AccountRenewalRequestLogs();
+      log.accountRenewalRequest = renewalRequest;
+      log.requestType = renewalRequest.requestType;
+      log.status = renewalRequest.status;
+      log.actionBy = TransitionRequestActionByTypes.SUPER_ADMIN;
+      log.user = { id: user.id } as any;
+      log.changes = JSON.stringify({ uploadedDocuments: uploadedDocuments.map(doc => ({ type: doc.documentType, fileName: doc.fileName })) });
+      log.comments = 'Documents uploaded by admin';
+      log.details = JSON.stringify({
+        actionBy: TransitionRequestActionByTypes.SUPER_ADMIN,
+        timestamp: new Date().toISOString()
+      });
+      await AccountRenewalRequestLogs.getRepository().save(log);
 
       logger.info(`RENEWAL | DOCUMENTS UPLOADED | ADMIN REQUEST: ${requestId} | COUNT: ${uploadedDocuments.length}`);
 
@@ -1318,7 +1416,11 @@ export class RenewalService {
       };
     } catch (error: any) {
       logger.error(`RENEWAL | UPLOAD DOCUMENTS ERROR: ${error.message}`);
-      throw error;
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
     }
   }
 }
