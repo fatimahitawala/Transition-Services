@@ -47,6 +47,87 @@ router.put('/tenant/:requestId', auth.auth(), validate(moveInValidation.updateTe
 router.put('/hho-unit/:requestId', auth.auth(), validate(moveInValidation.updateHhoOwnerMoveIn), catchAsync(moveInController.updateHhoOwnerMoveInRequest));
 router.put('/hhc-company/:requestId', auth.auth(), validate(moveInValidation.updateHhcCompanyMoveIn), catchAsync(moveInController.updateHhcCompanyMoveInRequest));
 
+// Move-In Process
+router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUnitAllocation), catchAsync(moveInController.moveInUnitAllocation));
+
+/**
+ * @swagger
+ * /admin/move-in/request/process:
+ *   post:
+ *     summary: Process move-in unit allocation (Admin)
+ *     description: Process move-in unit allocation by allocating units to users based on approved move-in requests. This endpoint handles user role management, unit status updates, and audit logging.
+ *     tags: [Admin MoveIn Management]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - requestId
+ *             properties:
+ *               requestId:
+ *                 type: integer
+ *                 description: ID of the approved move-in request to process
+ *                 example: 123
+ *           examples:
+ *             example1:
+ *               summary: Process move-in request
+ *               value:
+ *                 requestId: 123
+ *     responses:
+ *       200:
+ *         description: Move-in unit allocation processed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Move-in ticket processed successfully"
+ *                 unitId:
+ *                   type: integer
+ *                   description: ID of the unit that was allocated
+ *                   example: 456
+ *                 unitNumber:
+ *                   type: string
+ *                   description: Unit number
+ *                   example: "A-101"
+ *                 occupancyStatus:
+ *                   type: string
+ *                   description: New occupancy status of the unit
+ *                   example: "TENANT"
+ *                 moveInRequestId:
+ *                   type: integer
+ *                   description: ID of the processed move-in request
+ *                   example: 123
+ *                 userId:
+ *                   type: integer
+ *                   description: ID of the user who was allocated to the unit
+ *                   example: 789
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Move-in request not found"
+ *                 code:
+ *                   type: string
+ *                   example: "MOVE_IN_REQUEST_NOT_FOUND"
+ */
 /**
  * @swagger
  * /admin/move-in/request/{requestId}/documents:

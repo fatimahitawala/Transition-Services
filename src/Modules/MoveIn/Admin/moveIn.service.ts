@@ -2998,4 +2998,410 @@ export class MoveInService {
       logger.error(`Error logging move-in request action: ${error}`);
     }
   }
+  /**
+   * Process move-in(Unit allocation)
+   */
+  async moveInUnitAllocation(body: any) {
+    try {
+      const { requestId } = body;
+
+      logger.info(`=== MOVE-IN UNIT ALLOCATION START ===`);
+      logger.info(`Processing move-in ticket for request: ${requestId}`);
+      logger.info(`Request body: ${JSON.stringify(body)}`);
+      
+      logger.info(`Querying move-in request with ID: ${requestId}`);
+      const moveInRequest = await MoveInRequests.getRepository()
+        .createQueryBuilder('mir')
+        .leftJoinAndSelect('mir.unit', 'unit')
+        .leftJoinAndSelect('mir.user', 'user')
+        .where('mir.id = :requestId AND mir.isActive = true', { requestId })
+        .getOne();
+      
+      logger.info(`Move-in request query completed. Found: ${!!moveInRequest}`);
+      if (!moveInRequest) {
+        logger.error(`Move-in request not found for ID: ${requestId}`);
+        throw new ApiError(
+          httpStatus.INTERNAL_SERVER_ERROR,
+          'Move-in request not found',
+          'MOVE_IN_REQUEST_NOT_FOUND'
+        );
+      }
+
+      logger.info(`Move-in request found:`, {
+        id: moveInRequest.id,
+        requestType: moveInRequest.requestType,
+        status: moveInRequest.status,
+        moveInDate: moveInRequest.moveInDate,
+        unitId: moveInRequest.unit?.id,
+        userId: moveInRequest.user?.id,
+        hasUnit: !!moveInRequest.unit,
+        hasUser: !!moveInRequest.user,
+        createdBy: moveInRequest.createdBy,
+        updatedBy: moveInRequest.updatedBy,
+      });
+      if (!moveInRequest.unit) {
+        logger.error(`Unit relationship not loaded for move-in request: ${moveInRequest.id}`);
+        throw new ApiError(
+          httpStatus.INTERNAL_SERVER_ERROR,
+          'Unit information not found for move-in request',
+          'UNIT_RELATIONSHIP_NOT_FOUND'
+        );
+      }
+
+      if (!moveInRequest.user) {
+        logger.error(`User relationship not loaded for move-in request: ${moveInRequest.id}`);
+        throw new ApiError(
+          httpStatus.INTERNAL_SERVER_ERROR,
+          'User information not found for move-in request',
+          'USER_RELATIONSHIP_NOT_FOUND'
+        );
+      }
+     
+      // Step 1: Find unit by unitId
+      const unitEntity = await Units.getRepository()
+        .createQueryBuilder('u')
+        .where('u.id = :unitId AND u.isActive = true', { unitId: moveInRequest.unit.id })
+        .getOne();
+
+      if (!unitEntity) {
+        logger.error(`Unit not found for ID: ${moveInRequest.unit.id}`);
+        throw new ApiError(
+          httpStatus.INTERNAL_SERVER_ERROR,
+          'Unit not found',
+          'UNIT_NOT_FOUND'
+        );
+      }
+
+      logger.info(`Unit found:`, {
+        id: unitEntity.id,
+        unitNumber: unitEntity.unitNumber,
+        unitName: unitEntity.unitName,
+        currentOccupancyStatus: unitEntity.occupancyStatus
+      });
+
+      // Step 3: Determine occupancy role based on request type
+      const { OccupancyStatus } = await import('../../../Entities/EntityTypes/unit');
+      const { UserRoles } = await import('../../../Entities/UserRoles.entity');
+      const { Roles } = await import('../../../Entities/Roles.entity');
+
+      let occupancyRoleSlug: string;
+      switch (moveInRequest.requestType) {
+        case MOVE_IN_USER_TYPES.TENANT:
+          occupancyRoleSlug = OccupancyStatus.TENANT;
+          break;
+        case MOVE_IN_USER_TYPES.OWNER:
+          occupancyRoleSlug = OccupancyStatus.OWNER;
+          break;
+        case MOVE_IN_USER_TYPES.HHO_OWNER:
+          occupancyRoleSlug = OccupancyStatus.HHO;
+          break;
+        case MOVE_IN_USER_TYPES.HHO_COMPANY:
+          occupancyRoleSlug = OccupancyStatus.HHC;
+          break;
+        default:
+          occupancyRoleSlug = OccupancyStatus.VACANT;
+      }
+
+      logger.info(`Determined occupancy role: ${occupancyRoleSlug} for request type: ${moveInRequest.requestType}`);
+
+      // Step 4: Get role ID by slug
+      logger.info(`Looking for role with slug: ${occupancyRoleSlug}`);
+      const role = await Roles.getRepository()
+        .createQueryBuilder('r')
+        .where('r.slug = :slug AND r.isActive = true', { slug: occupancyRoleSlug })
+        .getOne();
+
+      if (!role) {
+        logger.error(`Role not found for slug: ${occupancyRoleSlug}`);
+        throw new ApiError(
+          httpStatus.INTERNAL_SERVER_ERROR,
+          'Role not found',
+          'ROLE_NOT_FOUND'
+        );
+      }
+
+      logger.info(`Role found:`, {
+        id: role.id,
+        slug: role.slug,
+        roleName: role.roleName
+      });
+
+      // Step 5: Get owner role ID for comparison
+      logger.info(`Looking for owner role with slug: ${OccupancyStatus.OWNER}`);
+      const ownerRole = await Roles.getRepository()
+        .createQueryBuilder('r')
+        .where('r.slug = :slug AND r.isActive = true', { slug: OccupancyStatus.OWNER })
+        .getOne();
+
+      logger.info(`Owner role found:`, {
+        id: ownerRole?.id,
+        slug: ownerRole?.slug,
+        roleName: ownerRole?.roleName
+      });
+
+      // Execute transaction for user role management and unit status update
+      logger.info(`Starting transaction for user role management and unit status update`);
+      await executeInTransaction(async () => {
+        // Step 6: Remove existing non-owner roles
+        logger.info(`Deactivating existing non-owner roles for unit: ${unitEntity.id}, excluding owner role: ${ownerRole?.id || 0}`);
+        const deactivateResult = await UserRoles.getRepository()
+          .createQueryBuilder()
+          .update(UserRoles)
+          .set({ isActive: false })
+          .where('unit = :unitId AND role != :ownerRoleId', {
+            unitId: unitEntity.id,
+            ownerRoleId: ownerRole?.id || 0
+          })
+          .execute();
+        
+        logger.info(`Deactivated ${deactivateResult.affected} existing non-owner roles`);
+
+        // Step 7: Determine dates for user role
+        let startDate: Date;
+        let endDate: Date | null = null;
+
+        // Get date details from move-in request details
+        logger.info(`Getting move-in request details for request: ${moveInRequest.id}, type: ${moveInRequest.requestType}`);
+        const requestDetails = await this.getMoveInRequestDetails(moveInRequest.id, moveInRequest.requestType);
+        
+        if (requestDetails) {
+          logger.info(`Request details found:`, {
+            hasLeaseStartDate: 'leaseStartDate' in requestDetails && !!requestDetails.leaseStartDate,
+            hasLeaseStartDateHO: 'leaseStartDateHO' in requestDetails && !!(requestDetails as any).leaseStartDateHO,
+            hasLeaseEndDate: 'leaseEndDate' in requestDetails && !!requestDetails.leaseEndDate,
+            hasLeaseEndDateHO: 'leaseEndDateHO' in requestDetails && !!(requestDetails as any).leaseEndDateHO
+          });
+        } else {
+          logger.info(`No request details found for request: ${moveInRequest.id}`);
+        }
+        
+        // Start date priority: leaseStartDate → leaseStartDateHO → moveInDate
+        if (requestDetails && 'leaseStartDate' in requestDetails && requestDetails.leaseStartDate) {
+          startDate = new Date(requestDetails.leaseStartDate as Date);
+          logger.info(`Using leaseStartDate as start date: ${startDate}`);
+        } else if (requestDetails && 'leaseStartDateHO' in requestDetails && (requestDetails as any).leaseStartDateHO) {
+          startDate = new Date((requestDetails as any).leaseStartDateHO as Date);
+          logger.info(`Using leaseStartDateHO as start date: ${startDate}`);
+        } else {
+          startDate = new Date(moveInRequest.moveInDate);
+          logger.info(`Using moveInDate as start date: ${startDate}`);
+        }
+
+        // End date priority: leaseEndDate → leaseEndDateHO
+        if (requestDetails && 'leaseEndDate' in requestDetails && requestDetails.leaseEndDate) {
+          endDate = new Date(requestDetails.leaseEndDate as Date);
+          logger.info(`Using leaseEndDate as end date: ${endDate}`);
+        } else if (requestDetails && 'leaseEndDateHO' in requestDetails && (requestDetails as any).leaseEndDateHO) {
+          endDate = new Date((requestDetails as any).leaseEndDateHO as Date);
+          logger.info(`Using leaseEndDateHO as end date: ${endDate}`);
+        } else {
+          logger.info(`No end date found, setting to null`);
+        }
+
+        // Step 8: Check if user role already exists
+        logger.info(`Checking for existing user role for user: ${moveInRequest.user.id}, unit: ${unitEntity.id}`);
+        const existingRole = await UserRoles.getRepository()
+          .createQueryBuilder('ur')
+          .where('ur.isActive = true')
+          .andWhere('ur.unit = :unit', { unit: unitEntity.id })
+          .andWhere('ur.user = :user', { user: moveInRequest.user.id })
+          .getOne();
+
+        if (existingRole) {
+          logger.info(`Existing user role found:`, {
+            id: existingRole.id,
+            currentEndDate: existingRole.endDate,
+            newEndDate: endDate
+          });
+          
+          // Update existing role end date if different
+          if (endDate && existingRole.endDate !== endDate) {
+            logger.info(`Updating existing role end date from ${existingRole.endDate} to ${endDate}`);
+            await UserRoles.getRepository()
+              .createQueryBuilder()
+              .update(UserRoles)
+              .set({ endDate: endDate })
+              .where('id = :id', { id: existingRole.id })
+              .execute();
+            logger.info(`Successfully updated existing role end date`);
+          } else {
+            logger.info(`No update needed for existing role`);
+          }
+        } else {
+          // Create new user role
+          logger.info(`Creating new user role for user: ${moveInRequest.user.id}, unit: ${unitEntity.id}, role: ${role.id}`);
+          
+          // Determine the user ID for createdBy and updatedBy fields
+          const currentUserId = moveInRequest.updatedBy || moveInRequest.user.id;
+          logger.info(`Using user ID ${currentUserId} for createdBy and updatedBy fields`);
+          logger.info(`moveInRequest.createdBy: ${moveInRequest.createdBy}, moveInRequest.updatedBy: ${moveInRequest.updatedBy}, moveInRequest.user.id: ${moveInRequest.user.id}`);
+          
+          const newUserRole = new UserRoles();
+          newUserRole.user = moveInRequest.user;
+          newUserRole.role = role;
+          newUserRole.unit = unitEntity;
+          newUserRole.startDate = startDate;
+          newUserRole.endDate = endDate as Date;
+          // Use fallback values to ensure we have valid numbers
+          newUserRole.createdBy = moveInRequest.createdBy || moveInRequest.user.id || 1;
+          newUserRole.updatedBy = moveInRequest.createdBy || moveInRequest.user.id || 1;
+          newUserRole.isActive = true;
+          
+          logger.info(`Setting createdBy: ${newUserRole.createdBy}, updatedBy: ${newUserRole.updatedBy}`);
+          
+          const savedUserRole = await newUserRole.save();
+          logger.info(`Successfully created new user role:`, {
+            id: savedUserRole.id,
+            userId: savedUserRole.user?.id,
+            unitId: savedUserRole.unit?.id,
+            roleId: savedUserRole.role?.id,
+            startDate: savedUserRole.startDate,
+            endDate: savedUserRole.endDate,
+            isActive: savedUserRole.isActive  
+          });
+        }
+      
+
+        // Step 9: Update unit occupancy status
+        logger.info(`Updating unit occupancy status from ${unitEntity.occupancyStatus} to ${occupancyRoleSlug}`);
+        const unitUpdateResult = await Units.getRepository()
+          .createQueryBuilder()
+          .update(Units)
+          .set({ 
+            occupancyStatus: occupancyRoleSlug,
+            updatedBy: moveInRequest.updatedBy
+          })
+          .where('id = :unitId', { unitId: unitEntity.id })
+          .execute();
+        logger.info(`Unit occupancy status updated successfully:`, { 
+          unitId: unitEntity.id,
+          oldStatus: unitEntity.occupancyStatus,
+          newStatus: occupancyRoleSlug,
+          affectedRows: unitUpdateResult.affected
+        });
+        // Step 10: Update move-in request comments
+        logger.info(`Updating move-in request: ${moveInRequest.id}`);
+        const requestUpdateResult = await MoveInRequests.getRepository()
+          .createQueryBuilder()
+          .update(MoveInRequests)
+          .set({ 
+            //comments: comments,
+            updatedBy: moveInRequest.updatedBy
+          })
+          .where('id = :requestId', { requestId: moveInRequest.id })
+          .execute();
+        
+        logger.info(`Move-in request updated successfully:`, {
+          requestId: moveInRequest.id,
+          affectedRows: requestUpdateResult.affected
+        });
+      });
+
+      logger.info(`=== MOVE-IN UNIT ALLOCATION SUCCESS ===`);
+      logger.info(`Successfully processed move-in request for unit: ${unitEntity.id}`);
+
+      const response = {
+        success: true,
+        message: 'Move-in ticket processed successfully',
+        unitId: unitEntity.id,
+        unitNumber: unitEntity.unitNumber,
+        occupancyStatus: occupancyRoleSlug,
+        moveInRequestId: moveInRequest.id,
+        userId: moveInRequest.user.id
+      };
+
+      logger.info(`Response data:`, response);
+      return response;
+
+    } catch (error: any) {
+      logger.error(`=== MOVE-IN UNIT ALLOCATION ERROR ===`);
+      logger.error(`Error processing move-in request: ${error.message}`);
+      logger.error(`Error stack: ${error.stack}`);
+      logger.error(`Request body that caused error: ${JSON.stringify(body)}`);
+      
+      if (error instanceof ApiError) {
+        logger.error(`API Error details:`, {
+          statusCode: error.statusCode,
+          message: error.message,
+          code: error.code
+        });
+        throw error;
+      }
+      
+      const apiError = new ApiError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        'Move-in request processing failure',
+        'INTEGRATION_FAILURE'
+      );
+      
+      logger.error(`Created API Error:`, {
+        statusCode: apiError.statusCode,
+        message: apiError.message,
+        code: apiError.code
+      });
+      
+      throw apiError;
+    }
+  }
+    /**
+   * Get move-in request details based on request type
+   */
+  private async getMoveInRequestDetails(requestId: number, requestType: string) {
+    try {
+      logger.info(`Getting move-in request details for requestId: ${requestId}, type: ${requestType}`);
+      
+      let details = null;
+      switch (requestType) {
+        case MOVE_IN_USER_TYPES.OWNER:
+          details = await MoveInRequestDetailsOwner.getRepository()
+            .createQueryBuilder('mir')
+            .where('mir.moveInRequest = :requestId', { requestId })
+            .getOne();
+          break;
+        
+        case MOVE_IN_USER_TYPES.TENANT:
+          details = await MoveInRequestDetailsTenant.getRepository()
+            .createQueryBuilder('mir')
+            .where('mir.moveInRequest = :requestId', { requestId })
+            .getOne();
+          break;
+        
+        case MOVE_IN_USER_TYPES.HHO_OWNER:
+          details = await MoveInRequestDetailsHhoOwner.getRepository()
+            .createQueryBuilder('mir')
+            .where('mir.moveInRequest = :requestId', { requestId })
+            .getOne();
+          break;
+        
+        case MOVE_IN_USER_TYPES.HHO_COMPANY:
+          details = await MoveInRequestDetailsHhcCompany.getRepository()
+            .createQueryBuilder('mir')
+            .where('mir.moveInRequest = :requestId', { requestId })
+            .getOne();
+          break;
+        
+        default:
+          logger.info(`Unknown request type: ${requestType}, returning null`);
+          return null;
+      }
+      
+      if (details) {
+        logger.info(`Found move-in request details for ${requestType}:`, {
+          id: details.id,
+          hasLeaseStartDate: 'leaseStartDate' in details && !!details.leaseStartDate,
+          hasLeaseEndDate: 'leaseEndDate' in details && !!details.leaseEndDate,
+          hasLeaseStartDateHO: 'leaseStartDateHO' in details && !!(details as any).leaseStartDateHO,
+          hasLeaseEndDateHO: 'leaseEndDateHO' in details && !!(details as any).leaseEndDateHO
+        });
+      } else {
+        logger.info(`No move-in request details found for ${requestType}`);
+      }
+      
+      return details;
+    } catch (error) {
+      logger.error(`Error getting move-in request details for requestId: ${requestId}, type: ${requestType}:`, error);
+      return null;
+    }
+  }
+
 }

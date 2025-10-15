@@ -460,4 +460,16 @@ export class MoveInvalidation {
       })
       .required(),
   };
+
+ /**
+   * Validation for move-in unit allocation
+   */
+  public moveInUnitAllocation = {
+    body: Joi.object()
+      .keys({
+        requestId: Joi.number().required(),
+      })
+      .required(),
+  };
+
 }
