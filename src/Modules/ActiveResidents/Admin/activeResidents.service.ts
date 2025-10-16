@@ -451,8 +451,7 @@ export class ActiveResidentsService {
         .innerJoin('od.accountRenewalRequest', 'arr')
         .where('arr.id = :id', { id: accountRenewalId })
         .getOne();
-      if (hho?.dubaITourismUnitPermitExpiryDate) return hho.dubaITourismUnitPermitExpiryDate as any;
-      if ((hho as any)?.dtcmExpiryDate) return (hho as any).dtcmExpiryDate as any;
+      if (hho?.dtcmPermitEndDate) return hho.dtcmPermitEndDate as any;
 
       return null;
     } catch {
@@ -497,24 +496,8 @@ export class ActiveResidentsService {
 
   private async getRenewalDtcmPermitNumber(accountRenewalId: number): Promise<string | null> {
     try {
-      const tenant = await AccountRenewalRequestDetailsTenant.getRepository().createQueryBuilder('td')
-        .innerJoin('td.accountRenewalRequest', 'arr')
-        .where('arr.id = :id', { id: accountRenewalId })
-        .getOne();
-      if ((tenant as any)?.dtcmPermitNumber) return (tenant as any).dtcmPermitNumber;
-
-      const hhc = await AccountRenewalRequestDetailsHhoCompany.getRepository().createQueryBuilder('cd')
-        .innerJoin('cd.accountRenewalRequest', 'arr')
-        .where('arr.id = :id', { id: accountRenewalId })
-        .getOne();
-      if ((hhc as any)?.dtcmPermitNumber) return (hhc as any).dtcmPermitNumber;
-
-      const hho = await AccountRenewalRequestDetailsHhoOwner.getRepository().createQueryBuilder('od')
-        .innerJoin('od.accountRenewalRequest', 'arr')
-        .where('arr.id = :id', { id: accountRenewalId })
-        .getOne();
-      if ((hho as any)?.dtcmPermitNumber) return (hho as any).dtcmPermitNumber;
-
+      // Renewal detail entities no longer store DTCM permit numbers.
+      // Keep API shape but return null for renewals.
       return null;
     } catch {
       return null;
