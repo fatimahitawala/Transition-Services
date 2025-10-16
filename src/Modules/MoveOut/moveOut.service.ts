@@ -5,7 +5,7 @@ import { APICodes } from "../../Common/Constants";
 import { MoveOutRequests } from "../../Entities/MoveOutRequests.entity";
 import { getPaginationInfo } from "../../Common/Utils/paginationUtils";
 import { checkAdminPermission, checkIsSecurity } from "../../Common/Utils/adminAccess";
-import { Units, getUnitInformation, getCurrentOccupancyRoleForUnit } from "../../Entities/Units.entity";
+import { Units, getUnitInformation } from "../../Entities/Units.entity";
 import { UnitBookings } from "../../Entities/UnitBookings.entity";
 import { MOVE_IN_AND_OUT_REQUEST_STATUS, MOVE_IN_USER_TYPES, MOVE_REQUEST_STATUS, OccupancyStatus } from "../../Entities/EntityTypes";
 import { addNotification, addAdminNotification } from "../../Common/Utils/notification";
@@ -1295,34 +1295,16 @@ export class MoveOutService {
         return { moveInRequest, accountRenewalRequest };
     }
 
-    // Admin helper: return occupant user details for a unit and ensure a closed move-in exists for same user
+    // Admin helper: get the user who raised the latest CLOSED move-in for the unit
     async getMoveOutUserDetailsByUnit(unitId: number, user: any) {
         try {
-            // basic unit check
+            // Ensure unit exists and is active
             const unit = await this.getUnitById(unitId);
             if (!unit) {
                 throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
             }
 
-            // 1) Try current occupant mapping via helper (does not over-restrict joins)
-            const currentOcc = await getCurrentOccupancyRoleForUnit(unitId);
-
-            if (currentOcc?.user?.id) {
-                // ensure a CLOSED move-in exists for the same user + unit
-                await this.getMoveInAndRenewalRequests(Number(currentOcc.user.id), unitId);
-                return {
-                    userId: Number(currentOcc.user.id),
-                    firstName: currentOcc.user.firstName || null,
-                    middleName: currentOcc.user.middleName || null,
-                    lastName: currentOcc.user.lastName || null,
-                    email: currentOcc.user.email || null,
-                    mobile: currentOcc.user.mobile || null,
-                    dialCode: (currentOcc.user as any)?.dialCode?.dialCode || (currentOcc.user as any)?.dialCode || null,
-                    residencyType: (currentOcc as any)?.role?.slug || unit.occupancyStatus || null,
-                };
-            }
-
-            // 2) Fallback: use the latest CLOSED Move-In for this unit to derive user
+            // Fetch the last CLOSED move-in request for this unit
             const lastClosedMoveIn = await MoveInRequests.getRepository()
                 .createQueryBuilder('mir')
                 .innerJoinAndSelect('mir.unit', 'u', 'u.isActive = true')
@@ -1335,7 +1317,6 @@ export class MoveOutService {
                 .getOne();
 
             if (!lastClosedMoveIn?.user?.id) {
-                // No occupant and no closed move-in → nothing to return for this unit
                 throw new ApiError(httpStatus.NOT_FOUND, APICodes.MOVE_IN_REQUEST_NOT_FOUND.message, APICodes.MOVE_IN_REQUEST_NOT_FOUND.code);
             }
 
