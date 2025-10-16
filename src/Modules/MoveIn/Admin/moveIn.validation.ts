@@ -196,6 +196,12 @@ export class MoveInvalidation {
             unitPermitStartDate: Joi.date().iso().optional(),
             unitPermitExpiryDate: Joi.date().iso().custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE)).optional(),
             termsAccepted: Joi.boolean().valid(true).required(),
+            peopleOfDetermination: Joi.boolean().default(false).optional(),
+            detailsText: Joi.string().allow('').when('peopleOfDetermination', {
+              is: true,
+              then: Joi.required(),
+              otherwise: Joi.optional()
+            }),
           })
           .required(),
       })
@@ -223,14 +229,14 @@ export class MoveInvalidation {
         nationality: Joi.string().required(),
         emiratesIdNumber: Joi.string().required(),
         emiratesIdExpiryDate: Joi.date().iso().required(),
-        tenancyContractStartDate: Joi.date().iso().custom(validateTenancyContractStartBeforeMoveIn).required(),
+        tenancyContractStartDate: Joi.date().iso().custom(validateTenancyContractStartBeforeMoveIn).optional(),
         unitPermitStartDate: Joi.date().iso().required(),
         unitPermitExpiryDate: Joi.date().iso().custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE)).required(),
         unitPermitNumber: Joi.string().required(),
         leaseStartDate: Joi.date().iso().required(),
         leaseEndDate: Joi.date().iso().custom(validateDateAfter('leaseStartDate', APICodes.LEASE_DATE_RANGE)).required(),
-        dtcmStartDate: Joi.date().iso().required(),
-        dtcmExpiryDate: Joi.date().iso().custom(validateDateAfter('dtcmStartDate', APICodes.LEASE_DATE_RANGE)).required(),
+        dtcmStartDate: Joi.date().iso().optional(),
+        dtcmExpiryDate: Joi.date().iso().custom(validateDateAfter('dtcmStartDate', APICodes.LEASE_DATE_RANGE)).optional(),
         comments: Joi.string().allow('').optional(),
         additionalInfo: Joi.string().allow('').optional(),
         // Do not require or persist termsAccepted for HHC company

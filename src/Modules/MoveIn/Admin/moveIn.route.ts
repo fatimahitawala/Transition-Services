@@ -1471,8 +1471,8 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *             without_special_needs:
  *               summary: Owner move-in without special needs
  *               value:
- *                 unitId: 7
- *                 moveInDate: "2025-09-17"
+ *                 unitId: 123
+ *                 moveInDate: "2025-11-10"
  *                 userId: 456
  *                 details:
  *                   adults: 1
@@ -1480,11 +1480,12 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *                   householdStaffs: 0
  *                   pets: 0
  *                   peopleOfDetermination: false
+ *                   detailsText: ""
  *             with_special_needs:
  *               summary: Owner move-in with special needs
  *               value:
- *                 unitId: 7
- *                 moveInDate: "2025-09-17"
+ *                 unitId: 123
+ *                 moveInDate: "2025-11-10"
  *                 userId: 456
  *                 details:
  *                   adults: 2
@@ -1606,7 +1607,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  * /admin/move-in/tenant:
  *   post:
  *     summary: Create tenant move-in request (Admin)
- *     description: Create a new move-in request for a tenant. All dates must be in ISO 8601 format (YYYY-MM-DD) and moveInDate must be at least 30 days in the future.
+ *     description: Create a new move-in request for a tenant. All dates must be in ISO 8601 format (YYYY-MM-DD) and moveInDate must be in the future and within 30 days from today.
  *     tags: [Admin MoveIn Management]
  *     security:
  *       - bearerAuth: []
@@ -1759,51 +1760,54 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *             without_special_needs:
  *               summary: Tenant move-in without special needs
  *               value:
- *                 unitId: 123
- *                 moveInDate: "2025-12-20"
- *                 userId: 456
- *                 firstName: "John"
- *                 lastName: "Doe"
- *                 email: "john.doe@example.com"
+ *                 unitId: 19
+ *                 moveInDate: "2025-11-10"
+ *                 status: "new"
+ *                 userId: 641
+ *                 firstName: "Yatin"
+ *                 lastName: "Singhal"
+ *                 email: "yatin.singhal@example.com"
  *                 dialCode: "+971"
- *                 phoneNumber: "501234567"
+ *                 phoneNumber: "6396775234"
  *                 nationality: "UAE"
- *                 emiratesIdNumber: "784-1985-1234567-8"
- *                 emiratesIdExpiryDate: "2026-12-31"
- *                 tenancyContractStartDate: "2025-09-01"
- *                 tenancyContractEndDate: "2026-08-31"
- *                 comments: "Need early access for furniture delivery"
+ *                 emiratesIdNumber: "784-2221-2221111-3"
+ *                 emiratesIdExpiryDate: "2026-10-31"
+ *                 tenancyContractStartDate: "2025-10-01"
+ *                 tenancyContractEndDate: "2026-10-03"
+ *                 comments: ""
  *                 additionalInfo: ""
  *                 details:
- *                   adults: 2
- *                   children: 1
+ *                   adults: 1
+ *                   children: 0
  *                   householdStaffs: 0
- *                   pets: 1
+ *                   pets: 0
  *                   peopleOfDetermination: false
  *                   termsAccepted: true
+ *                   detailsText: ""
  *             with_special_needs:
  *               summary: Tenant move-in with special needs
  *               value:
- *                 unitId: 123
- *                 moveInDate: "2025-12-20"
- *                 userId: 456
- *                 firstName: "John"
- *                 lastName: "Doe"
- *                 email: "john.doe@example.com"
+ *                 unitId: 19
+ *                 moveInDate: "2025-11-10"
+ *                 status: "new"
+ *                 userId: 641
+ *                 firstName: "Yatin"
+ *                 lastName: "Singhal"
+ *                 email: "yatin.singhal@example.com"
  *                 dialCode: "+971"
- *                 phoneNumber: "501234567"
+ *                 phoneNumber: "6396775234"
  *                 nationality: "UAE"
- *                 emiratesIdNumber: "784-1985-1234567-8"
- *                 emiratesIdExpiryDate: "2026-12-31"
- *                 tenancyContractStartDate: "2025-09-01"
- *                 tenancyContractEndDate: "2026-08-31"
- *                 comments: "Need early access for furniture delivery"
+ *                 emiratesIdNumber: "784-2221-2221111-3"
+ *                 emiratesIdExpiryDate: "2026-10-31"
+ *                 tenancyContractStartDate: "2025-10-01"
+ *                 tenancyContractEndDate: "2026-10-03"
+ *                 comments: ""
  *                 additionalInfo: ""
  *                 details:
- *                   adults: 2
- *                   children: 1
- *                   householdStaffs: 1
- *                   pets: 1
+ *                   adults: 1
+ *                   children: 0
+ *                   householdStaffs: 0
+ *                   pets: 0
  *                   peopleOfDetermination: true
  *                   termsAccepted: true
  *                   detailsText: "Need wheelchair assistance for elderly or people of determination during move-in"
@@ -1982,27 +1986,71 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               comments:
  *                 type: string
  *                 description: Additional comments
- *                 example: "Owner moving in after renovation"
+ *                 example: ""
+ *               additionalInfo:
+ *                 type: string
+ *                 description: Additional information
+ *                 example: ""
+ *               details:
+ *                 type: object
+ *                 required:
+ *                   - termsAccepted
+ *                 properties:
+ *                   unitPermitNumber:
+ *                     type: string
+ *                     description: Unit permit number (optional)
+ *                     example: "121212121"
+ *                   unitPermitStartDate:
+ *                     type: string
+ *                     format: date
+ *                     description: Unit permit start date (optional)
+ *                     example: "2025-10-31"
+ *                   unitPermitExpiryDate:
+ *                     type: string
+ *                     format: date
+ *                     description: Unit permit expiry date (optional)
+ *                     example: "2025-11-26"
+ *                   termsAccepted:
+ *                     type: boolean
+ *                     enum: [true]
+ *                     description: Must be true to accept terms and conditions
+ *                     example: true
+ *                   peopleOfDetermination:
+ *                     type: boolean
+ *                     description: Whether any occupants have special needs
+ *                     example: false
+ *                   detailsText:
+ *                     type: string
+ *                     description: Details about special needs assistance (required when peopleOfDetermination is true)
+ *                     example: ""
  *           examples:
  *             basic_hho_unit:
  *               summary: Basic HHO unit move-in request
  *               value:
- *                 unitId: 7
- *                 moveInDate: "2025-09-17"
- *                 userId: 456
- *                 ownerFirstName: "John"
- *                 ownerLastName: "Doe"
- *                 email: "john.doe@example.com"
+ *                 unitId: 4
+ *                 moveInDate: "2025-11-10"
+ *                 userId: 630
+ *                 ownerFirstName: "Krishnan"
+ *                 ownerLastName: "Kannan"
+ *                 email: "aminda.w@techcarrot.ae"
  *                 dialCode: "+971"
- *                 phoneNumber: "501234567"
+ *                 phoneNumber: "509174069"
  *                 nationality: "UAE"
- *                 comments: "Owner moving in after renovation"
+ *                 comments: ""
+ *                 additionalInfo: ""
+ *                 details:
+ *                   unitPermitNumber: "121212121"
+ *                   unitPermitStartDate: "2025-10-31"
+ *                   unitPermitExpiryDate: "2025-11-26"
+ *                   termsAccepted: true
  *             minimal_hho_unit:
  *               summary: Minimal HHO unit move-in request
  *               value:
- *                 unitId: 7
- *                 moveInDate: "2025-09-17"
- *                 userId: 456
+ *                 unitId: 4
+ *                 moveInDate: "2025-11-10"
+ *                 userId: 630
+ *                 details:
+ *                   termsAccepted: true
  *     responses:
  *       201:
  *         description: HHO Unit move-in request created successfully
@@ -2105,7 +2153,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  * /admin/move-in/hhc-company:
  *   post:
  *     summary: Create HHC Company move-in request (Admin)
- *     description: Create a move-in request on behalf of an HHC Company. All dates must be in ISO 8601 format (YYYY-MM-DD) and moveInDate must be at least 30 days in the future.
+ *     description: Create a move-in request on behalf of an HHC Company. All dates must be in ISO 8601 format (YYYY-MM-DD) and moveInDate must be in the future and within 30 days from today.
  *     tags: [Admin MoveIn Management]
  *     security:
  *       - bearerAuth: []
@@ -2131,15 +2179,11 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               - nationality
  *               - emiratesIdNumber
  *               - emiratesIdExpiryDate
- *               - tenancyContractStartDate
  *               - unitPermitStartDate
  *               - unitPermitExpiryDate
  *               - unitPermitNumber
  *               - leaseStartDate
  *               - leaseEndDate
- *               - dtcmStartDate
- *               - dtcmExpiryDate
- *               - details
  *             properties:
  *               unitId:
  *                 type: integer
@@ -2202,34 +2246,41 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               tenancyContractStartDate:
  *                 type: string
  *                 format: date
- *                 example: "2025-09-01"
+ *                 description: Tenancy contract start date (optional)
+ *                 example: "2025-10-01"
  *               unitPermitStartDate:
  *                 type: string
  *                 format: date
- *                 example: "2025-09-20"
+ *                 example: "2025-10-30"
  *               unitPermitExpiryDate:
  *                 type: string
  *                 format: date
- *                 example: "2026-09-20"
+ *                 example: "2025-10-31"
  *               unitPermitNumber:
  *                 type: string
- *                 example: "42388"
+ *                 example: "1212"
  *               leaseStartDate:
  *                 type: string
  *                 format: date
- *                 example: "2025-09-20"
+ *                 example: "2025-10-24"
  *               leaseEndDate:
  *                 type: string
  *                 format: date
- *                 example: "2026-09-20"
+ *                 example: "2025-10-30"
  *               dtcmStartDate:
  *                 type: string
  *                 format: date
- *                 example: "2025-09-01"
+ *                 description: DTCM start date (optional)
+ *                 example: "2025-10-24"
  *               dtcmExpiryDate:
  *                 type: string
  *                 format: date
- *                 example: "2027-12-31"
+ *                 description: DTCM expiry date (optional)
+ *                 example: "2025-11-24"
+ *               countryCode:
+ *                 type: string
+ *                 description: Country code
+ *                 example: "+971"
  *               comments:
  *                 type: string
  *                 nullable: true
@@ -2240,37 +2291,68 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *                 type: object
  *                 description: Ignored; termsAccepted is not required or stored
  *           examples:
- *             basic_hhc_company:
- *               summary: Basic HHC company move-in request
+ *             with_dtcm:
+ *               summary: HHC company move-in with DTCM dates
  *               value:
- *                 unitId: 123
- *                 moveInDate: "2025-09-20"
- *                 userId: 456
- *                 userEmail: "essa.mohammed@gmail.com"
- *                 firstName: "Essa"
- *                 middleName: "Mohammed"
- *                 lastName: "Mohammed"
- *                 mobileNumber: "0555 0898XX"
- *                 name: "Essa"
- *                 company: "ABC Company"
- *                 companyEmail: "abccompany@gmail.com"
- *                 operatorOfficeNumber: "+971 122345678"
- *                 tradeLicenseNumber: "12345678"
- *                 tradeLicenseExpiryDate: "2026-12-31"
- *                 nationality: "United Arab Emirates"
- *                 emiratesIdNumber: "12345678"
- *                 emiratesIdExpiryDate: "2030-05-15"
- *                 tenancyContractStartDate: "2025-09-01"
- *                 unitPermitStartDate: "2025-09-20"
- *                 unitPermitExpiryDate: "2026-09-20"
- *                 unitPermitNumber: "42388"
- *                 leaseStartDate: "2025-09-20"
- *                 leaseEndDate: "2026-09-20"
- *                 dtcmStartDate: "2025-09-01"
- *                 dtcmExpiryDate: "2027-12-31"
- *                 comments: "HHC company move-in request"
- *                 additionalInfo: "Additional information for HHC company"
- *                 details: {}
+ *                 unitId: 4
+ *                 moveInDate: "2025-10-24"
+ *                 userId: 630
+ *                 userEmail: "aminda.w@techcarrot.ae"
+ *                 firstName: "Krishnan"
+ *                 middleName: ""
+ *                 lastName: "Kannan"
+ *                 mobileNumber: "+971509174069"
+ *                 name: "12212"
+ *                 company: "1212"
+ *                 companyEmail: "aminda.w@techcarrot.ae"
+ *                 countryCode: "+971"
+ *                 operatorOfficeNumber: "1221212"
+ *                 tradeLicenseNumber: "12212121"
+ *                 tradeLicenseExpiryDate: "2025-10-31"
+ *                 nationality: "UAE"
+ *                 emiratesIdNumber: "784-1990-3425560-6"
+ *                 emiratesIdExpiryDate: "2025-10-30"
+ *                 unitPermitStartDate: "2025-10-30"
+ *                 unitPermitExpiryDate: "2025-10-31"
+ *                 unitPermitNumber: "1212"
+ *                 leaseStartDate: "2025-10-24"
+ *                 leaseEndDate: "2025-10-30"
+ *                 dtcmStartDate: "2025-10-24"
+ *                 dtcmExpiryDate: "2025-11-24"
+ *                 comments: ""
+ *                 additionalInfo: ""
+ *                 details:
+ *                   termsAccepted: true
+ *             without_dtcm:
+ *               summary: HHC company move-in without DTCM dates (minimal)
+ *               value:
+ *                 unitId: 4
+ *                 moveInDate: "2025-10-24"
+ *                 userId: 630
+ *                 userEmail: "aminda.w@techcarrot.ae"
+ *                 firstName: "Krishnan"
+ *                 middleName: ""
+ *                 lastName: "Kannan"
+ *                 mobileNumber: "+971509174069"
+ *                 name: "12212"
+ *                 company: "1212"
+ *                 companyEmail: "aminda.w@techcarrot.ae"
+ *                 countryCode: "+971"
+ *                 operatorOfficeNumber: "1221212"
+ *                 tradeLicenseNumber: "12212121"
+ *                 tradeLicenseExpiryDate: "2025-10-31"
+ *                 nationality: "UAE"
+ *                 emiratesIdNumber: "784-1990-3425560-6"
+ *                 emiratesIdExpiryDate: "2025-10-30"
+ *                 unitPermitStartDate: "2025-10-30"
+ *                 unitPermitExpiryDate: "2025-10-31"
+ *                 unitPermitNumber: "1212"
+ *                 leaseStartDate: "2025-10-24"
+ *                 leaseEndDate: "2025-10-30"
+ *                 comments: ""
+ *                 additionalInfo: ""
+ *                 details:
+ *                   termsAccepted: true
  *     responses:
  *       201:
  *         description: HHC Company move-in request created successfully
