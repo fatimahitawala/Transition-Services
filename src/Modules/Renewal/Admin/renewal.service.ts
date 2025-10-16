@@ -430,7 +430,7 @@ export class RenewalService {
       await this.validateUnitLinkage(unitId, userId);
       await this.checkDuplicateRenewal(unitId, userId);
       await this.checkMoveOutConflict(unitId, userId);
-      await this.validateMIPTemplate(unitId);
+      // await this.validateMIPTemplate(unitId);
 
       // Generate request number
       const requestNumber = await this.generateRenewalRequestNumber();
@@ -502,15 +502,13 @@ export class RenewalService {
         logger.info(`RENEWAL | TENANT CREATED | REQUEST: ${requestNumber}`);
       });
 
-      // Return clean object with selected properties (like move-in pattern)
+      // Return clean object with primitive values only (avoid circular references)
       return {
         id: savedRequest.id,
         accountRenewalRequestNo: requestNumber,
         status: savedRequest.status,
         requestType: savedRequest.requestType,
-        moveInDate: savedRequest.moveInDate,
-        unit: savedRequest.unit,
-        details: tenantDetails
+        message: 'Account renewal request created successfully'
       };
     } catch (error: any) {
       logger.error(`RENEWAL | CREATE TENANT ERROR: ${error.message}`);
@@ -536,7 +534,7 @@ export class RenewalService {
       await this.validateUnitLinkage(unitId, userId);
       await this.checkDuplicateRenewal(unitId, userId);
       await this.checkMoveOutConflict(unitId, userId);
-      await this.validateMIPTemplate(unitId);
+      // await this.validateMIPTemplate(unitId);
 
       // Generate request number
       const requestNumber = await this.generateRenewalRequestNumber();
@@ -598,15 +596,13 @@ export class RenewalService {
         logger.info(`RENEWAL | HHO OWNER CREATED | REQUEST: ${requestNumber}`);
       });
 
-      // Return clean object with selected properties (like move-in pattern)
+      // Return clean object with primitive values only (avoid circular references)
       return {
         id: savedRequest.id,
         accountRenewalRequestNo: requestNumber,
         status: savedRequest.status,
         requestType: savedRequest.requestType,
-        moveInDate: savedRequest.moveInDate,
-        unit: savedRequest.unit,
-        details: hhoOwnerDetails
+        message: 'Account renewal request created successfully'
       };
     } catch (error: any) {
       logger.error(`RENEWAL | CREATE HHO OWNER ERROR: ${error.message}`);
@@ -632,7 +628,7 @@ export class RenewalService {
       await this.validateUnitLinkage(unitId, userId);
       await this.checkDuplicateRenewal(unitId, userId);
       await this.checkMoveOutConflict(unitId, userId);
-      await this.validateMIPTemplate(unitId);
+      // await this.validateMIPTemplate(unitId);
 
       // Generate request number
       const requestNumber = await this.generateRenewalRequestNumber();
@@ -696,15 +692,13 @@ export class RenewalService {
         logger.info(`RENEWAL | HHC COMPANY CREATED | REQUEST: ${requestNumber}`);
       });
 
-      // Return clean object with selected properties (like move-in pattern)
+      // Return clean object with primitive values only (avoid circular references)
       return {
         id: savedRequest.id,
         accountRenewalRequestNo: requestNumber,
         status: savedRequest.status,
         requestType: savedRequest.requestType,
-        moveInDate: savedRequest.moveInDate,
-        unit: savedRequest.unit,
-        details: hhcCompanyDetails
+        message: 'Account renewal request created successfully'
       };
     } catch (error: any) {
       logger.error(`RENEWAL | CREATE HHC COMPANY ERROR: ${error.message}`);
