@@ -1687,7 +1687,7 @@ export class MoveInService {
         .leftJoinAndMapOne("u.unitRestriction", "u.unitRestriction", "ut", "ut.isActive = 1")
         .where({ id }).getOne();
     } catch (error) {
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code, error);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR?.message || 'Unknown error occurred', APICodes.UNKNOWN_ERROR?.code || 'EC001');
     }
   }
 
