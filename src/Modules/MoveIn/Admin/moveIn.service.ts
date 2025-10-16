@@ -495,6 +495,7 @@ export class MoveInService {
         entity.pets = details.pets;
         // peopleOfDetermination is persisted as column exists; termsAccepted not stored in tenant table
         entity.peopleOfDetermination = details.peopleOfDetermination;
+        entity.determination_text = details.determination_text || null;
         entity.emiratesIdNumber = details.emiratesIdNumber;
         entity.emiratesIdExpiryDate = details.emiratesIdExpiryDate;
         entity.tenancyContractStartDate = details.tenancyContractStartDate;
@@ -515,6 +516,8 @@ export class MoveInService {
         entity.householdStaffs = details.householdStaffs;
         entity.pets = details.pets;
         entity.comments = details.comments;
+        entity.peopleOfDetermination = details.peopleOfDetermination || false;
+        entity.determination_text = details.determination_text || null;
 
         // Optional fields with defaults (user personal info comes from Users table)
         entity.emergencyContactDialCode = "";
@@ -2725,8 +2728,8 @@ export class MoveInService {
           children: data.details?.children,
           householdStaffs: data.details?.householdStaffs,
           pets: data.details?.pets,
-          // peopleOfDetermination: data.details?.peopleOfDetermination || false, // Not available in Owner entity
-          comments: data.details?.detailsText || null,
+          peopleOfDetermination: data.details?.peopleOfDetermination || false,
+          determination_text: data.details?.detailsText || null,
           updatedBy: user?.id,
         })
         .where('move_in_request_id = :requestId', { requestId })
@@ -2792,7 +2795,8 @@ export class MoveInService {
           householdStaffs: data.details?.householdStaffs,
           pets: data.details?.pets,
           peopleOfDetermination: data.details?.peopleOfDetermination || false,
-          comments: data.details?.detailsText ?? data.comments ?? null,
+          determination_text: data.details?.detailsText || null,
+          comments: data.comments || null,
           updatedBy: user?.id,
         })
         .where('move_in_request_id = :requestId', { requestId })

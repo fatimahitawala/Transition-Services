@@ -3,7 +3,8 @@ import Joi from "joi";
 import { APICodes } from "../../../Common/Constants";
 import { TRANSITION_DOCUMENT_TYPES } from "../../../Entities/EntityTypes/transition";
 
-const moveInAtLeastDaysLater = (days: number) => (value: any, helpers: any) => {
+// Validates that date is in the future but within specified days from today
+const moveInWithinDaysFromToday = (days: number) => (value: any, helpers: any) => {
   const inputDate = new Date(value);
   const now = new Date();
   const maxDate = new Date();
@@ -96,7 +97,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDaysFromToday(30)).required(),
         comments: Joi.string().allow('').optional(),
         additionalInfo: Joi.string().allow('').optional(),
         details: Joi.object()
@@ -121,7 +122,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDaysFromToday(30)).required(),
         firstName: Joi.string().max(100).required(),
         lastName: Joi.string().max(100).required(),
         email: Joi.string().email().max(255).required(),
@@ -156,7 +157,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDaysFromToday(30)).required(),
         comments: Joi.string().allow('').optional(),
         additionalInfo: Joi.string().allow('').optional(),
         // Owner identity at root level (required fields)
@@ -190,7 +191,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDaysFromToday(30)).required(),
         userEmail: Joi.string().email().max(255).required(),
         firstName: Joi.string().max(100).required(),
         middleName: Joi.string().max(100).allow('').optional(),
