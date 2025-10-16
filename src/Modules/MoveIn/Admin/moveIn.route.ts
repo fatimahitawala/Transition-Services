@@ -380,7 +380,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be in the future and within 30 days from today.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
  *               status:
@@ -513,7 +513,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be in the future and within 30 days from today.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
  *               status:
@@ -627,7 +627,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be in the future and within 30 days from today.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
  *               status:
@@ -741,7 +741,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be in the future and within 30 days from today.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
  *               status:
@@ -1398,7 +1398,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  * /admin/move-in/owner:
  *   post:
  *     summary: Create owner move-in request (Admin)
- *     description: Create a new move-in request for an owner. All dates must be in ISO 8601 format (YYYY-MM-DD) and moveInDate must be at least 30 days in the future.
+ *     description: Create a new move-in request for an owner. All dates must be in ISO 8601 format (YYYY-MM-DD) and moveInDate must be in the future and within 30 days from today.
  *     tags: [Admin MoveIn Management]
  *     security:
  *       - bearerAuth: []
@@ -1420,7 +1420,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be in the future and within 30 days from today.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
  *               userId:
@@ -1638,7 +1638,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be in the future and within 30 days from today.
  *                 example: "2025-12-20"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
  *               userId:
@@ -1941,7 +1941,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be in the future and within 30 days from today.
  *                 example: "2025-09-17"
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
  *               userId:
@@ -2330,7 +2330,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be in the future and within 30 days from today.
  *                 example: "2025-09-20"
  *               status:
  *                 type: string
@@ -2445,7 +2445,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be in the future and within 30 days from today.
  *                 example: "2025-09-20"
  *               status:
  *                 type: string
@@ -2614,7 +2614,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be in the future and within 30 days from today.
  *                 example: "2025-09-20"
  *               status:
  *                 type: string
@@ -2763,7 +2763,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               moveInDate:
  *                 type: string
  *                 format: date
- *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be within 30 days from current date.
+ *                 description: Move-in date in ISO 8601 format (YYYY-MM-DD). Must be in the future and within 30 days from today.
  *                 example: "2025-09-20"
  *               status:
  *                 type: string

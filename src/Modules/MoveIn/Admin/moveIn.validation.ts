@@ -4,7 +4,8 @@ import { APICodes } from "../../../Common/Constants";
 import { TRANSITION_DOCUMENT_TYPES } from "../../../Entities/EntityTypes/transition";
 
 // Custom validation functions
-const moveInAtLeastDaysLater = (days: number) => (value: any, helpers: any) => {
+// Validates that date is in the future but within specified days from today
+const moveInWithinDaysFromToday = (days: number) => (value: any, helpers: any) => {
   const inputDate = new Date(value);
   const now = new Date();
   const maxDate = new Date();
@@ -116,7 +117,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDaysFromToday(30)).required(),
         userId: Joi.number().required(),
         details: Joi.object()
           .keys({
@@ -140,8 +141,9 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDaysFromToday(30)).required(),
         userId: Joi.number().required(),
+        status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').optional(),
         firstName: Joi.string().max(100).required(),
         lastName: Joi.string().max(100).required(),
         email: Joi.string().email().max(255).required(),
@@ -177,7 +179,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDaysFromToday(30)).required(),
         userId: Joi.number().required(),
         // Optional owner identity fields - if omitted, derived from authenticated admin
         ownerFirstName: Joi.string().max(100).optional(),
@@ -204,7 +206,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDaysFromToday(30)).required(),
         userId: Joi.number().required(),
         userEmail: Joi.string().email().required(),
         firstName: Joi.string().required(),
