@@ -1126,14 +1126,10 @@ export class RenewalService {
   }
 
   /**
-   * Upload documents for renewal request (Mobile)
+   * Upload documents for renewal request (Admin & Mobile)
    */
   async uploadDocuments(requestId: number, files: any, body: any, user: any) {
     try {
-      if (user?.isAdmin === true || user?.isAdmin === 1) {
-        throw new ApiError(httpStatus.FORBIDDEN, APICodes.INVALID_USER_ROLE.message, APICodes.INVALID_USER_ROLE.code);
-      }
-
       // Get the renewal request with user relationship
       const renewalRequest = await AccountRenewalRequests.getRepository()
         .createQueryBuilder("arr")
@@ -1145,8 +1141,8 @@ export class RenewalService {
         throw new ApiError(httpStatus.NOT_FOUND, APICodes.RENEWAL_REQUEST_NOT_FOUND.message, APICodes.RENEWAL_REQUEST_NOT_FOUND.code);
       }
 
-      // Verify the request belongs to the user
-      if (renewalRequest.user?.id !== user?.id) {
+      // For non-admin users, verify the request belongs to them
+      if (!user?.isAdmin && renewalRequest.user?.id !== user?.id) {
         throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
       }
 
