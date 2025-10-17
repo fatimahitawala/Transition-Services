@@ -4,7 +4,8 @@ import { APICodes } from "../../../Common/Constants";
 import { TRANSITION_DOCUMENT_TYPES } from "../../../Entities/EntityTypes/transition";
 
 // Custom validation functions
-const moveInAtLeastDaysLater = (days: number) => (value: any, helpers: any) => {
+// Validates that date is in the future but within specified days from today
+const moveInWithinDaysFromToday = (days: number) => (value: any, helpers: any) => {
   const inputDate = new Date(value);
   const now = new Date();
   const maxDate = new Date();
@@ -116,7 +117,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDaysFromToday(30)).required(),
         userId: Joi.number().required(),
         details: Joi.object()
           .keys({
@@ -140,8 +141,9 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDaysFromToday(30)).required(),
         userId: Joi.number().required(),
+        status: Joi.string().valid('new', 'rfi-pending', 'rfi-submitted', 'approved', 'user-cancelled', 'cancelled', 'closed').optional(),
         firstName: Joi.string().max(100).required(),
         lastName: Joi.string().max(100).required(),
         email: Joi.string().email().max(255).required(),
@@ -177,7 +179,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDaysFromToday(30)).required(),
         userId: Joi.number().required(),
         // Optional owner identity fields - if omitted, derived from authenticated admin
         ownerFirstName: Joi.string().max(100).optional(),
@@ -194,6 +196,12 @@ export class MoveInvalidation {
             unitPermitStartDate: Joi.date().iso().optional(),
             unitPermitExpiryDate: Joi.date().iso().custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE)).optional(),
             termsAccepted: Joi.boolean().valid(true).required(),
+            peopleOfDetermination: Joi.boolean().default(false).optional(),
+            detailsText: Joi.string().allow('').when('peopleOfDetermination', {
+              is: true,
+              then: Joi.required(),
+              otherwise: Joi.optional()
+            }),
           })
           .required(),
       })
@@ -204,7 +212,7 @@ export class MoveInvalidation {
     body: Joi.object()
       .keys({
         unitId: Joi.number().required(),
-        moveInDate: Joi.date().iso().custom(moveInAtLeastDaysLater(30)).required(),
+        moveInDate: Joi.date().iso().custom(moveInWithinDaysFromToday(30)).required(),
         userId: Joi.number().required(),
         userEmail: Joi.string().email().required(),
         firstName: Joi.string().required(),
@@ -221,14 +229,14 @@ export class MoveInvalidation {
         nationality: Joi.string().required(),
         emiratesIdNumber: Joi.string().required(),
         emiratesIdExpiryDate: Joi.date().iso().required(),
-        tenancyContractStartDate: Joi.date().iso().custom(validateTenancyContractStartBeforeMoveIn).required(),
+        tenancyContractStartDate: Joi.date().iso().custom(validateTenancyContractStartBeforeMoveIn).optional(),
         unitPermitStartDate: Joi.date().iso().required(),
         unitPermitExpiryDate: Joi.date().iso().custom(validateDateAfter('unitPermitStartDate', APICodes.UNIT_PERMIT_DATE_RANGE)).required(),
         unitPermitNumber: Joi.string().required(),
         leaseStartDate: Joi.date().iso().required(),
         leaseEndDate: Joi.date().iso().custom(validateDateAfter('leaseStartDate', APICodes.LEASE_DATE_RANGE)).required(),
-        dtcmStartDate: Joi.date().iso().required(),
-        dtcmExpiryDate: Joi.date().iso().custom(validateDateAfter('dtcmStartDate', APICodes.LEASE_DATE_RANGE)).required(),
+        dtcmStartDate: Joi.date().iso().optional(),
+        dtcmExpiryDate: Joi.date().iso().custom(validateDateAfter('dtcmStartDate', APICodes.LEASE_DATE_RANGE)).optional(),
         comments: Joi.string().allow('').optional(),
         additionalInfo: Joi.string().allow('').optional(),
         // Do not require or persist termsAccepted for HHC company

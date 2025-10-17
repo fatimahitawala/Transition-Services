@@ -185,7 +185,7 @@ export class RenewalService {
       };
     } catch (error: any) {
       logger.error(`RENEWAL | GET ADMIN LIST ERROR: ${error.message}`);
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR?.message || 'Unknown error occurred', APICodes.UNKNOWN_ERROR?.code || 'EC001');
     }
   }
 
@@ -251,7 +251,7 @@ export class RenewalService {
       };
     } catch (error: any) {
       logger.error(`RENEWAL | GET ADMIN DETAILS ERROR: ${error.message}`);
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR?.message || 'Unknown error occurred', APICodes.UNKNOWN_ERROR?.code || 'EC001');
     }
   }
 
@@ -268,6 +268,9 @@ export class RenewalService {
    * Validate unit is occupied and linked to user
    */
   private async validateUnitLinkage(unitId: number, userId: number): Promise<void> {
+    // Dynamic import to ensure DataSource is properly initialized
+    const { UserRoles } = await import('../../../Entities/UserRoles.entity');
+    
     const userRole = await UserRoles.getRepository().findOne({
       where: {
         unit: { id: unitId },
@@ -287,13 +290,15 @@ export class RenewalService {
 
   /**
    * Check for duplicate active renewal
+   * Only block if there's an APPROVED request (active/finalized renewal)
+   * Allow creating new requests to replace pending/open ones
    */
   private async checkDuplicateRenewal(unitId: number, userId: number): Promise<void> {
     const existingRenewal = await AccountRenewalRequests.getRepository().findOne({
       where: {
         unit: { id: unitId },
         user: { id: userId },
-        status: Not(In([MOVE_REQUEST_STATUS.CANCELLED, MOVE_REQUEST_STATUS.USER_CANCELLED])),
+        status: MOVE_REQUEST_STATUS.APPROVED,
         isActive: true
       }
     });
@@ -427,7 +432,7 @@ export class RenewalService {
       logger.info(`RENEWAL | CREATE TENANT | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
 
       // Validations as per BRD - BEFORE transaction (like move-in pattern)
-      await this.validateUnitLinkage(unitId, userId);
+      // Note: Admin can create renewal for any user/unit, so no unit linkage validation needed
       await this.checkDuplicateRenewal(unitId, userId);
       await this.checkMoveOutConflict(unitId, userId);
       // await this.validateMIPTemplate(unitId);
@@ -488,7 +493,7 @@ export class RenewalService {
           timestamp: new Date().toISOString()
         });
 
-        await qr.manager.save(AccountRenewalRequestLogs, log);
+        await qr.manager.save(log);
 
         // Mark parent move-in as renewed
         await this.markMoveInAsRenewed(qr, unitId, userId);
@@ -511,13 +516,16 @@ export class RenewalService {
         message: 'Account renewal request created successfully'
       };
     } catch (error: any) {
-      logger.error(`RENEWAL | CREATE TENANT ERROR: ${error.message}`);
+      logger.error(`RENEWAL | CREATE TENANT ERROR: ${error.message || error}`);
+      logger.error(`RENEWAL | CREATE TENANT ERROR STACK: ${error.stack}`);
       // Re-throw as clean error to avoid circular references
       if (error instanceof ApiError) {
         throw error;
       }
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      // Use original error message if available, otherwise use apiCode message
+      const errorMessage = error?.message || apiCode?.message || 'Unknown error occurred';
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, errorMessage, apiCode?.code || 'EC001');
     }
   }
 
@@ -531,7 +539,7 @@ export class RenewalService {
       logger.info(`RENEWAL | CREATE HHO OWNER | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
 
       // Validations as per BRD - BEFORE transaction (like move-in pattern)
-      await this.validateUnitLinkage(unitId, userId);
+      // Note: Admin can create renewal for any user/unit, so no unit linkage validation needed
       await this.checkDuplicateRenewal(unitId, userId);
       await this.checkMoveOutConflict(unitId, userId);
       // await this.validateMIPTemplate(unitId);
@@ -582,7 +590,7 @@ export class RenewalService {
           timestamp: new Date().toISOString()
         });
 
-        await qr.manager.save(AccountRenewalRequestLogs, log);
+        await qr.manager.save(log);
 
         // Mark parent move-in as renewed
         await this.markMoveInAsRenewed(qr, unitId, userId);
@@ -605,13 +613,16 @@ export class RenewalService {
         message: 'Account renewal request created successfully'
       };
     } catch (error: any) {
-      logger.error(`RENEWAL | CREATE HHO OWNER ERROR: ${error.message}`);
+      logger.error(`RENEWAL | CREATE HHO OWNER ERROR: ${error.message || error}`);
+      logger.error(`RENEWAL | CREATE HHO OWNER ERROR STACK: ${error.stack}`);
       // Re-throw as clean error to avoid circular references
       if (error instanceof ApiError) {
         throw error;
       }
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      // Use original error message if available, otherwise use apiCode message
+      const errorMessage = error?.message || apiCode?.message || 'Unknown error occurred';
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, errorMessage, apiCode?.code || 'EC001');
     }
   }
 
@@ -625,7 +636,7 @@ export class RenewalService {
       logger.info(`RENEWAL | CREATE HHC COMPANY | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
 
       // Validations as per BRD - BEFORE transaction (like move-in pattern)
-      await this.validateUnitLinkage(unitId, userId);
+      // Note: Admin can create renewal for any user/unit, so no unit linkage validation needed
       await this.checkDuplicateRenewal(unitId, userId);
       await this.checkMoveOutConflict(unitId, userId);
       // await this.validateMIPTemplate(unitId);
@@ -678,7 +689,7 @@ export class RenewalService {
           timestamp: new Date().toISOString()
         });
 
-        await qr.manager.save(AccountRenewalRequestLogs, log);
+        await qr.manager.save(log);
 
         // Mark parent move-in as renewed
         await this.markMoveInAsRenewed(qr, unitId, userId);
@@ -701,13 +712,16 @@ export class RenewalService {
         message: 'Account renewal request created successfully'
       };
     } catch (error: any) {
-      logger.error(`RENEWAL | CREATE HHC COMPANY ERROR: ${error.message}`);
+      logger.error(`RENEWAL | CREATE HHC COMPANY ERROR: ${error.message || error}`);
+      logger.error(`RENEWAL | CREATE HHC COMPANY ERROR STACK: ${error.stack}`);
       // Re-throw as clean error to avoid circular references
       if (error instanceof ApiError) {
         throw error;
       }
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      // Use original error message if available, otherwise use apiCode message
+      const errorMessage = error?.message || apiCode?.message || 'Unknown error occurred';
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, errorMessage, apiCode?.code || 'EC001');
     }
   }
 
@@ -774,7 +788,7 @@ export class RenewalService {
           actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
           timestamp: new Date().toISOString()
         });
-        await qr.manager.save(AccountRenewalRequestLogs, log);
+        await qr.manager.save(log);
 
         logger.info(`RENEWAL | TENANT UPDATED | REQUEST: ${requestId}`);
 
@@ -789,7 +803,7 @@ export class RenewalService {
           throw error;
         }
         const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
       }
     });
   }
@@ -853,7 +867,7 @@ export class RenewalService {
           actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
           timestamp: new Date().toISOString()
         });
-        await qr.manager.save(AccountRenewalRequestLogs, log);
+        await qr.manager.save(log);
 
         logger.info(`RENEWAL | HHO OWNER UPDATED | REQUEST: ${requestId}`);
 
@@ -868,7 +882,7 @@ export class RenewalService {
           throw error;
         }
         const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
       }
     });
   }
@@ -932,7 +946,7 @@ export class RenewalService {
           actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
           timestamp: new Date().toISOString()
         });
-        await qr.manager.save(AccountRenewalRequestLogs, log);
+        await qr.manager.save(log);
 
         logger.info(`RENEWAL | HHC COMPANY UPDATED | REQUEST: ${requestId}`);
 
@@ -947,7 +961,7 @@ export class RenewalService {
           throw error;
         }
         const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
       }
     });
   }
@@ -1029,7 +1043,7 @@ export class RenewalService {
           actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
           timestamp: new Date().toISOString()
         });
-        await qr.manager.save(AccountRenewalRequestLogs, log);
+        await qr.manager.save(log);
 
         // Send notification - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(renewalRequest.user.id, 'account_renewal_approved', {
@@ -1049,7 +1063,7 @@ export class RenewalService {
           throw error;
         }
         const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
       }
     });
   }
@@ -1105,7 +1119,7 @@ export class RenewalService {
           actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
           timestamp: new Date().toISOString()
         });
-        await qr.manager.save(AccountRenewalRequestLogs, log);
+        await qr.manager.save(log);
 
         // Send notification to user - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(renewalRequest.user.id, 'account_renewal_rfi_pending', {
@@ -1126,7 +1140,7 @@ export class RenewalService {
           throw error;
         }
         const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
       }
     });
   }
@@ -1182,7 +1196,7 @@ export class RenewalService {
           actionBy: TransitionRequestActionByTypes.COMMUNITY_ADMIN,
           timestamp: new Date().toISOString()
         });
-        await qr.manager.save(AccountRenewalRequestLogs, log);
+        await qr.manager.save(log);
 
         // Mark parent move-in as expired (as per BRD - cancelled renewal means expired move-in)
         try {
@@ -1218,7 +1232,7 @@ export class RenewalService {
           throw error;
         }
         const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
       }
     });
   }
@@ -1238,15 +1252,10 @@ export class RenewalService {
   }
 
   /**
-   * Upload documents for renewal request (Admin)
+   * Upload documents for renewal request (Admin & Mobile)
    */
   async uploadDocuments(requestId: number, files: any, body: any, user: any) {
     try {
-      // Only admin users can upload documents for renewal requests
-      if (!user?.isAdmin) {
-        throw new ApiError(httpStatus.FORBIDDEN, APICodes.INVALID_USER_ROLE.message, APICodes.INVALID_USER_ROLE.code);
-      }
-
       // Get the renewal request
       const renewalRequest = await AccountRenewalRequests.getRepository()
         .createQueryBuilder("arr")
@@ -1256,6 +1265,11 @@ export class RenewalService {
 
       if (!renewalRequest) {
         throw new ApiError(httpStatus.NOT_FOUND, APICodes.RENEWAL_REQUEST_NOT_FOUND.message, APICodes.RENEWAL_REQUEST_NOT_FOUND.code);
+      }
+
+      // For non-admin users, verify the request belongs to them
+      if (!user?.isAdmin && renewalRequest.user?.id !== user?.id) {
+        throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
       }
 
       // Check request type and enforce document restrictions
@@ -1414,7 +1428,7 @@ export class RenewalService {
         throw error;
       }
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
     }
   }
 }

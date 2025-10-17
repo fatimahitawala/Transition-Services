@@ -109,7 +109,7 @@ export class RenewalService {
       };
     } catch (error: any) {
       logger.error(`RENEWAL | GET MOBILE LIST ERROR: ${error.message}`);
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR?.message || 'Unknown error occurred', APICodes.UNKNOWN_ERROR?.code || 'EC001');
     }
   }
 
@@ -182,7 +182,7 @@ export class RenewalService {
       };
     } catch (error: any) {
       logger.error(`RENEWAL | GET MOBILE DETAILS ERROR: ${error.message}`);
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR.message, APICodes.UNKNOWN_ERROR.code);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, APICodes.UNKNOWN_ERROR?.message || 'Unknown error occurred', APICodes.UNKNOWN_ERROR?.code || 'EC001');
     }
   }
 
@@ -218,13 +218,15 @@ export class RenewalService {
 
   /**
    * Check for duplicate active renewal
+   * Only block if there's an APPROVED request (active/finalized renewal)
+   * Allow creating new requests to replace pending/open ones
    */
   private async checkDuplicateRenewal(unitId: number, userId: number): Promise<void> {
     const existingRenewal = await AccountRenewalRequests.findOne({
       where: {
         unit: { id: unitId },
         user: { id: userId },
-        status: Not(In([MOVE_REQUEST_STATUS.CANCELLED, MOVE_REQUEST_STATUS.USER_CANCELLED])),
+        status: MOVE_REQUEST_STATUS.APPROVED,
         isActive: true
       }
     });
@@ -433,7 +435,7 @@ export class RenewalService {
           timestamp: new Date().toISOString()
         });
 
-        await qr.manager.save(AccountRenewalRequestLogs, log);
+        await qr.manager.save(log);
 
         // Send notification to admin - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(user.id, 'account_renewal_submitted', {
@@ -453,7 +455,8 @@ export class RenewalService {
         message: 'Request Submitted Successfully!'
       };
     } catch (error: any) {
-      logger.error(`RENEWAL | CREATE TENANT ERROR: ${error.message}`);
+      logger.error(`RENEWAL | CREATE TENANT ERROR: ${error.message || error}`);
+      logger.error(`RENEWAL | CREATE TENANT ERROR STACK: ${error.stack}`);
       // Re-throw as clean error to avoid circular references
       if (error instanceof ApiError) {
         throw error;
@@ -463,7 +466,9 @@ export class RenewalService {
       const apiCode = errorCode ? 
         Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR 
         : APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      // Use original error message if available, otherwise use apiCode message
+      const errorMessage = error?.message || apiCode?.message || 'Unknown error occurred';
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, errorMessage, apiCode?.code || 'EC001');
     }
   }
 
@@ -531,7 +536,7 @@ export class RenewalService {
           timestamp: new Date().toISOString()
         });
 
-        await qr.manager.save(AccountRenewalRequestLogs, log);
+        await qr.manager.save(log);
 
         // Send notification - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(user.id, 'account_renewal_submitted', {
@@ -551,7 +556,8 @@ export class RenewalService {
         message: 'Request Submitted Successfully!'
       };
     } catch (error: any) {
-      logger.error(`RENEWAL | CREATE HHO OWNER ERROR: ${error.message}`);
+      logger.error(`RENEWAL | CREATE HHO OWNER ERROR: ${error.message || error}`);
+      logger.error(`RENEWAL | CREATE HHO OWNER ERROR STACK: ${error.stack}`);
       // Re-throw as clean error to avoid circular references
       if (error instanceof ApiError) {
         throw error;
@@ -561,7 +567,9 @@ export class RenewalService {
       const apiCode = errorCode ? 
         Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR 
         : APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      // Use original error message if available, otherwise use apiCode message
+      const errorMessage = error?.message || apiCode?.message || 'Unknown error occurred';
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, errorMessage, apiCode?.code || 'EC001');
     }
   }
 
@@ -633,7 +641,7 @@ export class RenewalService {
           timestamp: new Date().toISOString()
         });
 
-        await qr.manager.save(AccountRenewalRequestLogs, log);
+        await qr.manager.save(log);
 
         // Send notification - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(user.id, 'account_renewal_submitted', {
@@ -653,7 +661,8 @@ export class RenewalService {
         message: 'Request Submitted Successfully!'
       };
     } catch (error: any) {
-      logger.error(`RENEWAL | CREATE HHC COMPANY ERROR: ${error.message}`);
+      logger.error(`RENEWAL | CREATE HHC COMPANY ERROR: ${error.message || error}`);
+      logger.error(`RENEWAL | CREATE HHC COMPANY ERROR STACK: ${error.stack}`);
       // Re-throw as clean error to avoid circular references
       if (error instanceof ApiError) {
         throw error;
@@ -663,7 +672,9 @@ export class RenewalService {
       const apiCode = errorCode ? 
         Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR 
         : APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      // Use original error message if available, otherwise use apiCode message
+      const errorMessage = error?.message || apiCode?.message || 'Unknown error occurred';
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, errorMessage, apiCode?.code || 'EC001');
     }
   }
 
@@ -740,7 +751,7 @@ export class RenewalService {
           actionBy: TransitionRequestActionByTypes.USER,
           timestamp: new Date().toISOString()
         });
-        await AccountRenewalRequestLogs.save(log);
+        await queryRunner.manager.save(log);
 
         // Notify admin - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(user.id, 'account_renewal_rfi_submitted', {
@@ -827,7 +838,7 @@ export class RenewalService {
           actionBy: TransitionRequestActionByTypes.USER,
           timestamp: new Date().toISOString()
         });
-        await AccountRenewalRequestLogs.save(log);
+        await queryRunner.manager.save(log);
 
         // Notification - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(user.id, 'account_renewal_rfi_submitted', {
@@ -852,7 +863,7 @@ export class RenewalService {
         const apiCode = errorCode ? 
           Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR 
           : APICodes.UNKNOWN_ERROR;
-        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
       }
     });
   }
@@ -924,7 +935,7 @@ export class RenewalService {
           actionBy: TransitionRequestActionByTypes.USER,
           timestamp: new Date().toISOString()
         });
-        await AccountRenewalRequestLogs.save(log);
+        await queryRunner.manager.save(log);
 
         // Notification - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(user.id, 'account_renewal_rfi_submitted', {
@@ -949,7 +960,7 @@ export class RenewalService {
         const apiCode = errorCode ? 
           Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR 
           : APICodes.UNKNOWN_ERROR;
-        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
       }
     });
   }
@@ -1012,7 +1023,7 @@ export class RenewalService {
           timestamp: new Date().toISOString(),
           reason: reason
         });
-        await AccountRenewalRequestLogs.save(log);
+        await queryRunner.manager.save(log);
 
         // Send notification to admin - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(user.id, 'account_renewal_user_cancelled', {
@@ -1092,7 +1103,7 @@ export class RenewalService {
           actionBy: TransitionRequestActionByTypes.USER,
           timestamp: new Date().toISOString()
         });
-        await AccountRenewalRequestLogs.save(log);
+        await queryRunner.manager.save(log);
 
         // Send notification to admin - Commented out as per request - can be incorporated later if needed
         // await this.sendNotification(user.id, 'account_renewal_rfi_submitted', {
@@ -1115,14 +1126,10 @@ export class RenewalService {
   }
 
   /**
-   * Upload documents for renewal request (Mobile)
+   * Upload documents for renewal request (Admin & Mobile)
    */
   async uploadDocuments(requestId: number, files: any, body: any, user: any) {
     try {
-      if (user?.isAdmin === true || user?.isAdmin === 1) {
-        throw new ApiError(httpStatus.FORBIDDEN, APICodes.INVALID_USER_ROLE.message, APICodes.INVALID_USER_ROLE.code);
-      }
-
       // Get the renewal request with user relationship
       const renewalRequest = await AccountRenewalRequests.getRepository()
         .createQueryBuilder("arr")
@@ -1134,8 +1141,8 @@ export class RenewalService {
         throw new ApiError(httpStatus.NOT_FOUND, APICodes.RENEWAL_REQUEST_NOT_FOUND.message, APICodes.RENEWAL_REQUEST_NOT_FOUND.code);
       }
 
-      // Verify the request belongs to the user
-      if (renewalRequest.user?.id !== user?.id) {
+      // For non-admin users, verify the request belongs to them
+      if (!user?.isAdmin && renewalRequest.user?.id !== user?.id) {
         throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
       }
 

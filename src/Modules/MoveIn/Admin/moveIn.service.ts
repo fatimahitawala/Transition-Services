@@ -445,8 +445,8 @@ export class MoveInService {
       if (error instanceof ApiError) {
         throw error;
       }
-      const driverMsg = error?.driverError?.sqlMessage || error?.sqlMessage || error?.message || APICodes.UNKNOWN_ERROR.message;
-      const driverCode = error?.driverError?.code || error?.code || APICodes.UNKNOWN_ERROR.code;
+      const driverMsg = error?.driverError?.sqlMessage || error?.sqlMessage || error?.message || APICodes.UNKNOWN_ERROR?.message || 'Unknown error occurred';
+      const driverCode = error?.driverError?.code || error?.code || APICodes.UNKNOWN_ERROR?.code || 'EC001';
       throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, driverMsg, driverCode);
     }
   }
@@ -464,9 +464,8 @@ export class MoveInService {
     } catch (error) {
       throw new ApiError(
         httpStatus.INTERNAL_SERVER_ERROR,
-        APICodes.UNKNOWN_ERROR.message,
-        APICodes.UNKNOWN_ERROR.code,
-        error
+        APICodes.UNKNOWN_ERROR?.message || 'Unknown error occurred',
+        APICodes.UNKNOWN_ERROR?.code || 'EC001'
       );
     }
   }
@@ -495,6 +494,7 @@ export class MoveInService {
         entity.pets = details.pets;
         // peopleOfDetermination is persisted as column exists; termsAccepted not stored in tenant table
         entity.peopleOfDetermination = details.peopleOfDetermination;
+        entity.determination_text = details.determination_text || null;
         entity.emiratesIdNumber = details.emiratesIdNumber;
         entity.emiratesIdExpiryDate = details.emiratesIdExpiryDate;
         entity.tenancyContractStartDate = details.tenancyContractStartDate;
@@ -515,6 +515,8 @@ export class MoveInService {
         entity.householdStaffs = details.householdStaffs;
         entity.pets = details.pets;
         entity.comments = details.comments;
+        entity.peopleOfDetermination = details.peopleOfDetermination || false;
+        entity.determination_text = details.determination_text || null;
 
         // Optional fields with defaults (user personal info comes from Users table)
         entity.emergencyContactDialCode = "";
@@ -568,9 +570,9 @@ export class MoveInService {
         entity.unitPermitStartDate = details.unitPermitStartDate ?? null;
         entity.unitPermitExpiryDate = details.unitPermitExpiryDate ?? null;
 
-        // Optional fields
-        // entity.peopleOfDetermination = details.peopleOfDetermination;
-        // entity.termsAccepted = details.termsAccepted;
+        // People of determination fields
+        entity.peopleOfDetermination = details.peopleOfDetermination || false;
+        entity.determination_text = details.determination_text || null;
 
         // Additional fields with defaults
         entity.attorneyFirstName = details.attorneyFirstName || null;
@@ -706,7 +708,7 @@ export class MoveInService {
     } catch (error) {
       logger.error(`Error in createTenantMoveIn Admin: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
     }
   }
 
@@ -741,7 +743,7 @@ export class MoveInService {
     } catch (error) {
       logger.error(`Error in createHhoOwnerMoveIn Admin: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
     }
   }
 
@@ -777,7 +779,7 @@ export class MoveInService {
     } catch (error) {
       logger.error(`Error in createHhcCompanyMoveIn Admin: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
     }
   }
 
@@ -1274,7 +1276,7 @@ export class MoveInService {
     } catch (error: any) {
       logger.error(`Error in getMoveInRequestDetailsWithId: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
     }
   }
 
@@ -2725,8 +2727,8 @@ export class MoveInService {
           children: data.details?.children,
           householdStaffs: data.details?.householdStaffs,
           pets: data.details?.pets,
-          // peopleOfDetermination: data.details?.peopleOfDetermination || false, // Not available in Owner entity
-          comments: data.details?.detailsText || null,
+          peopleOfDetermination: data.details?.peopleOfDetermination || false,
+          determination_text: data.details?.detailsText || null,
           updatedBy: user?.id,
         })
         .where('move_in_request_id = :requestId', { requestId })
@@ -2745,7 +2747,7 @@ export class MoveInService {
     } catch (error: any) {
       logger.error(`Error in updateOwnerMoveIn: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
     }
   }
 
@@ -2792,7 +2794,8 @@ export class MoveInService {
           householdStaffs: data.details?.householdStaffs,
           pets: data.details?.pets,
           peopleOfDetermination: data.details?.peopleOfDetermination || false,
-          comments: data.details?.detailsText ?? data.comments ?? null,
+          determination_text: data.details?.detailsText || null,
+          comments: data.comments || null,
           updatedBy: user?.id,
         })
         .where('move_in_request_id = :requestId', { requestId })
@@ -2811,7 +2814,7 @@ export class MoveInService {
     } catch (error: any) {
       logger.error(`Error in updateTenantMoveIn: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
     }
   }
 
@@ -2872,7 +2875,7 @@ export class MoveInService {
     } catch (error: any) {
       logger.error(`Error in updateHhoOwnerMoveIn: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
     }
   }
 
@@ -2941,7 +2944,7 @@ export class MoveInService {
     } catch (error: any) {
       logger.error(`Error in updateHhcCompanyMoveIn: ${JSON.stringify(error)}`);
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
-      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
+      throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
     }
   }
 
