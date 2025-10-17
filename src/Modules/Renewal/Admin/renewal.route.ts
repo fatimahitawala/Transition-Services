@@ -17,7 +17,7 @@ router.get('/request/:requestId', auth.auth(), validate(renewalValidation.getAdm
 router.post('/tenant', auth.auth(), validate(renewalValidation.createTenantRenewal), catchAsync(renewalController.createTenantRenewalRequest));
 router.post('/hho-unit', auth.auth(), validate(renewalValidation.createHhoOwnerRenewal), catchAsync(renewalController.createHhoOwnerRenewalRequest));
 router.post('/hhc-company', auth.auth(), validate(renewalValidation.createHhcCompanyRenewal), catchAsync(renewalController.createHhcCompanyRenewalRequest));
-router.post('/request/:requestId/documents', auth.auth(), validate(renewalValidation.uploadDocuments), catchAsync(renewalController.uploadDocuments));
+// Document upload route removed - use /renewal/request/:requestId/documents instead (works for both admin and mobile)
 router.put('/request/:requestId/approve', auth.auth(), validate(renewalValidation.approveRequest), catchAsync(renewalController.approveRenewalRequest));
 router.put('/request/:requestId/rfi', auth.auth(), validate(renewalValidation.markRequestAsRFI), catchAsync(renewalController.markRequestAsRFI));
 router.put('/request/:requestId/cancel', auth.auth(), validate(renewalValidation.cancelRequest), catchAsync(renewalController.cancelRenewalRequest));
@@ -482,104 +482,8 @@ router.put('/hhc-company/:requestId', auth.auth(), validate(renewalValidation.up
  */
 
 /**
- * @swagger
- * /admin/renewal/request/{requestId}/documents:
- *   post:
- *     summary: Upload documents for renewal request (Admin)
- *     description: Upload documents for a renewal request. Document types are restricted based on the renewal request type.
- *     tags: [Renewal (Backoffice)]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: requestId
- *         required: true
- *         schema:
- *           type: integer
- *         description: Renewal request ID
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               emirates_id_front:
- *                 type: string
- *                 format: binary
- *                 description: Emirates ID front image
- *               emirates_id_back:
- *                 type: string
- *                 format: binary
- *                 description: Emirates ID back image
- *               ejari:
- *                 type: string
- *                 format: binary
- *                 description: Ejari document
- *               unit_permit:
- *                 type: string
- *                 format: binary
- *                 description: Unit permit document
- *               company_trade_license:
- *                 type: string
- *                 format: binary
- *                 description: Company trade license document
- *               title_deed:
- *                 type: string
- *                 format: binary
- *                 description: Title deed document
- *               other:
- *                 type: string
- *                 format: binary
- *                 description: Other supporting documents
- *     responses:
- *       200:
- *         description: Documents uploaded successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: boolean
- *                   example: true
- *                 code:
- *                   type: string
- *                   example: "SC001"
- *                 message:
- *                   type: string
- *                   example: "Success."
- *                 data:
- *                   type: object
- *                   properties:
- *                     uploadedDocuments:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: integer
- *                             example: 123
- *                           documentType:
- *                             type: string
- *                             example: "emirates_id_front"
- *                           fileName:
- *                             type: string
- *                             example: "emirates_id_front_123.pdf"
- *                           fileUrl:
- *                             type: string
- *                             example: "https://storage.azure.com/renewal/123/emirates_id_front/emirates_id_front_123.pdf"
- *                     message:
- *                       type: string
- *                       example: "2 document(s) uploaded successfully"
- *       400:
- *         description: Invalid document types or validation error
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Renewal request not found
- *       500:
- *         description: Internal server error
+ * NOTE: Document upload route removed from admin module.
+ * Use /renewal/request/{requestId}/documents instead (works for both admin and mobile users)
  */
 
 /**

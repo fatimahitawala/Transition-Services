@@ -579,9 +579,14 @@ router.put('/request/:requestId/rfi-submit', auth.auth(), validate(renewalValida
  * @swagger
  * /renewal/request/{requestId}/documents:
  *   post:
- *     summary: Upload renewal documents
+ *     summary: Upload renewal documents (Admin & Mobile)
  *     description: |
- *       Upload documents for a renewal request based on renewal type:
+ *       Upload documents for a renewal request based on renewal type.
+ *       **Works for both admin and mobile users.**
+ *       - **Admin users**: Can upload documents for any renewal request
+ *       - **Mobile users**: Can only upload documents for their own renewal requests
+ *       
+ *       **Document requirements by renewal type:**
  *       - **Tenant Renewal**: Only Ejari document (required)
  *       - **HHO Owner Renewal**: Only DTCM permit/Unit Permit (required)
  *       - **HHC Company Renewal**: No documents allowed - document upload is disabled for this type
