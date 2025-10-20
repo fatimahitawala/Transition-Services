@@ -2713,6 +2713,7 @@ export class MoveInService {
           unit: data.unitId ? { id: data.unitId } : undefined,
           moveInDate: data.moveInDate,
           status: data.status,
+          user: data.userId ? { id: data.userId } : undefined,
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
@@ -2769,6 +2770,7 @@ export class MoveInService {
           status: data.status,
           comments: data.comments || null,
           additionalInfo: data.additionalInfo || null,
+          user: data.userId ? { id: data.userId } : undefined,
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })

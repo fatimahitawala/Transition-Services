@@ -1374,11 +1374,16 @@ export class MoveInService {
       } = data;
 
       await executeInTransaction(async (qr: any) => {
+        // Auto-transition from RFI_PENDING to RFI_SUBMITTED when user updates
+        const newStatus = existing.status === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING 
+          ? MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED 
+          : (status || (undefined as any));
+
         // Update master
         await MoveInRequests.update({ id: requestId }, {
           unit: unitId ? ({ id: unitId } as any) : (undefined as any),
           moveInDate: moveInDate ? new Date(moveInDate) : (undefined as any),
-          status: status || (undefined as any),
+          status: newStatus,
           comments: comments ?? (undefined as any),
           additionalInfo: additionalInfo ?? (undefined as any),
           user: ({ id: user?.id } as any),
@@ -1492,8 +1497,10 @@ export class MoveInService {
         const log = new MoveInRequestLogs();
         log.moveInRequest = { id: requestId } as any;
         log.requestType = existing.requestType;
-        log.status = existing.status;
-        log.changes = 'Request updated';
+        log.status = newStatus !== undefined ? newStatus : existing.status;
+        log.changes = existing.status === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING && newStatus === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED 
+          ? 'RFI response submitted by user' 
+          : 'Request updated';
         log.user = { id: user?.id } as any;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.details = JSON.stringify({ data });
@@ -1513,7 +1520,7 @@ export class MoveInService {
 
       // If user has submitted additional info (RFI Submitted), notify admin and user
       try {
-        if (status === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED && existing.status === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING && updated) {
+        if (existing.status === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING && updated?.status === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED) {
           const moveInDateStr = updated.moveInDate
             ? new Date(updated.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' })
             : '';
