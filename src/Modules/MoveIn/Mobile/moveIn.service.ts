@@ -2011,14 +2011,13 @@ export class MoveInService {
       // Get the main move-in request with basic details (exclude password from user)
       let query = MoveInRequests.getRepository()
         .createQueryBuilder("mv")
-        .leftJoinAndSelect("mv.user", "user", "user.isActive = true")
+        .leftJoin("mv.user", "user", "user.isActive = true")
         .addSelect([
           "user.id",
           "user.firstName", 
           "user.lastName",
           "user.email",
-          "user.dialCode",
-          "user.phoneNumber",
+          "user.mobile",
           "user.isActive",
           "user.createdAt",
           "user.updatedAt"
