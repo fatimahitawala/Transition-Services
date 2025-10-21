@@ -370,8 +370,7 @@ export class RenewalService {
         adults, 
         children, 
         householdStaffs, 
-        pets,
-        determinationComments
+        pets
       } = body;
 
       logger.info(`RENEWAL | CREATE TENANT | MOBILE | USER: ${user.id} | UNIT: ${unitId}`);
@@ -412,9 +411,6 @@ export class RenewalService {
         tenantDetails.children = children;
         tenantDetails.householdStaffs = householdStaffs;
         tenantDetails.pets = pets;
-        if (determinationComments) {
-          tenantDetails.determinationComments = determinationComments;
-        }
         tenantDetails.createdBy = user.id;
         tenantDetails.updatedBy = user.id;
         tenantDetails.isActive = true;

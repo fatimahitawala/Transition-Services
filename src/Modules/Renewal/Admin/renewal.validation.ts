@@ -37,7 +37,6 @@ export class RenewalValidation {
       children: Joi.number().min(0).max(6).required(),
       householdStaffs: Joi.number().min(0).max(4).required(),
       pets: Joi.number().min(0).max(6).required(),
-      determinationComments: Joi.string().allow('').optional(),
     })
   };
 
