@@ -427,7 +427,7 @@ export class RenewalService {
    */
   async createTenantRenewal(body: any, user: any) {
     try {
-      const { unitId, userId, tenancyContractEndDate, adults, children, householdStaffs, pets, determinationComments, ejariNumber } = body;
+      const { unitId, userId, tenancyContractEndDate, adults, children, householdStaffs, pets } = body;
 
       logger.info(`RENEWAL | CREATE TENANT | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
 
@@ -467,12 +467,6 @@ export class RenewalService {
         tenantDetails.children = children;
         tenantDetails.householdStaffs = householdStaffs;
         tenantDetails.pets = pets;
-        if (determinationComments) {
-          tenantDetails.determinationComments = determinationComments;
-        }
-        if (ejariNumber) {
-          tenantDetails.ejariNumber = ejariNumber;
-        }
         tenantDetails.createdBy = user.id;
         tenantDetails.updatedBy = user.id;
         tenantDetails.isActive = true;
