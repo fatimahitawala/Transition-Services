@@ -1935,8 +1935,16 @@ export class MoveInService {
       throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
     }
 
-    // Only requests in 'new' status can be cancelled by users
-    if (mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN) {
+    // Users can cancel requests in 'new', 'rfi-pending', or 'rfi-submitted' status
+    // Cannot cancel if already approved, cancelled, user-cancelled, or closed
+    const notAllowedStatuses = [
+      MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
+      MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED,
+      MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED,
+      MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED
+    ];
+
+    if (notAllowedStatuses.includes(mir.status)) {
       throw new ApiError(httpStatus.BAD_REQUEST,
         APICodes.CANNOT_CANCEL_MOBILE_STATUS.message,
         APICodes.CANNOT_CANCEL_MOBILE_STATUS.code);

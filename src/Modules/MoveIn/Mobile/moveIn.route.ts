@@ -2914,7 +2914,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  * /move-in/request/{requestId}/cancel:
  *   put:
  *     summary: Cancel move-in request (Mobile)
- *     description: Cancel an existing move-in request. Only requests in 'new' status can be cancelled. Cancellation remarks are optional.
+ *     description: Cancel an existing move-in request. Users can cancel requests in 'new', 'rfi-pending', or 'rfi-submitted' status. Cannot cancel if already approved, cancelled, or closed. Cancellation remarks are optional.
  *     tags: [MoveIn]
  *     security:
  *       - bearerAuth: []
@@ -2972,7 +2972,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                       type: string
  *                       example: "Move-in request cancelled successfully"
  *       400:
- *         description: Bad request - validation error
+ *         description: Bad request - validation error or request cannot be cancelled in current status
  *         content:
  *           application/json:
  *             schema:
@@ -2983,7 +2983,7 @@ router.put('/request/:requestId/cancel', auth.auth(), validate(moveInValidation.
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: "Only requests in 'new' status can be cancelled"
+ *                   example: "Cannot cancel request in current status. Requests that are approved, cancelled, or closed cannot be cancelled by users."
  *                 code:
  *                   type: string
  *                   example: "EC207"
