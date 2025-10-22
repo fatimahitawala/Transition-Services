@@ -379,6 +379,15 @@ export class MoveInService {
 
   async createOwnerMoveIn(data: any, user: any) {
     try {
+      logger.info(`=== CREATE OWNER MOVE-IN START (MOBILE) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
+      // Validate Welcome Pack and MIP before proceeding
+      if (data.unitId) {
+        await this.validateWelcomePackAndMIP(Number(data.unitId));
+        logger.info(`Welcome Pack and MIP validation passed for owner move-in, unit: ${data.unitId}`);
+      }
+      
       // Map owner UI fields to details (user details come from Users table, not stored here)
       const { details = {}, ...rest } = data || {};
       const ownerDetails = {
@@ -394,6 +403,7 @@ export class MoveInService {
       };
 
       logger.debug(`Owner Details mapped: ${JSON.stringify(ownerDetails)}`);
+      logger.info(`=== CREATE OWNER MOVE-IN END (MOBILE) ===`);
       return this.createMoveIn({ ...rest, details: ownerDetails, requestType: MOVE_IN_USER_TYPES.OWNER }, user);
     } catch (error) {
       logger.error(`Error in createOwnerMoveIn Mobile: ${JSON.stringify(error)}`);
@@ -450,32 +460,47 @@ export class MoveInService {
   }
 
   async createHhoOwnerMoveIn(data: any, user: any) {
-    // Map HHO Owner UI fields to details - owner details come from root level
-    const { details = {}, ...rest } = data || {};
-    const hhoDetails = {
-      // Required owner identity fields from root level (required by validation)
-      ownerFirstName: rest.ownerFirstName,
-      ownerLastName: rest.ownerLastName,
-      email: rest.email,
-      dialCode: rest.dialCode,
-      phoneNumber: rest.phoneNumber,
-      nationality: rest.nationality,
+    try {
+      logger.info(`=== CREATE HHO OWNER MOVE-IN START (MOBILE) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
+      // Validate Welcome Pack and MIP before proceeding
+      if (data.unitId) {
+        await this.validateWelcomePackAndMIP(Number(data.unitId));
+        logger.info(`Welcome Pack and MIP validation passed for HHO owner move-in, unit: ${data.unitId}`);
+      }
+      
+      // Map HHO Owner UI fields to details - owner details come from root level
+      const { details = {}, ...rest } = data || {};
+      const hhoDetails = {
+        // Required owner identity fields from root level (required by validation)
+        ownerFirstName: rest.ownerFirstName,
+        ownerLastName: rest.ownerLastName,
+        email: rest.email,
+        dialCode: rest.dialCode,
+        phoneNumber: rest.phoneNumber,
+        nationality: rest.nationality,
 
-      // Permit fields coming from the mobile UI payload
-      unitPermitNumber: details.unitPermitNumber,
-      unitPermitStartDate: details.unitPermitStartDate,
-      unitPermitExpiryDate: details.unitPermitExpiryDate,
+        // Permit fields coming from the mobile UI payload
+        unitPermitNumber: details.unitPermitNumber,
+        unitPermitStartDate: details.unitPermitStartDate,
+        unitPermitExpiryDate: details.unitPermitExpiryDate,
 
-      // Determination details
-      peopleOfDetermination: details.peopleOfDetermination,
-      determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
-      termsAccepted: details.termsAccepted,
+        // Determination details
+        peopleOfDetermination: details.peopleOfDetermination,
+        determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
+        termsAccepted: details.termsAccepted,
 
-      // Optional comment
-      comments: rest.comments || null,
-    };
+        // Optional comment
+        comments: rest.comments || null,
+      };
 
-    return this.createMoveIn({ ...rest, details: hhoDetails, requestType: MOVE_IN_USER_TYPES.HHO_OWNER }, user);
+      logger.info(`=== CREATE HHO OWNER MOVE-IN END (MOBILE) ===`);
+      return this.createMoveIn({ ...rest, details: hhoDetails, requestType: MOVE_IN_USER_TYPES.HHO_OWNER }, user);
+    } catch (error) {
+      logger.error(`Error in createHhoOwnerMoveIn Mobile: ${JSON.stringify(error)}`);
+      throw error;
+    }
   }
 
   async createHhcCompanyMoveIn(data: any, user: any) {
@@ -1164,9 +1189,6 @@ export class MoveInService {
       let createdDetails: any = null;
 
       await executeInTransaction(async (qr: any) => {
-        // Validate Welcome Pack and MIP configuration INSIDE transaction to ensure it blocks
-        await this.validateWelcomePackAndMIP(Number(unitId));
-
         // Create master record
         const master = new MoveInRequests();
         master.moveInRequestNo = tempRequestNumber;
