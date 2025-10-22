@@ -1158,15 +1158,15 @@ export class MoveInService {
         throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
       }
 
-      // Validate Welcome Pack and MIP configuration
-      await this.validateWelcomePackAndMIP(Number(unitId));
-
       const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
 
       let createdMaster: MoveInRequests | undefined;
       let createdDetails: any = null;
 
       await executeInTransaction(async (qr: any) => {
+        // Validate Welcome Pack and MIP configuration INSIDE transaction to ensure it blocks
+        await this.validateWelcomePackAndMIP(Number(unitId));
+
         // Create master record
         const master = new MoveInRequests();
         master.moveInRequestNo = tempRequestNumber;
@@ -1333,6 +1333,13 @@ export class MoveInService {
       };
     } catch (error: any) {
       logger.error(`Error in createMoveIn: ${JSON.stringify(error)}`);
+      
+      // If it's already an ApiError, re-throw it as-is to preserve status code and message
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      // For other errors, wrap them
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
       throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
     }
