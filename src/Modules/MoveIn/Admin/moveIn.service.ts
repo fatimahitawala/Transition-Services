@@ -247,9 +247,6 @@ export class MoveInService {
             APICodes.OVERLAPPING_REQUESTS.code
           );
         }
-
-        // 3. Check if MIP template and Welcome pack exist and are active
-        await this.validateWelcomePackAndMIP(Number(unitId));
       }
 
       const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
@@ -258,6 +255,11 @@ export class MoveInService {
       let createdDetails: any = null;
 
       await executeInTransaction(async (qr: any) => {
+        // 3. Check if MIP template and Welcome pack exist and are active INSIDE transaction to ensure it blocks
+        if (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
+          await this.validateWelcomePackAndMIP(Number(unitId));
+        }
+
         // Create master record
         const master = new MoveInRequests();
         master.moveInRequestNo = tempRequestNumber;
@@ -2713,7 +2715,7 @@ export class MoveInService {
           unit: data.unitId ? { id: data.unitId } : undefined,
           moveInDate: data.moveInDate,
           status: data.status,
-          user: data.userId ? { id: data.userId } : undefined,
+          user: { id: data.userId },
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
@@ -2770,7 +2772,7 @@ export class MoveInService {
           status: data.status,
           comments: data.comments || null,
           additionalInfo: data.additionalInfo || null,
-          user: data.userId ? { id: data.userId } : undefined,
+          user: { id: data.userId },
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
@@ -2838,7 +2840,7 @@ export class MoveInService {
           status: data.status,
           comments: data.comments || null,
           additionalInfo: data.additionalInfo || null,
-          user: data.userId ? { id: data.userId } : undefined,
+          user: { id: data.userId },
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
@@ -2899,7 +2901,7 @@ export class MoveInService {
           status: data.status,
           comments: data.comments || null,
           additionalInfo: data.additionalInfo || null,
-          user: data.userId ? { id: data.userId } : undefined,
+          user: { id: data.userId },
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
