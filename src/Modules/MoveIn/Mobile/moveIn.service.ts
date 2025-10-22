@@ -403,6 +403,15 @@ export class MoveInService {
 
   async createTenantMoveIn(data: any, user: any) {
     try {
+      logger.info(`=== CREATE TENANT MOVE-IN START (MOBILE) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
+      // Validate Welcome Pack and MIP before proceeding
+      if (data.unitId) {
+        await this.validateWelcomePackAndMIP(Number(data.unitId));
+        logger.info(`Welcome Pack and MIP validation passed for tenant move-in, unit: ${data.unitId}`);
+      }
+      
       // Map tenant UI fields to details (user details come from Users table, not stored here)
       const { details = {}, ...rest } = data || {};
       const tenantDetails = {
@@ -432,6 +441,7 @@ export class MoveInService {
       };
 
       logger.debug(`Tenant Details mapped: ${JSON.stringify(tenantDetails)}`);
+      logger.info(`=== CREATE TENANT MOVE-IN END (MOBILE) ===`);
       return this.createMoveIn({ ...rest, details: tenantDetails, requestType: MOVE_IN_USER_TYPES.TENANT }, user);
     } catch (error) {
       logger.error(`Error in createTenantMoveIn Mobile: ${JSON.stringify(error)}`);
@@ -469,18 +479,33 @@ export class MoveInService {
   }
 
   async createHhcCompanyMoveIn(data: any, user: any) {
-    // Map determination details for HHC Company
-    const { details = {}, ...rest } = data || {};
-    const hhcDetails = {
-      // Determination details (must be set before spread operator)
-      peopleOfDetermination: details.peopleOfDetermination,
-      determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
-      termsAccepted: details.termsAccepted,
-      // Spread other details after setting determination fields
-      ...details,
-    };
+    try {
+      logger.info(`=== CREATE HHC COMPANY MOVE-IN START (MOBILE) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
+      // Validate Welcome Pack and MIP before proceeding
+      if (data.unitId) {
+        await this.validateWelcomePackAndMIP(Number(data.unitId));
+        logger.info(`Welcome Pack and MIP validation passed for HHC company move-in, unit: ${data.unitId}`);
+      }
+      
+      // Map determination details for HHC Company
+      const { details = {}, ...rest } = data || {};
+      const hhcDetails = {
+        // Determination details (must be set before spread operator)
+        peopleOfDetermination: details.peopleOfDetermination,
+        determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
+        termsAccepted: details.termsAccepted,
+        // Spread other details after setting determination fields
+        ...details,
+      };
 
-    return this.createMoveIn({ ...rest, details: hhcDetails, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
+      logger.info(`=== CREATE HHC COMPANY MOVE-IN END (MOBILE) ===`);
+      return this.createMoveIn({ ...rest, details: hhcDetails, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
+    } catch (error) {
+      logger.error(`Error in createHhcCompanyMoveIn Mobile: ${JSON.stringify(error)}`);
+      throw error;
+    }
   }
 
 
