@@ -255,11 +255,6 @@ export class MoveInService {
       let createdDetails: any = null;
 
       await executeInTransaction(async (qr: any) => {
-        // 3. Check if MIP template and Welcome pack exist and are active INSIDE transaction to ensure it blocks
-        if (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
-          await this.validateWelcomePackAndMIP(Number(unitId));
-        }
-
         // Create master record
         const master = new MoveInRequests();
         master.moveInRequestNo = tempRequestNumber;
@@ -645,6 +640,12 @@ export class MoveInService {
       logger.info(`Input data: ${JSON.stringify(data)}`);
       logger.info(`User: ${JSON.stringify(user)}`);
 
+      // Validate Welcome Pack and MIP before proceeding
+      if (data.unitId) {
+        await this.validateWelcomePackAndMIP(Number(data.unitId));
+        logger.info(`Welcome Pack and MIP validation passed for owner move-in, unit: ${data.unitId}`);
+      }
+
       // Map owner UI fields to details (user details come from Users table, not stored here)
       const { details = {}, ...rest } = data || {};
       const ownerDetails = {
@@ -678,6 +679,15 @@ export class MoveInService {
 
   async createTenantMoveIn(data: any, user: any) {
     try {
+      logger.info(`=== CREATE TENANT MOVE-IN START (ADMIN) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
+      // Validate Welcome Pack and MIP before proceeding
+      if (data.unitId) {
+        await this.validateWelcomePackAndMIP(Number(data.unitId));
+        logger.info(`Welcome Pack and MIP validation passed for tenant move-in, unit: ${data.unitId}`);
+      }
+      
       // Map tenant UI fields to details (user details come from Users table, not stored here)
       const { details = {}, ...rest } = data || {};
       const tenantDetails = {
@@ -716,6 +726,15 @@ export class MoveInService {
 
   async createHhoOwnerMoveIn(data: any, user: any) {
     try {
+      logger.info(`=== CREATE HHO OWNER MOVE-IN START (ADMIN) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
+      // Validate Welcome Pack and MIP before proceeding
+      if (data.unitId) {
+        await this.validateWelcomePackAndMIP(Number(data.unitId));
+        logger.info(`Welcome Pack and MIP validation passed for HHO owner move-in, unit: ${data.unitId}`);
+      }
+      
       // Map HHO Owner UI fields to details
       const { details = {}, ...rest } = data || {};
       const hhoOwnerDetails = {
@@ -751,6 +770,15 @@ export class MoveInService {
 
   async createHhcCompanyMoveIn(data: any, user: any) {
     try {
+      logger.info(`=== CREATE HHC COMPANY MOVE-IN START (ADMIN) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
+      // Validate Welcome Pack and MIP before proceeding
+      if (data.unitId) {
+        await this.validateWelcomePackAndMIP(Number(data.unitId));
+        logger.info(`Welcome Pack and MIP validation passed for HHC company move-in, unit: ${data.unitId}`);
+      }
+      
       const { details = {}, ...rest } = data || {};
       const hhcCompanyDetails = {
         name: rest.name,
