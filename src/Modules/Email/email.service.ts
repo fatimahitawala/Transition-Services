@@ -42,7 +42,8 @@ import { IsNull } from 'typeorm';
 export interface EmailAttachment {
     filename: string;        // Display name for the attachment
     content?: Buffer;        // File content as buffer (for generated PDFs)
-    path?: string;           // File path or URL (for existing files)
+    path?: string;           // Local file path (for existing files)
+    href?: string;           // Remote URL (for files hosted online)
     contentType?: string;     // MIME type of the attachment
 }
 
@@ -201,12 +202,27 @@ export class EmailService {
             
             // Add attachments if provided (enhancement over User-Services)
             if (attachments && attachments.length > 0) {
-                msg.attachments = attachments.map(att => ({
-                    filename: att.filename,
-                    content: att.content,
-                    path: att.path,
-                    contentType: att.contentType
-                }));
+                msg.attachments = attachments.map(att => {
+                    const attachment: any = {
+                        filename: att.filename,
+                        contentType: att.contentType
+                    };
+                    
+                    // Use content if provided (for generated PDFs)
+                    if (att.content) {
+                        attachment.content = att.content;
+                    } 
+                    // Use href for remote URLs (Azure Blob Storage)
+                    else if (att.href) {
+                        attachment.href = att.href;
+                    } 
+                    // Use path for local files
+                    else if (att.path) {
+                        attachment.path = att.path;
+                    }
+                    
+                    return attachment;
+                });
                 logger.info(`Attachments added: ${attachments.map(a => a.filename).join(', ')}`);
             }
             
@@ -524,7 +540,7 @@ export class EmailService {
                 
                 return {
                     filename: welcomePack.file.fileOriginalName || 'welcome-pack.pdf',
-                    path: fileUrl, // nodemailer can handle URLs
+                    href: fileUrl, // Use href for remote URLs
                     contentType: welcomePack.file.fileType || 'application/pdf'
                 };
             }
@@ -904,7 +920,7 @@ export class EmailService {
                 
                 if (welcomePackAttachment) {
                     attachments.push(welcomePackAttachment);
-                    welcomePackUrl = welcomePackAttachment.path || '';
+                    welcomePackUrl = welcomePackAttachment.href || welcomePackAttachment.path || '';
                     logger.info(`Welcome pack attachment found and added (${welcomePackAttachment.filename})`);
                 } else {
                     logger.warn(`No welcome pack found for community ${data.unitDetails.communityId}, tower ${data.unitDetails.towerId}`);
@@ -1259,6 +1275,9 @@ export class EmailService {
      * @returns {string} - Comprehensive HTML email body
      */
     private createDetailedApprovalEmailBody(data: MoveInEmailData, welcomePackUrl: string = ''): string {
+        // Get recipient name
+        const recipientName = `${data.userDetails.firstName} ${data.userDetails.lastName}`.trim() || 'homeowner';
+        
         // If welcome pack URL is provided, use it; otherwise show a message
         const welcomePackButton = welcomePackUrl ? 
             `<a href="${welcomePackUrl}" target="_blank" rel="noopener"
@@ -1292,7 +1311,7 @@ export class EmailService {
           <!-- Body -->
           <tr>
             <td style="padding:24px;">
-              <p style="margin:0 0 12px 0;font-size:15px;">Dear homeowner,</p>
+              <p style="margin:0 0 12px 0;font-size:15px;">Dear ${recipientName},</p>
 
               <p style="margin:0 0 12px 0;font-size:15px;line-height:1.5;">
                 We have reviewed your request and enclose herein your Move In Permit
@@ -1417,86 +1436,99 @@ export class EmailService {
             'Not specified';
         const occupantName = data.additionalInfo?.occupantName || applicantName;
 
-        return `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <!-- Header Image with Frame -->
-            <div style="width: 100%; margin-bottom: 20px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
-                <img src="https://res.cloudinary.com/ddbdlqjcq/image/upload/v1755076402/Screenshot_2025-08-13_142428_1_qwua5y.png" 
-                     alt="ONE Sobha Header" 
-                     style="width: 100%; height: auto; display: block;" />
-            </div>
-            
-            <!-- Email Content -->
-            <div style="padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
-                <h2 style="color: #333; margin-bottom: 15px;">Move-in Request Raised - ${data.requestNumber}</h2>
-                
-                <div style="background-color: #fff; border: 1px solid #ddd; padding: 20px; border-radius: 5px; margin: 15px 0;">
-                    <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                        Dear Team,
-                    </p>
-                    
-                    <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                        This is to notify you that a new Move In Permit (MIP) has been issued.
-                    </p>
-                    
-                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <tr>
-                                <td style="padding: 8px 0; font-weight: bold; width: 40%; color: #333;">MIP reference no.:</td>
-                                <td style="padding: 8px 0; color: #666;">${data.requestNumber}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; font-weight: bold; color: #333;">User type:</td>
-                                <td style="padding: 8px 0; color: #666;">${userType}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Property details:</td>
-                                <td style="padding: 8px 0; color: #666;">${data.unitDetails.unitNumber || 'Not specified'} - ${data.unitDetails.unitName || 'Not specified'}, ${data.unitDetails.communityName || 'Not specified'}${data.unitDetails.towerName ? ', ' + data.unitDetails.towerName : ''}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Applicant name:</td>
-                                <td style="padding: 8px 0; color: #666;">${applicantName}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Occupant name:</td>
-                                <td style="padding: 8px 0; color: #666;">${occupantName}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Move in date:</td>
-                                <td style="padding: 8px 0; color: #666;">${moveInDate || 'Not specified'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Move out date:</td>
-                                <td style="padding: 8px 0; color: #666;">${moveOutDate || 'Not specified'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; font-weight: bold; color: #333;">Start date (lease):</td>
-                                <td style="padding: 8px 0; color: #666;">${startDate || 'Not specified'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; font-weight: bold; color: #333;">End date (lease):</td>
-                                <td style="padding: 8px 0; color: #666;">${endDate || 'Not specified'}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; font-weight: bold; color: #333;">MIP date of issue:</td>
-                                <td style="padding: 8px 0; color: #666;">${mipIssueDate}</td>
-                            </tr>
-                        </table>
-                    </div>
-                    
-                    <p style="color: #333; font-size: 16px; line-height: 1.6; margin: 20px 0 0 0;">
-                        Kind regards,<br>
-                        Sobha Community Management
-                    </p>
-                </div>
-            </div>
-            
-            <!-- Footer -->
-            <div style="text-align: center; margin-top: 20px; padding: 15px; color: #999; font-size: 12px;">
-                <p>This is an automated message from ONE Sobha App</p>
-                <p>For support, please contact your community management team</p>
-            </div>
-        </div>`;
+        return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Move In Permit Notification</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial, Helvetica, sans-serif;color:#333;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f4f6f8;padding:20px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="background:#ffffff;border-radius:6px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background:#0b63a5;padding:20px 24px;color:#ffffff;">
+              <h1 style="margin:0;font-size:18px;font-weight:600;">Sobha Community Management</h1>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:24px;">
+              <p style="margin:0 0 12px 0;font-size:15px;">Dear Team,</p>
+
+              <p style="margin:0 0 18px 0;font-size:15px;line-height:1.5;">
+                This is to notify you that a new Move In Permit (MIP) has been issued.
+              </p>
+
+              <div style="background-color:#f8f9fa;padding:15px;border-radius:5px;margin:15px 0;">
+                <table style="width:100%;border-collapse:collapse;">
+                  <tr>
+                    <td style="padding:8px 0;font-weight:bold;width:40%;color:#333;">MIP reference no.:</td>
+                    <td style="padding:8px 0;color:#666;">${data.requestNumber}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-weight:bold;color:#333;">User type:</td>
+                    <td style="padding:8px 0;color:#666;">${userType}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-weight:bold;color:#333;">Property details:</td>
+                    <td style="padding:8px 0;color:#666;">${data.unitDetails.unitNumber || 'Not specified'} - ${data.unitDetails.unitName || 'Not specified'}, ${data.unitDetails.communityName || 'Not specified'}${data.unitDetails.towerName ? ', ' + data.unitDetails.towerName : ''}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-weight:bold;color:#333;">Applicant name:</td>
+                    <td style="padding:8px 0;color:#666;">${applicantName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-weight:bold;color:#333;">Occupant name:</td>
+                    <td style="padding:8px 0;color:#666;">${occupantName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-weight:bold;color:#333;">Move in date:</td>
+                    <td style="padding:8px 0;color:#666;">${moveInDate || 'Not specified'}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-weight:bold;color:#333;">Move out date:</td>
+                    <td style="padding:8px 0;color:#666;">${moveOutDate || 'Not specified'}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-weight:bold;color:#333;">Start date (lease):</td>
+                    <td style="padding:8px 0;color:#666;">${startDate || 'Not specified'}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-weight:bold;color:#333;">End date (lease):</td>
+                    <td style="padding:8px 0;color:#666;">${endDate || 'Not specified'}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-weight:bold;color:#333;">MIP date of issue:</td>
+                    <td style="padding:8px 0;color:#666;">${mipIssueDate}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <p style="margin:0 0 4px 0;font-size:15px;">Kind regards,</p>
+              <p style="margin:0;font-size:15px;font-weight:600;">Sobha Community Management</p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f0f4f8;padding:14px 24px;font-size:12px;color:#666;">
+              <span>© Sobha Community Management</span>
+              <span style="float:right;">Reference: ${data.requestNumber}</span>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
     }
 
     /**
