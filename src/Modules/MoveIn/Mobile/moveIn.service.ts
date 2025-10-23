@@ -382,12 +382,6 @@ export class MoveInService {
       logger.info(`=== CREATE OWNER MOVE-IN START (MOBILE) ===`);
       logger.info(`Unit ID: ${data.unitId}`);
       
-      // Validate Welcome Pack and MIP before proceeding
-      if (data.unitId) {
-        await this.validateWelcomePackAndMIP(Number(data.unitId));
-        logger.info(`Welcome Pack and MIP validation passed for owner move-in, unit: ${data.unitId}`);
-      }
-      
       // Map owner UI fields to details (user details come from Users table, not stored here)
       const { details = {}, ...rest } = data || {};
       const ownerDetails = {
@@ -415,12 +409,6 @@ export class MoveInService {
     try {
       logger.info(`=== CREATE TENANT MOVE-IN START (MOBILE) ===`);
       logger.info(`Unit ID: ${data.unitId}`);
-      
-      // Validate Welcome Pack and MIP before proceeding
-      if (data.unitId) {
-        await this.validateWelcomePackAndMIP(Number(data.unitId));
-        logger.info(`Welcome Pack and MIP validation passed for tenant move-in, unit: ${data.unitId}`);
-      }
       
       // Map tenant UI fields to details (user details come from Users table, not stored here)
       const { details = {}, ...rest } = data || {};
@@ -464,12 +452,6 @@ export class MoveInService {
       logger.info(`=== CREATE HHO OWNER MOVE-IN START (MOBILE) ===`);
       logger.info(`Unit ID: ${data.unitId}`);
       
-      // Validate Welcome Pack and MIP before proceeding
-      if (data.unitId) {
-        await this.validateWelcomePackAndMIP(Number(data.unitId));
-        logger.info(`Welcome Pack and MIP validation passed for HHO owner move-in, unit: ${data.unitId}`);
-      }
-      
       // Map HHO Owner UI fields to details - owner details come from root level
       const { details = {}, ...rest } = data || {};
       const hhoDetails = {
@@ -507,12 +489,6 @@ export class MoveInService {
     try {
       logger.info(`=== CREATE HHC COMPANY MOVE-IN START (MOBILE) ===`);
       logger.info(`Unit ID: ${data.unitId}`);
-      
-      // Validate Welcome Pack and MIP before proceeding
-      if (data.unitId) {
-        await this.validateWelcomePackAndMIP(Number(data.unitId));
-        logger.info(`Welcome Pack and MIP validation passed for HHC company move-in, unit: ${data.unitId}`);
-      }
       
       // Map determination details for HHC Company
       const { details = {}, ...rest } = data || {};
