@@ -1365,11 +1365,15 @@ export class MoveInService {
   // Check if MIP template and Welcome pack exist for the unit
   private async checkMIPAndWelcomePack(unitId: number): Promise<{ hasMIP: boolean; hasWelcomePack: boolean }> {
     try {
-      // TODO: Implement MIP template check
-      // TODO: Implement Welcome pack check
-      // For now, return true to allow development
+      // Use the existing validateWelcomePackAndMIP method which validates both
+      await this.validateWelcomePackAndMIP(unitId);
       return { hasMIP: true, hasWelcomePack: true };
     } catch (error) {
+      // If validation fails, return false
+      if (error instanceof ApiError) {
+        logger.error(`Error checking MIP and Welcome pack: ${error.message}`);
+        return { hasMIP: false, hasWelcomePack: false };
+      }
       logger.error(`Error checking MIP and Welcome pack: ${error}`);
       throw new ApiError(
         httpStatus.INTERNAL_SERVER_ERROR,
@@ -1628,8 +1632,8 @@ export class MoveInService {
       if (!mipCheck.hasMIP) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          APICodes.MIP_TEMPLATE_NOT_AVAILABLE.message,
-          APICodes.MIP_TEMPLATE_NOT_AVAILABLE.code
+          APICodes.MIP_NOT_CONFIGURED.message,
+          APICodes.MIP_NOT_CONFIGURED.code
         );
       }
 
