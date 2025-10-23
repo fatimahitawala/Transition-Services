@@ -1632,8 +1632,8 @@ export class MoveInService {
       if (!mipCheck.hasMIP) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          APICodes.MIP_TEMPLATE_NOT_AVAILABLE.message,
-          APICodes.MIP_TEMPLATE_NOT_AVAILABLE.code
+          APICodes.MIP_NOT_CONFIGURED.message,
+          APICodes.MIP_NOT_CONFIGURED.code
         );
       }
 
