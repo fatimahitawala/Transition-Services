@@ -879,11 +879,12 @@ export class EmailService {
 
             // Generate attachments only for user emails, not for recipient emails
             const attachments: EmailAttachment[] = [];
+            let welcomePackUrl = '';
             
             if (!data.isRecipientEmail) {
                 // Generate MIP template as PDF attachment
                 logger.info(`Generating MIP template as PDF attachment...`);
-                const mipTemplateHtml = this.getMIPTemplateHTML(data);
+                const mipTemplateHtml = await this.getMIPTemplateHTML(data);
                 const mipPdfAttachment = await this.generateMIPTemplatePDF(mipTemplateHtml, data);
 
                 // Get welcome pack attachment
@@ -903,6 +904,7 @@ export class EmailService {
                 
                 if (welcomePackAttachment) {
                     attachments.push(welcomePackAttachment);
+                    welcomePackUrl = welcomePackAttachment.path || '';
                     logger.info(`Welcome pack attachment found and added (${welcomePackAttachment.filename})`);
                 } else {
                     logger.warn(`No welcome pack found for community ${data.unitDetails.communityId}, tower ${data.unitDetails.towerId}`);
@@ -916,7 +918,7 @@ export class EmailService {
             // Create detailed email body with header image and move-in permit content
             const emailBody = data.isRecipientEmail ? 
                 this.createRecipientApprovalEmailBody(data) : 
-                this.createDetailedApprovalEmailBody(data);
+                this.createDetailedApprovalEmailBody(data, welcomePackUrl);
 
             // Generate subject
             const subject = this.getEmailSubject('approved', data.requestNumber, data.isRecipientEmail, data);
@@ -954,148 +956,156 @@ export class EmailService {
      * @param {MoveInEmailData} data - Complete email data for template generation
      * @returns {string} - Complete HTML document ready for PDF conversion
      */
-    private getMIPTemplateHTML(data: MoveInEmailData): string {
-        // Use the uploaded MIP template and replace placeholders
-        const template = `<!DOCTYPE html>
+    private async getMIPTemplateHTML(data: MoveInEmailData): Promise<string> {
+        try {
+            // Fetch MIP template from database
+            logger.info(`Fetching MIP template from database for MC:${data.unitDetails.masterCommunityId}, C:${data.unitDetails.communityId}, T:${data.unitDetails.towerId}`);
+            
+            const templateRepository = AppDataSource.getRepository(OccupancyRequestTemplates);
+            let template = null;
+            
+            // Try to find template with exact match (tower → community → master community hierarchy)
+            // 1. First try: Tower-specific template
+            if (data.unitDetails.towerId) {
+                template = await templateRepository.findOne({
+                    where: {
+                        masterCommunityId: data.unitDetails.masterCommunityId,
+                        communityId: data.unitDetails.communityId,
+                        towerId: data.unitDetails.towerId,
+                        templateType: OCUPANCY_REQUEST_TYPES.MOVE_IN,
+                        isActive: true
+                    }
+                });
+                if (template) {
+                    logger.info(`Found tower-specific MIP template`);
+                }
+            }
+            
+            // 2. Second try: Community-level template (no tower)
+            if (!template) {
+                template = await templateRepository.findOne({
+                    where: {
+                        masterCommunityId: data.unitDetails.masterCommunityId,
+                        communityId: data.unitDetails.communityId,
+                        towerId: IsNull(),
+                        templateType: OCUPANCY_REQUEST_TYPES.MOVE_IN,
+                        isActive: true
+                    }
+                });
+                if (template) {
+                    logger.info(`Found community-specific MIP template`);
+                }
+            }
+            
+            // 3. Third try: Master community level template
+            if (!template) {
+                template = await templateRepository.findOne({
+                    where: {
+                        masterCommunityId: data.unitDetails.masterCommunityId,
+                        communityId: IsNull(),
+                        towerId: IsNull(),
+                        templateType: OCUPANCY_REQUEST_TYPES.MOVE_IN,
+                        isActive: true
+                    }
+                });
+                if (template) {
+                    logger.info(`Found master community MIP template`);
+                }
+            }
+            
+            if (!template || !template.templateString) {
+                logger.warn(`No MIP template found in database, using fallback template`);
+                return this.getFallbackMIPTemplate(data);
+            }
+            
+            logger.info(`MIP template found in database (length: ${template.templateString.length} chars)`);
+            
+            // Replace placeholders with actual data
+            const processedTemplate = this.replaceMIPPlaceholders(template.templateString, data);
+            
+            return processedTemplate;
+        } catch (error) {
+            logger.error('Error fetching MIP template from database:', error);
+            return this.getFallbackMIPTemplate(data);
+        }
+    }
+    
+    /**
+     * REPLACE MIP TEMPLATE PLACEHOLDERS
+     * ==================================
+     * Replaces only the minimal required placeholders in MIP template
+     */
+    private replaceMIPPlaceholders(template: string, data: MoveInEmailData): string {
+        const occupantName = `${data.userDetails.firstName} ${data.userDetails.lastName}`;
+        const address = `${data.unitDetails.unitNumber || ''} ${data.unitDetails.unitName || ''}`.trim();
+        const community = data.unitDetails.communityName || '';
+        const moveInDate = data.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        }) : '';
+        const dateOfIssue = new Date().toLocaleDateString('en-GB', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        
+        const replacements: Record<string, string> = {
+            '{{REFERENCE_NO}}': data.requestNumber,
+            '{{MOVE_IN_DATE}}': moveInDate,
+            '{{OCCUPANT_NAME}}': occupantName,
+            '{{ADDRESS}}': address,
+            '{{COMMUNITY}}': community,
+            '{{DATE_OF_ISSUE}}': dateOfIssue
+        };
+        
+        let processedTemplate = template;
+        Object.entries(replacements).forEach(([placeholder, value]) => {
+            processedTemplate = processedTemplate.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
+        });
+        
+        return processedTemplate;
+    }
+    
+    /**
+     * FALLBACK MIP TEMPLATE
+     * =====================
+     * Used when no template is found in database
+     */
+    private getFallbackMIPTemplate(data: MoveInEmailData): string {
+        const occupantName = `${data.userDetails.firstName} ${data.userDetails.lastName}`;
+        const address = `${data.unitDetails.unitNumber || ''} ${data.unitDetails.unitName || ''}`.trim();
+        const community = data.unitDetails.communityName || '';
+        const moveInDate = data.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        }) : '';
+        const dateOfIssue = new Date().toLocaleDateString('en-GB', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        
+        return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Move-In Request Update - ONE Sobha App</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .header-image {
-            width: 100%;
-            margin-bottom: 20px;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-        .header-image img {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
-        .header {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-        .content {
-            background-color: white;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        .details-box {
-            background-color: #f1f3f4;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 15px 0;
-        }
-        .status-approved {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 15px 0;
-        }
-        .status-rfi {
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 15px 0;
-        }
-        .status-cancelled {
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 15px 0;
-        }
-        .footer {
-            text-align: center;
-            margin-top: 20px;
-            color: #666;
-            font-size: 12px;
-        }
-    </style>
+    <title>Move In Permit</title>
 </head>
-<body>
-    <!-- Header Image with Frame -->
-    <div class="header-image">
-        <img src="https://res.cloudinary.com/ddbdlqjcq/image/upload/v1755076402/Screenshot_2025-08-13_142428_1_qwua5y.png" 
-             alt="ONE Sobha Header" />
-    </div>
+<body style="margin:0;padding:20px;font-family:Arial, sans-serif;">
+    <h2>Your move in date starts from ${moveInDate}</h2>
+    <h3>Ref # ${data.requestNumber}</h3>
     
-    <div class="header">
-        <h2 style="color: #333; margin: 0;">ONE Sobha App - Move-In Request Update</h2>
-    </div>
-    
-    <div class="content">
-        <p>Dear {{fullName}},</p>
-        
-        <p>Your move-in request <strong>{{requestNumber}}</strong> for unit <strong>{{unitName}}</strong> has been updated.</p>
-        
-        <div class="details-box">
-            <h3 style="margin: 0 0 10px 0; color: #333;">Request Details:</h3>
-            <p><strong>Request Number:</strong> {{requestNumber}}</p>
-            <p><strong>Unit:</strong> {{unitName}}</p>
-            <p><strong>Community:</strong> {{communityName}}</p>
-            <p><strong>Master Community:</strong> {{masterCommunityName}}</p>
-            <p><strong>Tower:</strong> {{towerName}}</p>
-            <p><strong>Status:</strong> <span style="color: #007bff; font-weight: bold;">{{status}}</span></p>
-            <p><strong>Move-in Date:</strong> {{moveInDate}}</p>
-            <p><strong>Comments:</strong> {{comments}}</p>
-        </div>
-        
-        <!-- Status-specific content will be inserted here -->
-        <div class="status-approved">
-            <h3 style="margin: 0 0 10px 0;">🎉 Congratulations! Your move-in request has been approved!</h3>
-            <p>You can now proceed with your move-in as scheduled. Please find your welcome pack attached to this email.</p>
-            <p>Please ensure you have all required documents ready for the move-in process.</p>
-        </div>
-        
-        <h3 style="color: #333; margin-top: 25px;">Next Steps:</h3>
-        <ul>
-            <li>Review the attached welcome pack for detailed move-in instructions</li>
-            <li>Ensure all required documents are ready</li>
-            <li>Contact the community management team if you have any questions</li>
-            <li>Arrive at the scheduled move-in time</li>
-        </ul>
-        
-        <h3 style="color: #333; margin-top: 25px;">Important Information:</h3>
-        <ul>
-            <li>Bring a valid ID for verification</li>
-            <li>Ensure all utilities are connected</li>
-            <li>Check parking arrangements if applicable</li>
-            <li>Review community rules and regulations</li>
-        </ul>
-        
-        <p>If you have any questions, please contact our support team at {{supportEmail}}.</p>
-        
-        <p>Best regards,<br>Team @ {{companyName}}</p>
-    </div>
-    
-    <div class="footer">
-        <p>© {{currentYear}} {{companyName}}. All rights reserved.</p>
+    <div style="margin-top:30px;">
+        <p><strong>Occupant name:</strong> ${occupantName}</p>
+        <p><strong>Address:</strong> ${address}</p>
+        <p><strong>Community:</strong> ${community}</p>
+        <p><strong>Date of issue:</strong> ${dateOfIssue}</p>
     </div>
 </body>
 </html>`;
-
-        // Replace placeholders with actual data
-        return this.replaceTemplatePlaceholders(template, data);
     }
 
     /**
@@ -1248,82 +1258,87 @@ export class EmailService {
      * @param {MoveInEmailData} data - Complete email data for content generation
      * @returns {string} - Comprehensive HTML email body
      */
-    private createDetailedApprovalEmailBody(data: MoveInEmailData): string {
-        const statusMessage = this.getStatusMessage('approved');
-        const nextSteps = this.getNextSteps('approved');
+    private createDetailedApprovalEmailBody(data: MoveInEmailData, welcomePackUrl: string = ''): string {
+        // If welcome pack URL is provided, use it; otherwise show a message
+        const welcomePackButton = welcomePackUrl ? 
+            `<a href="${welcomePackUrl}" target="_blank" rel="noopener"
+                   style="display:inline-block;background:#0b63a5;color:#ffffff;padding:10px 16px;border-radius:4px;text-decoration:none;font-weight:600;">
+                  Click here to view the Welcome Pack
+                </a>` :
+            `<p style="margin:0 0 18px 0;font-size:15px;line-height:1.5;color:#666;">
+                Welcome Pack is attached to this email.
+              </p>`;
         
-        return `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <!-- Header Image with Frame -->
-            <div style="width: 100%; margin-bottom: 20px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
-                <img src="https://res.cloudinary.com/ddbdlqjcq/image/upload/v1755076402/Screenshot_2025-08-13_142428_1_qwua5y.png" 
-                     alt="ONE Sobha Header" 
-                     style="width: 100%; height: auto; display: block;" />
-            </div>
-            
-            <!-- Email Content -->
-            <div style="padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
-                <h2 style="color: #333; margin-bottom: 15px;">🎉 Move-in Request Approved</h2>
-                
-                <!-- Status Message -->
-                <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                    <h3 style="margin: 0 0 10px 0;">Congratulations! Your move-in request has been approved!</h3>
-                    <p style="margin: 0;">You can now proceed with your move-in as scheduled. Please find your welcome pack and detailed information attached to this email.</p>
-                </div>
-                
-                <!-- Request Details -->
-                <div style="background-color: #fff; border: 1px solid #ddd; padding: 20px; border-radius: 5px; margin: 15px 0;">
-                    <h3 style="color: #333; margin-top: 0;">Request Details</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold; width: 40%;">Occupant Name:</td>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${data.userDetails.firstName} ${data.userDetails.lastName}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold;">Address:</td>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${data.unitDetails.unitNumber} - ${data.unitDetails.unitName}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold;">Community:</td>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${data.unitDetails.communityName}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee; font-weight: bold;">Date of Issue:</td>
-                            <td style="padding: 8px 0; border-bottom: 1px solid #eee;">${new Date().toLocaleDateString()}</td>
-                        </tr>
-                    </table>
-                </div>
-                
-                <!-- Next Steps -->
-                <div style="background-color: #e7f3ff; border: 1px solid #b3d9ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                    <h3 style="color: #333; margin-top: 0;">Next Steps</h3>
-                    <p style="margin: 0; color: #666;">${nextSteps}</p>
-                </div>
-                
-                <!-- Attachments Info -->
-                <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                    <h3 style="color: #333; margin-top: 0;">📎 Attachments</h3>
-                    <ul style="margin: 0; padding-left: 20px;">
-                        <li><strong>MIP Template:</strong> Detailed move-in process information and requirements</li>
-                        <li><strong>Welcome Pack:</strong> Community guidelines, amenities information, and move-in checklist</li>
-                    </ul>
-                </div>
-                
-                <!-- Comments -->
-                ${data.comments ? `
-                <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                    <h3 style="color: #333; margin-top: 0;">Additional Information</h3>
-                    <p style="margin: 0; color: #666;">${data.comments}</p>
-                </div>
-                ` : ''}
-            </div>
-            
-            <!-- Footer -->
-            <div style="text-align: center; margin-top: 20px; padding: 15px; color: #999; font-size: 12px;">
-                <p>This is an automated message from ONE Sobha App</p>
-                <p>For support, please contact your community management team</p>
-            </div>
-        </div>`;
+        return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Move In Permit Approved</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial, Helvetica, sans-serif;color:#333;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f4f6f8;padding:20px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="background:#ffffff;border-radius:6px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background:#0b63a5;padding:20px 24px;color:#ffffff;">
+              <h1 style="margin:0;font-size:18px;font-weight:600;">Sobha Community Management</h1>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:24px;">
+              <p style="margin:0 0 12px 0;font-size:15px;">Dear homeowner,</p>
+
+              <p style="margin:0 0 12px 0;font-size:15px;line-height:1.5;">
+                We have reviewed your request and enclose herein your Move In Permit
+                (Reference no. <strong>${data.requestNumber}</strong>).
+              </p>
+
+              <p style="margin:0 0 18px 0;font-size:15px;line-height:1.5;">
+                ${welcomePackButton}
+              </p>
+
+              <p style="margin:0 0 12px 0;font-size:15px;line-height:1.5;">
+                In the provided Welcome Pack, you will find everything you need to know about your community — from amenities and events, to information on the Community Service Fee, FAQs and emergency guidelines.
+              </p>
+
+              <p style="margin:0 0 12px 0;font-size:15px;line-height:1.5;">
+                On behalf of Sobha Community Management we welcome you to the community.
+              </p>
+
+              <p style="margin:0 0 12px 0;font-size:15px;line-height:1.5;">
+                Please provide your movers with a copy of this MIP to gain access to the community if you are not accompanying them.
+              </p>
+
+              <p style="margin:0 0 18px 0;font-size:15px;line-height:1.5;">
+                If you have any other enquiries, please feel free to get in touch with us at
+                <strong>800 SOBHACC (7624222)</strong> or <a href="tel:+9718007624222" style="color:#0b63a5;text-decoration:none;">+971 800 762 4222</a>.
+              </p>
+
+              <p style="margin:0 0 4px 0;font-size:15px;">Kind regards,</p>
+              <p style="margin:0;font-size:15px;font-weight:600;">Sobha Community Management</p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f0f4f8;padding:14px 24px;font-size:12px;color:#666;">
+              <span>© Sobha Community Management</span>
+              <span style="float:right;">Reference: ${data.requestNumber}</span>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
     }
 
     /**
@@ -1530,8 +1545,8 @@ export class EmailService {
                 // For recipient emails: "Move in request Raised : request id"
                 return `Move in request Raised : ${requestNumber}`;
             } else {
-                // For user emails: "Your move in date starts from 15 August 2022 Ref # MIP-10"
-                return `Your move in date starts from ${moveInDateStr} Ref # ${requestNumber}`;
+                // For user emails: "Move In Permit Reference no. MIP-10: Application approved"
+                return `Move In Permit Reference no. ${requestNumber}: Application approved`;
             }
         }
         
