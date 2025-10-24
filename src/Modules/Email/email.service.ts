@@ -1336,7 +1336,7 @@ export class EmailService {
 
               <p style="margin:0 0 18px 0;font-size:15px;line-height:1.5;">
                 If you have any other enquiries, please feel free to get in touch with us at
-                <strong>800 SOBHACC (7624222)</strong> or <a href="tel:+9718007624222" style="color:#0b63a5;text-decoration:none;">+971 800 762 4222</a>.
+                <strong>800 SOBHACC (7624222)</strong> 
               </p>
 
               <p style="margin:0 0 4px 0;font-size:15px;">Kind regards,</p>
@@ -1344,13 +1344,13 @@ export class EmailService {
             </td>
           </tr>
 
-          <!-- Footer -->
+          <!-- Footer 
           <tr>
             <td style="background:#f0f4f8;padding:14px 24px;font-size:12px;color:#666;">
               <span>© Sobha Community Management</span>
               <span style="float:right;">Reference: ${data.requestNumber}</span>
             </td>
-          </tr>
+          </tr>-->
 
         </table>
       </td>
