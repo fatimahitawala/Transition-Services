@@ -2638,10 +2638,10 @@ export class MoveInService {
         comments: comments
       };
 
-      // Send RFI email (without attachment)
-      await this.emailService.sendMoveInStatusEmail(emailData);
+      // Send RFI email (without attachment) - DISABLED: Only approval emails should be sent
+      // await this.emailService.sendMoveInStatusEmail(emailData);
 
-      logger.info(`RFI notifications sent for move-in request ${requestId}`);
+      logger.info(`RFI notification - Email skipped for request ${requestId} (only approval emails are sent)`);
     } catch (error) {
       logger.error(`Error sending RFI notifications: ${error}`);
       // Don't throw error to avoid breaking the RFI process
@@ -2719,10 +2719,10 @@ export class MoveInService {
         comments: cancellationRemarks
       };
 
-      // Send cancellation email (without attachment)
-      await this.emailService.sendMoveInStatusEmail(emailData);
+      // Send cancellation email (without attachment) - DISABLED: Only approval emails should be sent
+      // await this.emailService.sendMoveInStatusEmail(emailData);
 
-      logger.info(`Cancellation notifications sent for move-in request ${requestId}`);
+      logger.info(`Cancellation notification - Email skipped for request ${requestId} (only approval emails are sent)`);
     } catch (error) {
       logger.error(`Error sending cancellation notifications: ${error}`);
       // Don't throw error to avoid breaking the cancellation process
