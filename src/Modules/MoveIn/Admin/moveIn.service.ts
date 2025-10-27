@@ -1312,9 +1312,37 @@ export class MoveInService {
 
 
 
-  // Check if unit is available for a new move-in request (no APPROVED request exists)
+  // Check if unit is available for a new move-in request
   private async checkUnitAvailabilityForNewRequest(unitId: number): Promise<boolean> {
     try {
+      // Check unit status conditions
+      const unit = await Units.getRepository()
+        .createQueryBuilder("unit")
+        .where("unit.id = :unitId", { unitId })
+        .getOne();
+
+      if (!unit) {
+        logger.error(`Unit not found: ${unitId}`);
+        return false;
+      }
+
+      // Validate unit status conditions
+      if (unit.isActive !== true) {
+        logger.error(`Unit ${unitId} is not active`);
+        return false;
+      }
+
+      if (unit.availabilityStatus !== 'Available') {
+        logger.error(`Unit ${unitId} availability status is not 'Available': ${unit.availabilityStatus}`);
+        return false;
+      }
+
+      if (unit.occupancyStatus !== 'vacant') {
+        logger.error(`Unit ${unitId} occupancy status is not 'vacant': ${unit.occupancyStatus}`);
+        return false;
+      }
+
+      // Check for existing approved request
       const existingApprovedRequest = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
@@ -1322,10 +1350,14 @@ export class MoveInService {
         .andWhere("mir.isActive = 1")
         .getOne();
 
-      // Unit is available if there is NO approved request
-      return !existingApprovedRequest;
+      if (existingApprovedRequest) {
+        logger.error(`Unit ${unitId} already has an approved move-in request: ${existingApprovedRequest.id}`);
+        return false;
+      }
+
+      return true;
     } catch (error) {
-      logger.error(`Error checking unit vacancy: ${error}`);
+      logger.error(`Error checking unit availability: ${error}`);
       throw new ApiError(
         httpStatus.INTERNAL_SERVER_ERROR,
         APICodes.UNKNOWN_ERROR.message,
@@ -1614,6 +1646,16 @@ export class MoveInService {
           httpStatus.BAD_REQUEST,
           APICodes.CANNOT_APPROVE_STATUS.message,
           APICodes.CANNOT_APPROVE_STATUS.code
+        );
+      }
+
+      // Validate unit availability status before approval
+      const isUnitAvailable = await this.checkUnitAvailabilityForNewRequest(moveInRequest.unit.id);
+      if (!isUnitAvailable) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          APICodes.UNIT_NOT_VACANT.message,
+          APICodes.UNIT_NOT_VACANT.code
         );
       }
 

@@ -686,91 +686,6 @@ export class EmailService {
         return parts.join(', ');
     }
 
-    /**
-     * Get default email template for different statuses
-     */
-    private getDefaultEmailTemplate(status: string, data: MoveInEmailData): string {
-        const baseTemplate = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <!-- Header Image with Frame -->
-            <div style="width: 100%; margin-bottom: 20px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
-                <img src="https://res.cloudinary.com/ddbdlqjcq/image/upload/v1755076402/Screenshot_2025-08-13_142428_1_qwua5y.png" 
-                     alt="ONE Sobha Header" 
-                     style="width: 100%; height: auto; display: block;" />
-            </div>
-            
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
-                <h2 style="color: #333; margin: 0;">ONE Sobha App - Move-In Request Update</h2>
-            </div>
-            
-            <div style="background-color: white; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
-                <p>Dear {{fullName}},</p>
-                
-                <p>Your move-in request <strong>{{requestNumber}}</strong> for unit <strong>{{unitName}}</strong> has been updated.</p>
-                
-                <div style="background-color: #f1f3f4; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                    <h3 style="margin: 0 0 10px 0; color: #333;">Request Details:</h3>
-                    <p><strong>Request Number:</strong> {{requestNumber}}</p>
-                    <p><strong>Unit:</strong> {{unitName}}</p>
-                    <p><strong>Community:</strong> {{communityName}}</p>
-                    <p><strong>Status:</strong> <span style="color: #007bff; font-weight: bold;">{{status}}</span></p>
-                    {{moveInDateSection}}
-                    {{commentsSection}}
-                </div>
-                
-                {{statusSpecificContent}}
-                
-                <p>If you have any questions, please contact our support team.</p>
-                
-                <p>Best regards,<br>Team @ ONE Sobha App</p>
-            </div>
-            
-            <div style="text-align: center; margin-top: 20px; color: #666; font-size: 12px;">
-                <p>© {{currentYear}} ONE Sobha App. All rights reserved.</p>
-            </div>
-        </div>`;
-
-        let statusSpecificContent = '';
-        let moveInDateSection = data.moveInDate ? `<p><strong>Move-in Date:</strong> {{moveInDate}}</p>` : '';
-        let commentsSection = data.comments ? `<p><strong>Comments:</strong> {{comments}}</p>` : '';
-
-        switch (status.toLowerCase()) {
-            case 'approved':
-                statusSpecificContent = `
-                <div style="background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                    <h3 style="margin: 0 0 10px 0;">🎉 Congratulations! Your move-in request has been approved!</h3>
-                    <p>You can now proceed with your move-in as scheduled. Please find your welcome pack attached to this email.</p>
-                    <p>Please ensure you have all required documents ready for the move-in process.</p>
-                </div>`;
-                break;
-            case 'rfi-pending':
-                statusSpecificContent = `
-                <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                    <h3 style="margin: 0 0 10px 0;">📋 Additional Information Required</h3>
-                    <p>Your move-in request requires additional information or documentation. Please review the comments above and provide the requested information.</p>
-                    <p>You can update your request through the ONE Sobha App.</p>
-                </div>`;
-                break;
-            case 'cancelled':
-                statusSpecificContent = `
-                <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                    <h3 style="margin: 0 0 10px 0;">❌ Move-in Request Cancelled</h3>
-                    <p>Your move-in request has been cancelled. Please review the comments above for more details.</p>
-                    <p>If you have any questions or would like to submit a new request, please contact our support team.</p>
-                </div>`;
-                break;
-            default:
-                statusSpecificContent = `
-                <div style="background-color: #e2e3e5; border: 1px solid #d6d8db; color: #383d41; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                    <p>Your request status has been updated. Please check the ONE Sobha App for more details.</p>
-                </div>`;
-        }
-
-        return baseTemplate
-            .replace('{{statusSpecificContent}}', statusSpecificContent)
-            .replace('{{moveInDateSection}}', moveInDateSection)
-            .replace('{{commentsSection}}', commentsSection);
-    }
 
     /**
      * MOVE-IN STATUS EMAIL SENDER
@@ -810,12 +725,11 @@ export class EmailService {
                 data.status
             );
 
-            // Fallback to default template if custom template not found
-            if (!emailTemplate) {
-                emailTemplate = this.getDefaultEmailTemplate(data.status, data);
-                logger.info(`Using default email template for status: ${data.status}`);
-            } else {
+            // Use custom template from database if found
+            if (emailTemplate) {
                 logger.info(`Using custom email template from database (length: ${emailTemplate.length} chars)`);
+            } else {
+                logger.info(`No custom email template found, will use simple email body`);
             }
 
             // Create simple email body with header image and status content
@@ -882,16 +796,15 @@ export class EmailService {
                 'approved'
             );
 
-            // Fallback to default template if custom template not found
-            if (!emailTemplate) {
-                emailTemplate = this.getDefaultEmailTemplate('approved', data);
-                logger.info(`Using default approval email template`);
-            } else {
+            // Use custom template from database if found
+            if (emailTemplate) {
                 logger.info(`Using custom email template from database`);
+            } else {
+                logger.info(`No custom email template found for approval, will use detailed approval body`);
             }
 
-            // Replace placeholders with actual data
-            const processedTemplate = this.replaceTemplatePlaceholders(emailTemplate, data);
+            // Replace placeholders with actual data if template exists
+            const processedTemplate = emailTemplate ? this.replaceTemplatePlaceholders(emailTemplate, data) : null;
 
             // Generate attachments only for user emails, not for recipient emails
             const attachments: EmailAttachment[] = [];
@@ -932,9 +845,7 @@ export class EmailService {
             }
 
             // Create detailed email body with header image and move-in permit content
-            const emailBody = data.isRecipientEmail ? 
-                this.createRecipientApprovalEmailBody(data) : 
-                this.createDetailedApprovalEmailBody(data, welcomePackUrl);
+            const emailBody = this.createDetailedApprovalEmailBody(data, welcomePackUrl);
 
             // Generate subject
             const subject = this.getEmailSubject('approved', data.requestNumber, data.isRecipientEmail, data);
@@ -1360,176 +1271,6 @@ export class EmailService {
 </html>`;
     }
 
-    /**
-     * RECIPIENT APPROVAL EMAIL BODY CREATOR
-     * =====================================
-     * Creates email body specifically for recipient emails (team/community management)
-     * Uses the new MIP notification format with structured content
-     * 
-     * Features:
-     * - Professional header with Sobha branding
-     * - "Dear Team" greeting
-     * - Structured MIP notification format
-     * - All required fields: MIP reference, user type, property details, etc.
-     * - Professional footer with Sobha Community Management signature
-     * 
-     * @param {MoveInEmailData} data - Complete email data for content generation
-     * @returns {string} - HTML email body for recipient notifications
-     */
-    private createRecipientApprovalEmailBody(data: MoveInEmailData): string {
-        // Format dates properly
-        const moveInDate = data.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-        }) : '';
-        
-        const moveOutDate = data.additionalInfo?.moveOutDate ? 
-            new Date(data.additionalInfo.moveOutDate).toLocaleDateString('en-GB', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-            }) : '';
-            
-        const startDate = data.additionalInfo?.startDate ? 
-            new Date(data.additionalInfo.startDate).toLocaleDateString('en-GB', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-            }) : '';
-            
-        const endDate = data.additionalInfo?.endDate ? 
-            new Date(data.additionalInfo.endDate).toLocaleDateString('en-GB', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-            }) : '';
-        
-        const mipIssueDate = new Date().toLocaleDateString('en-GB', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-        });
-
-        // Get user type based on request type
-        let userType = '';
-        switch (data.requestType?.toLowerCase()) {
-            case 'owner':
-                userType = 'Owner';
-                break;
-            case 'tenant':
-                userType = 'Tenant';
-                break;
-            case 'hho-owner':
-                userType = 'HHO Owner';
-                break;
-            case 'hhc-company':
-                userType = 'HHC Company';
-                break;
-            default:
-                userType = data.requestType || 'Owner';
-        }
-
-        // Get applicant and occupant names with better fallback handling
-        const applicantName = data.userDetails ? 
-            `${data.userDetails.firstName || ''} ${data.userDetails.lastName || ''}`.trim() || 'Not specified' : 
-            'Not specified';
-        const occupantName = data.additionalInfo?.occupantName || applicantName;
-
-        return `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Move In Permit Notification</title>
-</head>
-<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial, Helvetica, sans-serif;color:#333;">
-  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f4f6f8;padding:20px 0;">
-    <tr>
-      <td align="center">
-        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="background:#ffffff;border-radius:6px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.08);">
-          
-          <!-- Header -->
-          <tr>
-            <td style="background:#0b63a5;padding:20px 24px;color:#ffffff;">
-              <h1 style="margin:0;font-size:18px;font-weight:600;">Sobha Community Management</h1>
-            </td>
-          </tr>
-
-          <!-- Body -->
-          <tr>
-            <td style="padding:24px;">
-              <p style="margin:0 0 12px 0;font-size:15px;">Dear Team,</p>
-
-              <p style="margin:0 0 18px 0;font-size:15px;line-height:1.5;">
-                This is to notify you that a new Move In Permit (MIP) has been issued.
-              </p>
-
-              <div style="background-color:#f8f9fa;padding:15px;border-radius:5px;margin:15px 0;">
-                <table style="width:100%;border-collapse:collapse;">
-                  <tr>
-                    <td style="padding:8px 0;font-weight:bold;width:40%;color:#333;">MIP reference no.:</td>
-                    <td style="padding:8px 0;color:#666;">${data.requestNumber}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:8px 0;font-weight:bold;color:#333;">User type:</td>
-                    <td style="padding:8px 0;color:#666;">${userType}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:8px 0;font-weight:bold;color:#333;">Property details:</td>
-                    <td style="padding:8px 0;color:#666;">${data.unitDetails.unitNumber || 'Not specified'} - ${data.unitDetails.unitName || 'Not specified'}, ${data.unitDetails.communityName || 'Not specified'}${data.unitDetails.towerName ? ', ' + data.unitDetails.towerName : ''}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:8px 0;font-weight:bold;color:#333;">Applicant name:</td>
-                    <td style="padding:8px 0;color:#666;">${applicantName}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:8px 0;font-weight:bold;color:#333;">Occupant name:</td>
-                    <td style="padding:8px 0;color:#666;">${occupantName}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:8px 0;font-weight:bold;color:#333;">Move in date:</td>
-                    <td style="padding:8px 0;color:#666;">${moveInDate || 'Not specified'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:8px 0;font-weight:bold;color:#333;">Move out date:</td>
-                    <td style="padding:8px 0;color:#666;">${moveOutDate || 'Not specified'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:8px 0;font-weight:bold;color:#333;">Start date (lease):</td>
-                    <td style="padding:8px 0;color:#666;">${startDate || 'Not specified'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:8px 0;font-weight:bold;color:#333;">End date (lease):</td>
-                    <td style="padding:8px 0;color:#666;">${endDate || 'Not specified'}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:8px 0;font-weight:bold;color:#333;">MIP date of issue:</td>
-                    <td style="padding:8px 0;color:#666;">${mipIssueDate}</td>
-                  </tr>
-                </table>
-              </div>
-
-              <p style="margin:0 0 4px 0;font-size:15px;">Kind regards,</p>
-              <p style="margin:0;font-size:15px;font-weight:600;">Sobha Community Management</p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background:#f0f4f8;padding:14px 24px;font-size:12px;color:#666;">
-              <span>© Sobha Community Management</span>
-              <span style="float:right;">Reference: ${data.requestNumber}</span>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-    }
 
     /**
      * STATUS MESSAGE GENERATOR
