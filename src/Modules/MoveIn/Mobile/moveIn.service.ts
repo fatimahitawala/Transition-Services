@@ -1159,6 +1159,31 @@ export class MoveInService {
         throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
       }
 
+      // Validate unit status conditions
+      if (unit.isActive !== true) {
+        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
+      }
+
+      if (unit.availabilityStatus !== 'Available') {
+        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
+      }
+
+      if (unit.occupancyStatus !== 'vacant') {
+        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
+      }
+
+      // Check for existing approved requests
+      const existingApprovedRequest = await MoveInRequests.getRepository()
+        .createQueryBuilder("mir")
+        .where("mir.unit.id = :unitId", { unitId })
+        .andWhere("mir.status = :approvedStatus", { approvedStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED })
+        .andWhere("mir.isActive = 1")
+        .getOne();
+
+      if (existingApprovedRequest) {
+        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
+      }
+
       const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
 
       let createdMaster: MoveInRequests | undefined;
