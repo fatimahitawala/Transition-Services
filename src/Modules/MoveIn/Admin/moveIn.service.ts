@@ -229,14 +229,7 @@ export class MoveInService {
       // Business Logic Validations for Owner, Tenant, HHO-Unit, and HHO-Company Move-in Requests
       if (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
         // 1. Allow multiple OPEN requests; block only if an APPROVED request already exists
-        const isUnitAvailableForNewRequest = await this.checkUnitAvailabilityForNewRequest(Number(unitId));
-        if (!isUnitAvailableForNewRequest) {
-          throw new ApiError(
-            httpStatus.CONFLICT,
-            APICodes.UNIT_NOT_VACANT.message,
-            APICodes.UNIT_NOT_VACANT.code
-          );
-        }
+        await this.checkUnitAvailabilityForNewRequest(Number(unitId));
 
         // 2. Overlap: allow overlaps for OPEN/PENDING; only block if an APPROVED request exists
         const overlapCheck = await this.checkOverlappingRequests(Number(unitId), new Date(moveInDate));
@@ -456,7 +449,7 @@ export class MoveInService {
         .innerJoinAndSelect("ut.masterCommunity", "mc", "mc.isActive = 1")
         .innerJoinAndSelect("ut.community", "c", "c.isActive = 1")
         .innerJoinAndSelect("ut.tower", "t", "t.isActive = 1")
-        .where("ut.id = :id AND ut.isActive = 1", { id })
+        .where("ut.id = :id", { id })
         .getOne();
     } catch (error) {
       throw new ApiError(
@@ -1318,28 +1311,47 @@ export class MoveInService {
       // Check unit status conditions
       const unit = await Units.getRepository()
         .createQueryBuilder("unit")
+        .addSelect("unit.isActive")
         .where("unit.id = :unitId", { unitId })
         .getOne();
 
       if (!unit) {
         logger.error(`Unit not found: ${unitId}`);
-        return false;
+        throw new ApiError(
+          httpStatus.NOT_FOUND,
+          `Unit ${unitId} not found`,
+          "EC404"
+        );
       }
 
       // Validate unit status conditions
-      if (unit.isActive !== true) {
-        logger.error(`Unit ${unitId} is not active`);
-        return false;
+      logger.debug(`Unit ${unitId} debug - isActive: ${unit.isActive}, type: ${typeof unit.isActive}, availabilityStatus: ${unit.availabilityStatus}, occupancyStatus: ${unit.occupancyStatus}`);
+      
+      if (!unit.isActive) {
+        logger.error(`Unit ${unitId} is not active - Value: ${unit.isActive}, Type: ${typeof unit.isActive}`);
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Unit ${unitId} is not active`,
+          "EC223"
+        );
       }
 
       if (unit.availabilityStatus !== 'Available') {
         logger.error(`Unit ${unitId} availability status is not 'Available': ${unit.availabilityStatus}`);
-        return false;
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Unit ${unitId} is not available for move-in. Status: ${unit.availabilityStatus}`,
+          "EC224"
+        );
       }
 
       if (unit.occupancyStatus !== 'vacant') {
         logger.error(`Unit ${unitId} occupancy status is not 'vacant': ${unit.occupancyStatus}`);
-        return false;
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Unit ${unitId} is not vacant. Current occupancy: ${unit.occupancyStatus}`,
+          "EC225"
+        );
       }
 
       // Check for existing approved request
@@ -1352,11 +1364,20 @@ export class MoveInService {
 
       if (existingApprovedRequest) {
         logger.error(`Unit ${unitId} already has an approved move-in request: ${existingApprovedRequest.id}`);
-        return false;
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          APICodes.UNIT_NOT_VACANT.message,
+          APICodes.UNIT_NOT_VACANT.code
+        );
       }
 
       return true;
-    } catch (error) {
+    } catch (error: any) {
+      // If it's already an ApiError (our specific validation errors), re-throw it
+      if (error.isOperational) {
+        throw error;
+      }
+      // Only catch unexpected errors
       logger.error(`Error checking unit availability: ${error}`);
       throw new ApiError(
         httpStatus.INTERNAL_SERVER_ERROR,
