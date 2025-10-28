@@ -813,23 +813,32 @@ export class EmailService {
             if (!data.isRecipientEmail) {
                 // Generate MIP template as PDF attachment
                 logger.info(`Generating MIP template as PDF attachment...`);
-                const mipTemplateHtml = await this.getMIPTemplateHTML(data);
-                const mipPdfAttachment = await this.generateMIPTemplatePDF(mipTemplateHtml, data);
+                
+                try {
+                    const mipTemplateHtml = await this.getMIPTemplateHTML(data);
+                    const mipPdfAttachment = await this.generateMIPTemplatePDF(mipTemplateHtml, data);
 
-                // Get welcome pack attachment
+                    if (mipPdfAttachment) {
+                        attachments.push(mipPdfAttachment);
+                        logger.info(`MIP template PDF attachment added (${mipPdfAttachment.filename})`);
+                    } else {
+                        logger.error(`✗ MIP template PDF generation returned null - Cannot send approval email`);
+                        throw new Error('MIP template PDF generation failed');
+                    }
+                } catch (mipError) {
+                    logger.error(`✗ CRITICAL ERROR: MIP template generation failed`);
+                    logger.error(`Error: ${mipError instanceof Error ? mipError.message : 'Unknown error'}`);
+                    logger.error(`Cannot send approval email without MIP template`);
+                    throw mipError; // Re-throw to prevent approval email from being sent
+                }
+
+                // Get welcome pack attachment (optional - failure here doesn't block email)
                 logger.info(`Fetching welcome pack for MC:${data.unitDetails.masterCommunityId}, C:${data.unitDetails.communityId}, T:${data.unitDetails.towerId}`);
                 const welcomePackAttachment = await this.getWelcomePackFile(
                     data.unitDetails.masterCommunityId,
                     data.unitDetails.communityId,
                     data.unitDetails.towerId
                 );
-
-                if (mipPdfAttachment) {
-                    attachments.push(mipPdfAttachment);
-                    logger.info(`MIP template PDF attachment added (${mipPdfAttachment.filename})`);
-                } else {
-                    logger.warn(`MIP template PDF attachment failed to generate`);
-                }
                 
                 if (welcomePackAttachment) {
                     attachments.push(welcomePackAttachment);
@@ -839,7 +848,7 @@ export class EmailService {
                     logger.warn(`No welcome pack found for community ${data.unitDetails.communityId}, tower ${data.unitDetails.towerId}`);
                 }
 
-                logger.info(`Total attachments: ${attachments.length} (MIP: ${mipPdfAttachment ? 'Yes' : 'No'}, Welcome Pack: ${welcomePackAttachment ? 'Yes' : 'No'})`);
+                logger.info(`Total attachments: ${attachments.length} (MIP: Yes, Welcome Pack: ${welcomePackAttachment ? 'Yes' : 'No'})`);
             } else {
                 logger.info(`Recipient email - no attachments will be sent`);
             }
@@ -859,9 +868,14 @@ export class EmailService {
                 data.ccEmails || [] // CC emails if provided
             );
 
-            logger.info(`Move-in approval email with welcome pack sent successfully for request ${data.requestNumber}`);
+            logger.info(`=== MOVE-IN APPROVAL EMAIL SUCCESS ===`);
+            logger.info(`Move-in approval email sent successfully for request ${data.requestNumber}`);
         } catch (error) {
-            logger.error(`Failed to send move-in approval email for request ${data.requestNumber}:`, error);
+            logger.error(`=== MOVE-IN APPROVAL EMAIL FAILED ===`);
+            logger.error(`Failed to send move-in approval email for request ${data.requestNumber}`);
+            logger.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            logger.error(`Stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
+            logger.error(`=== MOVE-IN APPROVAL EMAIL FAILED END ===`);
             throw error;
         }
     }
@@ -885,155 +899,193 @@ export class EmailService {
      */
     private async getMIPTemplateHTML(data: MoveInEmailData): Promise<string> {
         try {
-            // Fetch MIP template from database
-            logger.info(`Fetching MIP template from database for MC:${data.unitDetails.masterCommunityId}, C:${data.unitDetails.communityId}, T:${data.unitDetails.towerId}`);
+            logger.info(`=== MIP TEMPLATE HTML GENERATION START ===`);
+            logger.info(`Request: ${data.requestNumber}, MC:${data.unitDetails.masterCommunityId}, C:${data.unitDetails.communityId}, T:${data.unitDetails.towerId}`);
+            logger.info(`User: ${data.userDetails.firstName} ${data.userDetails.lastName}, Email: ${data.userDetails.email}`);
+            logger.info(`Move-in Date: ${data.moveInDate}`);
             
             const templateRepository = AppDataSource.getRepository(OccupancyRequestTemplates);
             let template = null;
             
             // Try to find template with exact match (tower → community → master community hierarchy)
+            // Note: isActive has select: false, so we need to explicitly select it
+            const selectFields = ['id', 'masterCommunityId', 'communityId', 'towerId', 'templateType', 'templateString', 'isActive'];
+            
             // 1. First try: Tower-specific template
             if (data.unitDetails.towerId) {
-                template = await templateRepository.findOne({
-                    where: {
-                        masterCommunityId: data.unitDetails.masterCommunityId,
-                        communityId: data.unitDetails.communityId,
-                        towerId: data.unitDetails.towerId,
-                        templateType: OCUPANCY_REQUEST_TYPES.MOVE_IN,
-                        isActive: true
-                    }
-                });
+                template = await templateRepository
+                    .createQueryBuilder('template')
+                    .select(selectFields.map(f => `template.${f}`))
+                    .where('template.masterCommunityId = :masterCommunityId', { masterCommunityId: data.unitDetails.masterCommunityId })
+                    .andWhere('template.communityId = :communityId', { communityId: data.unitDetails.communityId })
+                    .andWhere('template.towerId = :towerId', { towerId: data.unitDetails.towerId })
+                    .andWhere('template.templateType = :templateType', { templateType: OCUPANCY_REQUEST_TYPES.MOVE_IN })
+                    .andWhere('template.isActive = :isActive', { isActive: true })
+                    .getOne();
+                    
                 if (template) {
-                    logger.info(`Found tower-specific MIP template`);
+                    logger.info(`✓ Found tower-specific MIP template (ID: ${template.id})`);
                 }
             }
             
             // 2. Second try: Community-level template (no tower)
             if (!template) {
-                template = await templateRepository.findOne({
-                    where: {
-                        masterCommunityId: data.unitDetails.masterCommunityId,
-                        communityId: data.unitDetails.communityId,
-                        towerId: IsNull(),
-                        templateType: OCUPANCY_REQUEST_TYPES.MOVE_IN,
-                        isActive: true
-                    }
-                });
+                template = await templateRepository
+                    .createQueryBuilder('template')
+                    .select(selectFields.map(f => `template.${f}`))
+                    .where('template.masterCommunityId = :masterCommunityId', { masterCommunityId: data.unitDetails.masterCommunityId })
+                    .andWhere('template.communityId = :communityId', { communityId: data.unitDetails.communityId })
+                    .andWhere('template.towerId IS NULL')
+                    .andWhere('template.templateType = :templateType', { templateType: OCUPANCY_REQUEST_TYPES.MOVE_IN })
+                    .andWhere('template.isActive = :isActive', { isActive: true })
+                    .getOne();
+                    
                 if (template) {
-                    logger.info(`Found community-specific MIP template`);
+                    logger.info(`✓ Found community-specific MIP template (ID: ${template.id})`);
                 }
             }
             
             // 3. Third try: Master community level template
             if (!template) {
-                template = await templateRepository.findOne({
-                    where: {
-                        masterCommunityId: data.unitDetails.masterCommunityId,
-                        communityId: IsNull(),
-                        towerId: IsNull(),
-                        templateType: OCUPANCY_REQUEST_TYPES.MOVE_IN,
-                        isActive: true
-                    }
-                });
+                template = await templateRepository
+                    .createQueryBuilder('template')
+                    .select(selectFields.map(f => `template.${f}`))
+                    .where('template.masterCommunityId = :masterCommunityId', { masterCommunityId: data.unitDetails.masterCommunityId })
+                    .andWhere('template.communityId IS NULL')
+                    .andWhere('template.towerId IS NULL')
+                    .andWhere('template.templateType = :templateType', { templateType: OCUPANCY_REQUEST_TYPES.MOVE_IN })
+                    .andWhere('template.isActive = :isActive', { isActive: true })
+                    .getOne();
+                    
                 if (template) {
-                    logger.info(`Found master community MIP template`);
+                    logger.info(`✓ Found master community MIP template (ID: ${template.id})`);
                 }
             }
             
             if (!template || !template.templateString) {
-                logger.warn(`No MIP template found in database, using fallback template`);
-                return this.getFallbackMIPTemplate(data);
+                logger.error(`✗ NO MIP TEMPLATE FOUND IN DATABASE - CANNOT GENERATE PDF`);
+                logger.error(`Searched for: MC=${data.unitDetails.masterCommunityId}, C=${data.unitDetails.communityId}, T=${data.unitDetails.towerId}`);
+                logger.error(`MIP template must be configured in database before approving move-in requests`);
+                throw new Error(`MIP template not found for MC:${data.unitDetails.masterCommunityId}, C:${data.unitDetails.communityId}, T:${data.unitDetails.towerId}`);
             }
             
-            logger.info(`MIP template found in database (length: ${template.templateString.length} chars)`);
+            logger.info(`=== MIP TEMPLATE FOUND IN DATABASE ===`);
+                logger.info(`Template ID: ${template.id}`);
+                logger.info(`Template Type: ${template.templateType}`);
+                logger.info(`Master Community ID: ${template.masterCommunityId}`);
+                logger.info(`Community ID: ${template.communityId}`);
+                logger.info(`Tower ID: ${template.towerId || 'NULL (Community level)'}`);
+                logger.info(`Template length: ${template.templateString.length} characters`);
+            logger.info(`Template type check - First 50 chars: ${template.templateString.substring(0, 50)}`);
+            
+            let templateContent = template.templateString;
+            
+            // Check if template is Base64 encoded
+                // Base64 strings typically don't start with < or <!DOCTYPE
+                const isLikelyBase64 = !templateContent.trim().startsWith('<') && 
+                                       !templateContent.trim().startsWith('<!') &&
+                                       /^[A-Za-z0-9+/=]+$/.test(templateContent.substring(0, 100));
+                
+                if (isLikelyBase64) {
+                    try {
+                        logger.info(`⚠ Template appears to be Base64 encoded, attempting to decode...`);
+                        templateContent = Buffer.from(templateContent, 'base64').toString('utf-8');
+                        logger.info(`✓ Base64 decoded successfully (new length: ${templateContent.length} chars)`);
+                        logger.info(`Decoded preview (first 200 chars): ${templateContent.substring(0, 200)}...`);
+                    } catch (decodeError) {
+                        logger.error(`✗ Base64 decode failed:`, decodeError);
+                        logger.warn(`Using template as-is without decoding`);
+                    }
+            } else {
+                logger.info(`✓ Template appears to be plain HTML (not Base64 encoded)`);
+            }
+            
+            logger.info(`Template preview (first 200 chars): ${templateContent.substring(0, 200)}...`);
             
             // Replace placeholders with actual data
-            const processedTemplate = this.replaceMIPPlaceholders(template.templateString, data);
+            const finalHtml = this.replaceMIPPlaceholders(templateContent, data);
+            logger.info(`✓ Placeholders replaced (final length: ${finalHtml.length} chars)`);
+            logger.info(`Final HTML preview (first 200 chars): ${finalHtml.substring(0, 200)}...`);
             
-            return processedTemplate;
+            logger.info(`=== MIP TEMPLATE HTML GENERATION COMPLETE ===`);
+            return finalHtml;
         } catch (error) {
+            logger.error('=== MIP TEMPLATE HTML GENERATION ERROR ===');
             logger.error('Error fetching MIP template from database:', error);
-            return this.getFallbackMIPTemplate(data);
+            logger.error(`Error message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
+            logger.error('=== MIP TEMPLATE HTML GENERATION FAILED ===');
+            // Do NOT use fallback template - throw error to prevent approval without proper template
+            throw error;
         }
     }
     
     /**
      * REPLACE MIP TEMPLATE PLACEHOLDERS
      * ==================================
-     * Replaces only the minimal required placeholders in MIP template
+     * Replaces only the 6 specific placeholders used in MIP template
+     * Supports ${} format placeholders
      */
     private replaceMIPPlaceholders(template: string, data: MoveInEmailData): string {
+        const currentDate = new Date();
+        const moveInDate = data.moveInDate ? new Date(data.moveInDate) : null;
+        
         const occupantName = `${data.userDetails.firstName} ${data.userDetails.lastName}`;
         const address = `${data.unitDetails.unitNumber || ''} ${data.unitDetails.unitName || ''}`.trim();
         const community = data.unitDetails.communityName || '';
-        const moveInDate = data.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+        const moveInDateFormatted = moveInDate ? moveInDate.toLocaleDateString('en-GB', { 
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
         }) : '';
-        const dateOfIssue = new Date().toLocaleDateString('en-GB', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+        const dateOfIssue = currentDate.toLocaleDateString('en-GB', { 
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
         });
         
+        // ONLY the 6 placeholders used in the template
         const replacements: Record<string, string> = {
-            '{{REFERENCE_NO}}': data.requestNumber,
-            '{{MOVE_IN_DATE}}': moveInDate,
-            '{{OCCUPANT_NAME}}': occupantName,
-            '{{ADDRESS}}': address,
-            '{{COMMUNITY}}': community,
-            '{{DATE_OF_ISSUE}}': dateOfIssue
+            '${data.MoveInDate}': moveInDateFormatted,
+            '${data.AdminPortalRequestCode}': data.requestNumber,
+            '${OccupantName}': occupantName,
+            '${Address}': address,
+            '${Community}': community,
+            '${DateOfIssue}': dateOfIssue
         };
         
+        logger.info(`Replacing MIP template placeholders...`);
+        logger.info(`Placeholders to replace: ${Object.keys(replacements).length}`);
+        
         let processedTemplate = template;
+        let replacedCount = 0;
+        
+        // Replace all placeholders
         Object.entries(replacements).forEach(([placeholder, value]) => {
-            processedTemplate = processedTemplate.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
+            // Escape special regex characters
+            const escapedPlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(escapedPlaceholder, 'g');
+            const matches = processedTemplate.match(regex);
+            if (matches && matches.length > 0) {
+                processedTemplate = processedTemplate.replace(regex, value);
+                replacedCount += matches.length;
+                logger.info(`  ✓ ${placeholder} -> ${value}`);
+            }
         });
+        
+        logger.info(`✓ Total replacements: ${replacedCount}`);
+        
+        // Check for any remaining unreplaced placeholders
+        const remainingPlaceholders = processedTemplate.match(/\$\{[^}]+\}/g);
+        if (remainingPlaceholders && remainingPlaceholders.length > 0) {
+            logger.warn(`⚠ Unreplaced placeholders found: ${[...new Set(remainingPlaceholders)].join(', ')}`);
+        } else {
+            logger.info(`✓ All placeholders replaced successfully`);
+        }
         
         return processedTemplate;
     }
     
-    /**
-     * FALLBACK MIP TEMPLATE
-     * =====================
-     * Used when no template is found in database
-     */
-    private getFallbackMIPTemplate(data: MoveInEmailData): string {
-        const occupantName = `${data.userDetails.firstName} ${data.userDetails.lastName}`;
-        const address = `${data.unitDetails.unitNumber || ''} ${data.unitDetails.unitName || ''}`.trim();
-        const community = data.unitDetails.communityName || '';
-        const moveInDate = data.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-        }) : '';
-        const dateOfIssue = new Date().toLocaleDateString('en-GB', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-        });
-        
-        return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Move In Permit</title>
-</head>
-<body style="margin:0;padding:20px;font-family:Arial, sans-serif;">
-    <h2>Your move in date starts from ${moveInDate}</h2>
-    <h3>Ref # ${data.requestNumber}</h3>
-    
-    <div style="margin-top:30px;">
-        <p><strong>Occupant name:</strong> ${occupantName}</p>
-        <p><strong>Address:</strong> ${address}</p>
-        <p><strong>Community:</strong> ${community}</p>
-        <p><strong>Date of issue:</strong> ${dateOfIssue}</p>
-    </div>
-</body>
-</html>`;
-    }
 
     /**
      * PDF GENERATION USING PUPPETEER
@@ -1062,20 +1114,47 @@ export class EmailService {
             // Import puppeteer dynamically to avoid build issues
             const puppeteer = require('puppeteer');
             
-            logger.info(`Generating MIP template PDF for request ${data.requestNumber}`);
+            logger.info(`=== MIP PDF GENERATION START ===`);
+            logger.info(`Request: ${data.requestNumber}, Status: ${data.status}`);
+            logger.info(`HTML Content Length: ${htmlContent.length} characters`);
+            logger.info(`HTML Preview (first 300 chars): ${htmlContent.substring(0, 300)}...`);
+            logger.info(`HTML Preview (last 100 chars): ...${htmlContent.substring(htmlContent.length - 100)}`);
             
-            // Launch Puppeteer
-            const browser = await puppeteer.launch({
+            // Configure Chrome executable path from environment variable
+            const launchOptions: any = {
                 headless: true,
                 args: ['--no-sandbox', '--disable-setuid-sandbox']
-            });
+            };
+            
+            // Add executablePath if EXECUTABLE_PATH is set in environment
+            const chromeExecutablePath = process.env.EXECUTABLE_PATH;
+            logger.info(`=== Chrome Executable Path Configuration ===`);
+            logger.info(`EXECUTABLE_PATH from env: ${chromeExecutablePath || 'NOT SET'}`);
+            
+            if (chromeExecutablePath && chromeExecutablePath.trim()) {
+                launchOptions.executablePath = chromeExecutablePath.trim();
+                logger.info(`✓ Using Chrome executable path from EXECUTABLE_PATH env variable`);
+                logger.info(`✓ Path: ${chromeExecutablePath.trim()}`);
+            } else {
+                logger.info(`⚠ EXECUTABLE_PATH not set, using Puppeteer auto-detection`);
+                logger.warn(`If PDF generation fails, set EXECUTABLE_PATH in .env file`);
+            }
+            
+            // Launch Puppeteer
+            logger.info(`Launching Puppeteer browser...`);
+            const browser = await puppeteer.launch(launchOptions);
+            logger.info(`✓ Browser launched successfully`);
             
             const page = await browser.newPage();
+            logger.info(`✓ New page created`);
             
             // Set content and wait for images to load
+            logger.info(`Setting HTML content and waiting for network idle...`);
             await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+            logger.info(`✓ HTML content set successfully`);
             
             // Generate PDF
+            logger.info(`Generating PDF from HTML...`);
             const pdfBuffer = await page.pdf({
                 format: 'A4',
                 printBackground: true,
@@ -1086,18 +1165,29 @@ export class EmailService {
                     left: '10mm'
                 }
             });
+            logger.info(`✓ PDF generated successfully (${pdfBuffer.length} bytes)`);
             
             await browser.close();
+            logger.info(`✓ Browser closed`);
             
-            logger.info(`MIP template PDF generated successfully (${pdfBuffer.length} bytes)`);
+            const filename = `${data.requestNumber}-${data.status}.pdf`;
+            logger.info(`=== MIP PDF GENERATION COMPLETE ===`);
+            logger.info(`Filename: ${filename}, Size: ${pdfBuffer.length} bytes`);
             
             return {
-                filename: `${data.requestNumber}-${data.status}.pdf`,
+                filename: filename,
                 content: pdfBuffer,
                 contentType: 'application/pdf'
             };
         } catch (error) {
+            logger.error('=== MIP PDF GENERATION ERROR ===');
             logger.error('Error generating MIP template PDF:', error);
+            logger.error(`EXECUTABLE_PATH from env: ${process.env.EXECUTABLE_PATH || 'NOT SET'}`);
+            logger.error(`HTML Content Length: ${htmlContent ? htmlContent.length : 0} characters`);
+            logger.error(`HTML Content Preview: ${htmlContent ? htmlContent.substring(0, 200) : 'NULL/EMPTY'}`);
+            logger.error(`Error message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
+            logger.error('=================================');
             return null;
         }
     }
