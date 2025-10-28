@@ -185,20 +185,20 @@ export class EmailService {
             logger.info(`Attachments: ${attachments.length} files`);
             logger.info(`HTML content length: ${text.length} characters`);
             logger.info(`HTML content preview: ${text.substring(0, 200)}...`);
-            
-            const msg: any = { 
-                from: config.email.from, 
-                to, 
-                subject, 
+
+            const msg: any = {
+                from: config.email.from,
+                to,
+                subject,
                 html: text  // Plain UTF-8 string, NOT Base64
             };
-            
+
             // Add CC if provided
             if (cc && cc.length > 0) {
                 msg.cc = cc;
                 logger.info(`CC recipients added: ${cc.join(', ')}`);
             }
-            
+
             // Add attachments if provided (enhancement over User-Services)
             if (attachments && attachments.length > 0) {
                 msg.attachments = attachments.map(att => ({
@@ -209,7 +209,7 @@ export class EmailService {
                 }));
                 logger.info(`Attachments added: ${attachments.map(a => a.filename).join(', ')}`);
             }
-            
+
             const result = await transport.sendMail(msg);
             logger.info(`=== EMAIL SENT SUCCESSFULLY ===`);
             logger.info(`Message ID: ${result.messageId}`);
@@ -267,6 +267,8 @@ export class EmailService {
      */
     async sendResetPasswordEmail(to: string, details: any) {
         const subject = 'Reset Password : OTP Verification Required';
+        details.firstName = (details && details.firstName) ? details.firstName : 'User';
+        details.lastName = (details && details.lastName) ? details.lastName : '';
         const text = `<div>Dear&nbsp;${details.firstName}&nbsp;${details.lastName}<br><br>Please use the following OTP to reset your password:<br><br><strong><span style="font-size: 18px;">OTP: ${details.otp}</span></strong><br><br>This OTP is valid for a limited time and is essential to activate your account. Please enter it in the app as prompted.<br>If you encounter any issues during the reset password process or have questions about our app, feel free to reach out to our support team for assistance.<br>Best regards,<br>Team @ ONE Sobha App</div>`;
         await this.sendEmail(to, subject, text);
     };
@@ -283,6 +285,8 @@ export class EmailService {
      */
     async sendMoveInVerificationEmail(to: string, details: any) {
         const subject = 'Move In : OTP Verification Required';
+        details.firstName = (details && details.firstName) ? details.firstName : 'User';
+        details.lastName = (details && details.lastName) ? details.lastName : '';
         const text = `<div>Dear&nbsp;${details.firstName}&nbsp;${details.lastName}<br><br>Please use the following OTP to move in:<br><br><strong><span style="font-size: 18px;">OTP: ${details.otp}</span></strong><br><br>This OTP is valid for a limited time and is essential to activate your account. Please enter it in the app as prompted.<br>If you encounter any issues during the move in process or have questions about our app, feel free to reach out to our support team for assistance.<br>Best regards,<br>Team @ ONE Sobha App</div>`;
         await this.sendEmail(to, subject, text);
     };
@@ -362,12 +366,12 @@ export class EmailService {
     ): Promise<string | null> {
         try {
             const templateRepository = AppDataSource.getRepository(OccupancyRequestTemplates);
-            
+
             logger.info(`Fetching MIP email template for masterCommunity: ${masterCommunityId}, community: ${communityId}, tower: ${towerId}, status: ${status}`);
-            
+
             // Try to find template with exact match (tower → community → master community hierarchy)
             let template = null;
-            
+
             // 1. First try: Tower-specific template
             if (towerId) {
                 template = await templateRepository.findOne({
@@ -379,7 +383,7 @@ export class EmailService {
                         isActive: true
                     }
                 });
-                
+
                 if (template) {
                     logger.info(`Found tower-specific MIP template for tower: ${towerId}`);
                 }
@@ -396,7 +400,7 @@ export class EmailService {
                         isActive: true
                     }
                 });
-                
+
                 if (template) {
                     logger.info(`Found community-specific MIP template for community: ${communityId}`);
                 }
@@ -413,7 +417,7 @@ export class EmailService {
                         isActive: true
                     }
                 });
-                
+
                 if (template) {
                     logger.info(`Found master community MIP template for masterCommunity: ${masterCommunityId}`);
                 }
@@ -457,12 +461,12 @@ export class EmailService {
         try {
             logger.info(`=== WELCOME PACK RETRIEVAL START ===`);
             logger.info(`Searching for welcome pack with MC:${masterCommunityId}, C:${communityId}, T:${towerId}`);
-            
+
             const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
-            
+
             // Try to find welcome pack with exact match (including tower)
             let welcomePack = null;
-            
+
             // 1. First try: Tower-specific welcome pack
             if (towerId) {
                 logger.info(`Searching for tower-specific welcome pack...`);
@@ -506,7 +510,7 @@ export class EmailService {
                     relations: ['file']
                 });
             }
-            
+
             logger.info(`Master community-level search result: ${welcomePack ? 'FOUND' : 'NOT FOUND'}`);
 
             if (welcomePack?.file) {
@@ -516,12 +520,12 @@ export class EmailService {
                     filePath: welcomePack.file.filePath,
                     fileType: welcomePack.file.fileType
                 })}`);
-                
+
                 // If file is stored in Azure Blob Storage, we need to download it
                 const fileUrl = `https://${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/application/${welcomePack.file.filePath}`;
-                
+
                 logger.info(`Welcome pack file URL: ${fileUrl}`);
-                
+
                 return {
                     filename: welcomePack.file.fileOriginalName || 'welcome-pack.pdf',
                     path: fileUrl, // nodemailer can handle URLs
@@ -558,14 +562,14 @@ export class EmailService {
     private replaceTemplatePlaceholders(template: string, data: MoveInEmailData): string {
         const currentDate = new Date();
         const moveInDate = data.moveInDate ? new Date(data.moveInDate) : null;
-        
+
         const replacements: Record<string, string> = {
             // User Information
             '{{firstName}}': data.userDetails.firstName,
             '{{lastName}}': data.userDetails.lastName,
             '{{fullName}}': `${data.userDetails.firstName} ${data.userDetails.lastName}`,
             '{{email}}': Array.isArray(data.userDetails.email) ? data.userDetails.email.join(', ') : data.userDetails.email,
-            
+
             // Request Information
             '{{requestNumber}}': data.requestNumber,
             '{{requestId}}': data.requestId.toString(),
@@ -573,7 +577,7 @@ export class EmailService {
             '{{statusTitle}}': this.getStatusTitle(data.status),
             '{{comments}}': data.comments || '',
             '{{remarks}}': data.comments || '',
-            
+
             // Unit Information
             '{{unitNumber}}': data.unitDetails.unitNumber,
             '{{unitName}}': data.unitDetails.unitName,
@@ -581,29 +585,29 @@ export class EmailService {
             '{{communityName}}': data.unitDetails.communityName,
             '{{towerName}}': data.unitDetails.towerName || '',
             '{{propertyAddress}}': this.formatPropertyAddress(data.unitDetails),
-            
+
             // Date Information
-            '{{moveInDate}}': moveInDate ? moveInDate.toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+            '{{moveInDate}}': moveInDate ? moveInDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
             }) : '',
             '{{moveInDateShort}}': moveInDate ? moveInDate.toLocaleDateString() : '',
-            '{{currentDate}}': currentDate.toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+            '{{currentDate}}': currentDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
             }),
             '{{currentDateShort}}': currentDate.toLocaleDateString(),
             '{{currentYear}}': currentDate.getFullYear().toString(),
             '{{currentTime}}': currentDate.toLocaleTimeString(),
-            
+
             // Status-specific information
             '{{statusMessage}}': this.getStatusMessage(data.status),
             '{{nextSteps}}': this.getNextSteps(data.status),
-            
+
             // Company/App Information
             '{{companyName}}': 'ONE Sobha App',
             '{{supportEmail}}': process.env.ONE_APP_SUPPORT_EMAIL || 'support@onesobhaapp.com',
@@ -611,7 +615,7 @@ export class EmailService {
         };
 
         let processedTemplate = template;
-        
+
         // Replace all placeholders
         Object.entries(replacements).forEach(([placeholder, value]) => {
             // Use global replace with regex to replace all occurrences
@@ -666,7 +670,7 @@ export class EmailService {
             unitDetails.communityName,
             unitDetails.masterCommunityName
         ].filter(Boolean);
-        
+
         return parts.join(', ');
     }
 
@@ -879,7 +883,7 @@ export class EmailService {
 
             // Generate attachments only for user emails, not for recipient emails
             const attachments: EmailAttachment[] = [];
-            
+
             if (!data.isRecipientEmail) {
                 // Generate MIP template as PDF attachment
                 logger.info(`Generating MIP template as PDF attachment...`);
@@ -900,7 +904,7 @@ export class EmailService {
                 } else {
                     logger.warn(`MIP template PDF attachment failed to generate`);
                 }
-                
+
                 if (welcomePackAttachment) {
                     attachments.push(welcomePackAttachment);
                     logger.info(`Welcome pack attachment found and added (${welcomePackAttachment.filename})`);
@@ -914,8 +918,8 @@ export class EmailService {
             }
 
             // Create detailed email body with header image and move-in permit content
-            const emailBody = data.isRecipientEmail ? 
-                this.createRecipientApprovalEmailBody(data) : 
+            const emailBody = data.isRecipientEmail ?
+                this.createRecipientApprovalEmailBody(data) :
                 this.createDetailedApprovalEmailBody(data);
 
             // Generate subject
@@ -1124,20 +1128,20 @@ export class EmailService {
         try {
             // Import puppeteer dynamically to avoid build issues
             const puppeteer = require('puppeteer');
-            
+
             logger.info(`Generating MIP template PDF for request ${data.requestNumber}`);
-            
+
             // Launch Puppeteer
             const browser = await puppeteer.launch({
                 headless: true,
                 args: ['--no-sandbox', '--disable-setuid-sandbox']
             });
-            
+
             const page = await browser.newPage();
-            
+
             // Set content and wait for images to load
             await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-            
+
             // Generate PDF
             const pdfBuffer = await page.pdf({
                 format: 'A4',
@@ -1149,11 +1153,11 @@ export class EmailService {
                     left: '10mm'
                 }
             });
-            
+
             await browser.close();
-            
+
             logger.info(`MIP template PDF generated successfully (${pdfBuffer.length} bytes)`);
-            
+
             return {
                 filename: `${data.requestNumber}-${data.status}.pdf`,
                 content: pdfBuffer,
@@ -1184,7 +1188,7 @@ export class EmailService {
     private createEmailBodyWithHeader(status: string, requestNumber: string, isRecipientEmail: boolean = false, data?: MoveInEmailData): string {
         const statusMessage = this.getStatusMessage(status);
         const moveInDateStr = data?.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
-        
+
         let heading = '';
         if (status.toLowerCase() === 'approved') {
             if (isRecipientEmail) {
@@ -1198,7 +1202,7 @@ export class EmailService {
         } else {
             heading = 'Move-in Request Update';
         }
-        
+
         return `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <!-- Header Image with Frame -->
@@ -1251,7 +1255,7 @@ export class EmailService {
     private createDetailedApprovalEmailBody(data: MoveInEmailData): string {
         const statusMessage = this.getStatusMessage('approved');
         const nextSteps = this.getNextSteps('approved');
-        
+
         return `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <!-- Header Image with Frame -->
@@ -1344,37 +1348,37 @@ export class EmailService {
      */
     private createRecipientApprovalEmailBody(data: MoveInEmailData): string {
         // Format dates properly
-        const moveInDate = data.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+        const moveInDate = data.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
         }) : '';
-        
-        const moveOutDate = data.additionalInfo?.moveOutDate ? 
-            new Date(data.additionalInfo.moveOutDate).toLocaleDateString('en-GB', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+
+        const moveOutDate = data.additionalInfo?.moveOutDate ?
+            new Date(data.additionalInfo.moveOutDate).toLocaleDateString('en-GB', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
             }) : '';
-            
-        const startDate = data.additionalInfo?.startDate ? 
-            new Date(data.additionalInfo.startDate).toLocaleDateString('en-GB', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+
+        const startDate = data.additionalInfo?.startDate ?
+            new Date(data.additionalInfo.startDate).toLocaleDateString('en-GB', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
             }) : '';
-            
-        const endDate = data.additionalInfo?.endDate ? 
-            new Date(data.additionalInfo.endDate).toLocaleDateString('en-GB', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+
+        const endDate = data.additionalInfo?.endDate ?
+            new Date(data.additionalInfo.endDate).toLocaleDateString('en-GB', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
             }) : '';
-        
-        const mipIssueDate = new Date().toLocaleDateString('en-GB', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+
+        const mipIssueDate = new Date().toLocaleDateString('en-GB', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
         });
 
         // Get user type based on request type
@@ -1397,8 +1401,8 @@ export class EmailService {
         }
 
         // Get applicant and occupant names with better fallback handling
-        const applicantName = data.userDetails ? 
-            `${data.userDetails.firstName || ''} ${data.userDetails.lastName || ''}`.trim() || 'Not specified' : 
+        const applicantName = data.userDetails ?
+            `${data.userDetails.firstName || ''} ${data.userDetails.lastName || ''}`.trim() || 'Not specified' :
             'Not specified';
         const occupantName = data.additionalInfo?.occupantName || applicantName;
 
@@ -1524,7 +1528,7 @@ export class EmailService {
      */
     private getEmailSubject(status: string, requestNumber: string, isRecipientEmail: boolean = false, data?: MoveInEmailData): string {
         const moveInDateStr = data?.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
-        
+
         if (status.toLowerCase() === 'approved') {
             if (isRecipientEmail) {
                 // For recipient emails: "Move in request Raised : request id"
@@ -1534,7 +1538,7 @@ export class EmailService {
                 return `Your move in date starts from ${moveInDateStr} Ref # ${requestNumber}`;
             }
         }
-        
+
         // For other statuses, use the original format
         switch (status.toLowerCase()) {
             case 'rfi-pending':
