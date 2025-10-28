@@ -229,14 +229,7 @@ export class MoveInService {
       // Business Logic Validations for Owner, Tenant, HHO-Unit, and HHO-Company Move-in Requests
       if (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
         // 1. Allow multiple OPEN requests; block only if an APPROVED request already exists
-        const isUnitAvailableForNewRequest = await this.checkUnitAvailabilityForNewRequest(Number(unitId));
-        if (!isUnitAvailableForNewRequest) {
-          throw new ApiError(
-            httpStatus.CONFLICT,
-            APICodes.UNIT_NOT_VACANT.message,
-            APICodes.UNIT_NOT_VACANT.code
-          );
-        }
+        await this.checkUnitAvailabilityForNewRequest(Number(unitId));
 
         // 2. Overlap: allow overlaps for OPEN/PENDING; only block if an APPROVED request exists
         const overlapCheck = await this.checkOverlappingRequests(Number(unitId), new Date(moveInDate));
@@ -247,9 +240,6 @@ export class MoveInService {
             APICodes.OVERLAPPING_REQUESTS.code
           );
         }
-
-        // 3. Check if MIP template and Welcome pack exist and are active
-        await this.validateWelcomePackAndMIP(Number(unitId));
       }
 
       const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
@@ -459,7 +449,7 @@ export class MoveInService {
         .innerJoinAndSelect("ut.masterCommunity", "mc", "mc.isActive = 1")
         .innerJoinAndSelect("ut.community", "c", "c.isActive = 1")
         .innerJoinAndSelect("ut.tower", "t", "t.isActive = 1")
-        .where("ut.id = :id AND ut.isActive = 1", { id })
+        .where("ut.id = :id", { id })
         .getOne();
     } catch (error) {
       throw new ApiError(
@@ -643,6 +633,12 @@ export class MoveInService {
       logger.info(`Input data: ${JSON.stringify(data)}`);
       logger.info(`User: ${JSON.stringify(user)}`);
 
+      // Validate Welcome Pack and MIP before proceeding
+      if (data.unitId) {
+        await this.validateWelcomePackAndMIP(Number(data.unitId));
+        logger.info(`Welcome Pack and MIP validation passed for owner move-in, unit: ${data.unitId}`);
+      }
+
       // Map owner UI fields to details (user details come from Users table, not stored here)
       const { details = {}, ...rest } = data || {};
       const ownerDetails = {
@@ -676,6 +672,15 @@ export class MoveInService {
 
   async createTenantMoveIn(data: any, user: any) {
     try {
+      logger.info(`=== CREATE TENANT MOVE-IN START (ADMIN) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
+      // Validate Welcome Pack and MIP before proceeding
+      if (data.unitId) {
+        await this.validateWelcomePackAndMIP(Number(data.unitId));
+        logger.info(`Welcome Pack and MIP validation passed for tenant move-in, unit: ${data.unitId}`);
+      }
+      
       // Map tenant UI fields to details (user details come from Users table, not stored here)
       const { details = {}, ...rest } = data || {};
       const tenantDetails = {
@@ -714,6 +719,15 @@ export class MoveInService {
 
   async createHhoOwnerMoveIn(data: any, user: any) {
     try {
+      logger.info(`=== CREATE HHO OWNER MOVE-IN START (ADMIN) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
+      // Validate Welcome Pack and MIP before proceeding
+      if (data.unitId) {
+        await this.validateWelcomePackAndMIP(Number(data.unitId));
+        logger.info(`Welcome Pack and MIP validation passed for HHO owner move-in, unit: ${data.unitId}`);
+      }
+      
       // Map HHO Owner UI fields to details
       const { details = {}, ...rest } = data || {};
       const hhoOwnerDetails = {
@@ -749,6 +763,15 @@ export class MoveInService {
 
   async createHhcCompanyMoveIn(data: any, user: any) {
     try {
+      logger.info(`=== CREATE HHC COMPANY MOVE-IN START (ADMIN) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
+      // Validate Welcome Pack and MIP before proceeding
+      if (data.unitId) {
+        await this.validateWelcomePackAndMIP(Number(data.unitId));
+        logger.info(`Welcome Pack and MIP validation passed for HHC company move-in, unit: ${data.unitId}`);
+      }
+      
       const { details = {}, ...rest } = data || {};
       const hhcCompanyDetails = {
         name: rest.name,
@@ -1282,9 +1305,56 @@ export class MoveInService {
 
 
 
-  // Check if unit is available for a new move-in request (no APPROVED request exists)
+  // Check if unit is available for a new move-in request
   private async checkUnitAvailabilityForNewRequest(unitId: number): Promise<boolean> {
     try {
+      // Check unit status conditions
+      const unit = await Units.getRepository()
+        .createQueryBuilder("unit")
+        .addSelect("unit.isActive")
+        .where("unit.id = :unitId", { unitId })
+        .getOne();
+
+      if (!unit) {
+        logger.error(`Unit not found: ${unitId}`);
+        throw new ApiError(
+          httpStatus.NOT_FOUND,
+          `Unit ${unitId} not found`,
+          "EC404"
+        );
+      }
+
+      // Validate unit status conditions
+      logger.debug(`Unit ${unitId} debug - isActive: ${unit.isActive}, type: ${typeof unit.isActive}, availabilityStatus: ${unit.availabilityStatus}, occupancyStatus: ${unit.occupancyStatus}`);
+      
+      if (!unit.isActive) {
+        logger.error(`Unit ${unitId} is not active - Value: ${unit.isActive}, Type: ${typeof unit.isActive}`);
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Unit ${unitId} is not active`,
+          "EC223"
+        );
+      }
+
+      if (unit.availabilityStatus !== 'Available') {
+        logger.error(`Unit ${unitId} availability status is not 'Available': ${unit.availabilityStatus}`);
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Unit ${unitId} is not available for move-in. Status: ${unit.availabilityStatus}`,
+          "EC224"
+        );
+      }
+
+      if (unit.occupancyStatus !== 'vacant') {
+        logger.error(`Unit ${unitId} occupancy status is not 'vacant': ${unit.occupancyStatus}`);
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Unit ${unitId} is not vacant. Current occupancy: ${unit.occupancyStatus}`,
+          "EC225"
+        );
+      }
+
+      // Check for existing approved request
       const existingApprovedRequest = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
@@ -1292,10 +1362,23 @@ export class MoveInService {
         .andWhere("mir.isActive = 1")
         .getOne();
 
-      // Unit is available if there is NO approved request
-      return !existingApprovedRequest;
-    } catch (error) {
-      logger.error(`Error checking unit vacancy: ${error}`);
+      if (existingApprovedRequest) {
+        logger.error(`Unit ${unitId} already has an approved move-in request: ${existingApprovedRequest.id}`);
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          APICodes.UNIT_NOT_VACANT.message,
+          APICodes.UNIT_NOT_VACANT.code
+        );
+      }
+
+      return true;
+    } catch (error: any) {
+      // If it's already an ApiError (our specific validation errors), re-throw it
+      if (error.isOperational) {
+        throw error;
+      }
+      // Only catch unexpected errors
+      logger.error(`Error checking unit availability: ${error}`);
       throw new ApiError(
         httpStatus.INTERNAL_SERVER_ERROR,
         APICodes.UNKNOWN_ERROR.message,
@@ -1335,11 +1418,15 @@ export class MoveInService {
   // Check if MIP template and Welcome pack exist for the unit
   private async checkMIPAndWelcomePack(unitId: number): Promise<{ hasMIP: boolean; hasWelcomePack: boolean }> {
     try {
-      // TODO: Implement MIP template check
-      // TODO: Implement Welcome pack check
-      // For now, return true to allow development
+      // Use the existing validateWelcomePackAndMIP method which validates both
+      await this.validateWelcomePackAndMIP(unitId);
       return { hasMIP: true, hasWelcomePack: true };
     } catch (error) {
+      // If validation fails, return false
+      if (error instanceof ApiError) {
+        logger.error(`Error checking MIP and Welcome pack: ${error.message}`);
+        return { hasMIP: false, hasWelcomePack: false };
+      }
       logger.error(`Error checking MIP and Welcome pack: ${error}`);
       throw new ApiError(
         httpStatus.INTERNAL_SERVER_ERROR,
@@ -1583,6 +1670,16 @@ export class MoveInService {
         );
       }
 
+      // Validate unit availability status before approval
+      const isUnitAvailable = await this.checkUnitAvailabilityForNewRequest(moveInRequest.unit.id);
+      if (!isUnitAvailable) {
+        throw new ApiError(
+          httpStatus.CONFLICT,
+          APICodes.UNIT_NOT_VACANT.message,
+          APICodes.UNIT_NOT_VACANT.code
+        );
+      }
+
       // Check for overlapping requests
       const overlapCheck = await this.checkOverlappingRequests(moveInRequest.unit.id, moveInRequest.moveInDate);
       if (overlapCheck.hasOverlap) {
@@ -1598,8 +1695,8 @@ export class MoveInService {
       if (!mipCheck.hasMIP) {
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          APICodes.MIP_TEMPLATE_NOT_AVAILABLE.message,
-          APICodes.MIP_TEMPLATE_NOT_AVAILABLE.code
+          APICodes.MIP_NOT_CONFIGURED.message,
+          APICodes.MIP_NOT_CONFIGURED.code
         );
       }
 
@@ -2604,10 +2701,10 @@ export class MoveInService {
         comments: comments
       };
 
-      // Send RFI email (without attachment)
-      await this.emailService.sendMoveInStatusEmail(emailData);
+      // Send RFI email (without attachment) - DISABLED: Only approval emails should be sent
+      // await this.emailService.sendMoveInStatusEmail(emailData);
 
-      logger.info(`RFI notifications sent for move-in request ${requestId}`);
+      logger.info(`RFI notification - Email skipped for request ${requestId} (only approval emails are sent)`);
     } catch (error) {
       logger.error(`Error sending RFI notifications: ${error}`);
       // Don't throw error to avoid breaking the RFI process
@@ -2685,10 +2782,10 @@ export class MoveInService {
         comments: cancellationRemarks
       };
 
-      // Send cancellation email (without attachment)
-      await this.emailService.sendMoveInStatusEmail(emailData);
+      // Send cancellation email (without attachment) - DISABLED: Only approval emails should be sent
+      // await this.emailService.sendMoveInStatusEmail(emailData);
 
-      logger.info(`Cancellation notifications sent for move-in request ${requestId}`);
+      logger.info(`Cancellation notification - Email skipped for request ${requestId} (only approval emails are sent)`);
     } catch (error) {
       logger.error(`Error sending cancellation notifications: ${error}`);
       // Don't throw error to avoid breaking the cancellation process
@@ -2713,6 +2810,7 @@ export class MoveInService {
           unit: data.unitId ? { id: data.unitId } : undefined,
           moveInDate: data.moveInDate,
           status: data.status,
+          user: { id: data.userId },
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
@@ -2769,6 +2867,7 @@ export class MoveInService {
           status: data.status,
           comments: data.comments || null,
           additionalInfo: data.additionalInfo || null,
+          user: { id: data.userId },
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
@@ -2836,7 +2935,7 @@ export class MoveInService {
           status: data.status,
           comments: data.comments || null,
           additionalInfo: data.additionalInfo || null,
-          user: data.userId ? { id: data.userId } : undefined,
+          user: { id: data.userId },
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })
@@ -2897,7 +2996,7 @@ export class MoveInService {
           status: data.status,
           comments: data.comments || null,
           additionalInfo: data.additionalInfo || null,
-          user: data.userId ? { id: data.userId } : undefined,
+          user: { id: data.userId },
           updatedBy: user?.id,
         })
         .where('id = :requestId', { requestId })

@@ -12,7 +12,37 @@ const authMiddleware = new AuthMiddleware();
 const router = express.Router();
 
 // Note: Move-in emails are sent automatically during move-in operations
-// No manual email routes needed - emails are triggered automatically
+// These test endpoints are for development and debugging purposes only
+
+/**
+ * Test endpoint to send test move-in approval email with PDF generation
+ * POST /api/v1/email/test-approval
+ */
+router.post(
+    '/test-approval',
+    authMiddleware.auth(),
+    catchAsync(emailController.testMoveInApprovalEmail.bind(emailController))
+);
+
+/**
+ * Test endpoint to verify environment configuration
+ * GET /api/v1/email/check-config
+ */
+router.get(
+    '/check-config',
+    authMiddleware.auth(),
+    catchAsync(emailController.checkEnvConfig.bind(emailController))
+);
+
+/**
+ * Test endpoint to send basic test email
+ * POST /api/v1/email/test
+ */
+router.post(
+    '/test',
+    authMiddleware.auth(),
+    catchAsync(emailController.testEmail.bind(emailController))
+);
 
 export default router;
 

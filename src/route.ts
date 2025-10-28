@@ -13,6 +13,7 @@ import moveOutRoutes from './Modules/MoveOut/Mobile/moveOut.route';
 import moveOutAdminRoutes from './Modules/MoveOut/Admin/moveOutAdmin.route';
 import emailRoutes from './Modules/Email/email.route';
 import activeResidentsAdminRoutes from './Modules/ActiveResidents/Admin/activeResidents.route';
+import testHistoryRoutes from './Modules/TestHistory/testHistory.route';
 const router = express.Router();
 
 const defaultRoutes = [
@@ -27,6 +28,7 @@ const defaultRoutes = [
     { path: '/integration', route: integrationRoutes },
     { path: '/webhook', route: webhookRoutes },
     { path: '/email', route: emailRoutes },
+    { path: '/test-history', route: testHistoryRoutes },
 ];
 
 defaultRoutes.forEach((route) => {

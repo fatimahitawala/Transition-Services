@@ -249,4 +249,57 @@ export class EmailController {
             throw error;
         }
     }
+
+    /**
+     * CHECK ENVIRONMENT CONFIGURATION ENDPOINT
+     * ========================================
+     * HTTP GET endpoint to verify environment variable configuration
+     * 
+     * Purpose:
+     * - Verifies that EXECUTABLE_PATH is loaded correctly
+     * - Checks SMTP configuration
+     * - Useful for deployment troubleshooting
+     * - Development and debugging tool
+     * 
+     * Response:
+     * - Environment configuration details (sensitive data masked)
+     * 
+     * @param {AuthenticatedRequest} req - Express request with user authentication
+     * @param {Response} res - Express response object
+     * @returns {Promise<Response>} - HTTP response
+     */
+    async checkEnvConfig(req: AuthenticatedRequest, res: Response) {
+        try {
+            logger.info(`=== CHECK ENV CONFIG API CALLED ===`);
+            
+            const executablePath = process.env.EXECUTABLE_PATH;
+            const smtpHost = process.env.SMTP_HOST;
+            const smtpPort = process.env.SMTP_PORT;
+            const emailFrom = process.env.EMAIL_FROM;
+            
+            logger.info(`EXECUTABLE_PATH from env: ${executablePath || 'NOT SET'}`);
+            logger.info(`SMTP_HOST from env: ${smtpHost || 'NOT SET'}`);
+            
+            const config = {
+                chrome: {
+                    executablePath: executablePath || 'NOT SET (will use auto-detection)',
+                    isConfigured: !!executablePath,
+                    pathExists: executablePath ? 'Check manually on server' : 'N/A'
+                },
+                smtp: {
+                    host: smtpHost || 'NOT SET',
+                    port: smtpPort || 'NOT SET',
+                    from: emailFrom || 'NOT SET',
+                    isConfigured: !!(smtpHost && smtpPort && emailFrom)
+                },
+                environment: process.env.NODE_ENV || 'development',
+                timestamp: new Date().toISOString()
+            };
+            
+            return successResponseWithData(res, APICodes.COMMON_SUCCESS, config);
+        } catch (error) {
+            logger.error('Error in checkEnvConfig controller:', error);
+            throw error;
+        }
+    }
 }

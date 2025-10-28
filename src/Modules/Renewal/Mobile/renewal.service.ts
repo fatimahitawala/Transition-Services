@@ -127,7 +127,18 @@ export class RenewalService {
         .leftJoinAndSelect('u.masterCommunity', 'mc', 'mc.isActive = true')
         .leftJoinAndSelect('u.community', 'c', 'c.isActive = true')
         .leftJoinAndSelect('u.tower', 't', 't.isActive = true')
-        .leftJoinAndSelect('arr.user', 'user', 'user.isActive = true')
+        .leftJoin('arr.user', 'user', 'user.isActive = true')
+        .addSelect([
+          'user.id',
+          'user.firstName',
+          'user.middleName',
+          'user.lastName',
+          'user.email',
+          'user.mobile',
+          'user.isActive',
+          'user.createdAt',
+          'user.updatedAt'
+        ])
         .leftJoinAndSelect('arr.moveInRequest', 'mir')
         .addSelect('arr.createdAt')
         .addSelect('arr.updatedAt')
@@ -412,9 +423,7 @@ export class RenewalService {
         tenantDetails.children = children;
         tenantDetails.householdStaffs = householdStaffs;
         tenantDetails.pets = pets;
-        if (determinationComments) {
-          tenantDetails.determinationComments = determinationComments;
-        }
+        tenantDetails.determinationComments = determinationComments || null;
         tenantDetails.createdBy = user.id;
         tenantDetails.updatedBy = user.id;
         tenantDetails.isActive = true;

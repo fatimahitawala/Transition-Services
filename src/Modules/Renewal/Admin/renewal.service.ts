@@ -200,7 +200,18 @@ export class RenewalService {
         .leftJoinAndSelect('unit.community', 'community')
         .leftJoinAndSelect('unit.tower', 'tower')
         .leftJoinAndSelect('unit.masterCommunity', 'masterCommunity')
-        .leftJoinAndSelect('renewal.user', 'requestUser')
+        .leftJoin('renewal.user', 'requestUser')
+        .addSelect([
+          'requestUser.id',
+          'requestUser.firstName',
+          'requestUser.middleName',
+          'requestUser.lastName',
+          'requestUser.email',
+          'requestUser.mobile',
+          'requestUser.isActive',
+          'requestUser.createdAt',
+          'requestUser.updatedAt'
+        ])
         .leftJoinAndSelect('renewal.moveInRequest', 'moveInRequest')
         .where('renewal.id = :requestId', { requestId })
         .andWhere('renewal.isActive = :isActive', { isActive: true })
@@ -236,12 +247,21 @@ export class RenewalService {
         relations: ['file']
       });
 
-      // Get logs (history)
-      const logs = await AccountRenewalRequestLogs.getRepository().find({
-        where: { accountRenewalRequest: { id: requestId } },
-        relations: ['user'],
-        order: { timestamp: 'DESC' }
-      });
+      // Get logs (history) - exclude password from user
+      const logs = await AccountRenewalRequestLogs.getRepository()
+        .createQueryBuilder('log')
+        .leftJoin('log.user', 'user')
+        .addSelect([
+          'user.id',
+          'user.firstName',
+          'user.middleName',
+          'user.lastName',
+          'user.email',
+          'user.mobile'
+        ])
+        .where('log.accountRenewalRequest.id = :requestId', { requestId })
+        .orderBy('log.timestamp', 'DESC')
+        .getMany();
 
       return {
         ...renewalRequest,
@@ -427,7 +447,7 @@ export class RenewalService {
    */
   async createTenantRenewal(body: any, user: any) {
     try {
-      const { unitId, userId, tenancyContractEndDate, adults, children, householdStaffs, pets, determinationComments, ejariNumber } = body;
+      const { unitId, userId, tenancyContractEndDate, adults, children, householdStaffs, pets, determinationComments } = body;
 
       logger.info(`RENEWAL | CREATE TENANT | ADMIN | USER: ${user.id} | UNIT: ${unitId} | FOR USER: ${userId}`);
 
@@ -467,12 +487,7 @@ export class RenewalService {
         tenantDetails.children = children;
         tenantDetails.householdStaffs = householdStaffs;
         tenantDetails.pets = pets;
-        if (determinationComments) {
-          tenantDetails.determinationComments = determinationComments;
-        }
-        if (ejariNumber) {
-          tenantDetails.ejariNumber = ejariNumber;
-        }
+        tenantDetails.determinationComments = determinationComments || null;
         tenantDetails.createdBy = user.id;
         tenantDetails.updatedBy = user.id;
         tenantDetails.isActive = true;

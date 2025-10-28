@@ -379,6 +379,9 @@ export class MoveInService {
 
   async createOwnerMoveIn(data: any, user: any) {
     try {
+      logger.info(`=== CREATE OWNER MOVE-IN START (MOBILE) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
       // Map owner UI fields to details (user details come from Users table, not stored here)
       const { details = {}, ...rest } = data || {};
       const ownerDetails = {
@@ -394,6 +397,7 @@ export class MoveInService {
       };
 
       logger.debug(`Owner Details mapped: ${JSON.stringify(ownerDetails)}`);
+      logger.info(`=== CREATE OWNER MOVE-IN END (MOBILE) ===`);
       return this.createMoveIn({ ...rest, details: ownerDetails, requestType: MOVE_IN_USER_TYPES.OWNER }, user);
     } catch (error) {
       logger.error(`Error in createOwnerMoveIn Mobile: ${JSON.stringify(error)}`);
@@ -403,6 +407,9 @@ export class MoveInService {
 
   async createTenantMoveIn(data: any, user: any) {
     try {
+      logger.info(`=== CREATE TENANT MOVE-IN START (MOBILE) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
       // Map tenant UI fields to details (user details come from Users table, not stored here)
       const { details = {}, ...rest } = data || {};
       const tenantDetails = {
@@ -432,6 +439,7 @@ export class MoveInService {
       };
 
       logger.debug(`Tenant Details mapped: ${JSON.stringify(tenantDetails)}`);
+      logger.info(`=== CREATE TENANT MOVE-IN END (MOBILE) ===`);
       return this.createMoveIn({ ...rest, details: tenantDetails, requestType: MOVE_IN_USER_TYPES.TENANT }, user);
     } catch (error) {
       logger.error(`Error in createTenantMoveIn Mobile: ${JSON.stringify(error)}`);
@@ -440,47 +448,65 @@ export class MoveInService {
   }
 
   async createHhoOwnerMoveIn(data: any, user: any) {
-    // Map HHO Owner UI fields to details - owner details come from root level
-    const { details = {}, ...rest } = data || {};
-    const hhoDetails = {
-      // Required owner identity fields from root level (required by validation)
-      ownerFirstName: rest.ownerFirstName,
-      ownerLastName: rest.ownerLastName,
-      email: rest.email,
-      dialCode: rest.dialCode,
-      phoneNumber: rest.phoneNumber,
-      nationality: rest.nationality,
+    try {
+      logger.info(`=== CREATE HHO OWNER MOVE-IN START (MOBILE) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
+      // Map HHO Owner UI fields to details - owner details come from root level
+      const { details = {}, ...rest } = data || {};
+      const hhoDetails = {
+        // Required owner identity fields from root level (required by validation)
+        ownerFirstName: rest.ownerFirstName,
+        ownerLastName: rest.ownerLastName,
+        email: rest.email,
+        dialCode: rest.dialCode,
+        phoneNumber: rest.phoneNumber,
+        nationality: rest.nationality,
 
-      // Permit fields coming from the mobile UI payload
-      unitPermitNumber: details.unitPermitNumber,
-      unitPermitStartDate: details.unitPermitStartDate,
-      unitPermitExpiryDate: details.unitPermitExpiryDate,
+        // Permit fields coming from the mobile UI payload
+        unitPermitNumber: details.unitPermitNumber,
+        unitPermitStartDate: details.unitPermitStartDate,
+        unitPermitExpiryDate: details.unitPermitExpiryDate,
 
-      // Determination details
-      peopleOfDetermination: details.peopleOfDetermination,
-      determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
-      termsAccepted: details.termsAccepted,
+        // Determination details
+        peopleOfDetermination: details.peopleOfDetermination,
+        determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
+        termsAccepted: details.termsAccepted,
 
-      // Optional comment
-      comments: rest.comments || null,
-    };
+        // Optional comment
+        comments: rest.comments || null,
+      };
 
-    return this.createMoveIn({ ...rest, details: hhoDetails, requestType: MOVE_IN_USER_TYPES.HHO_OWNER }, user);
+      logger.info(`=== CREATE HHO OWNER MOVE-IN END (MOBILE) ===`);
+      return this.createMoveIn({ ...rest, details: hhoDetails, requestType: MOVE_IN_USER_TYPES.HHO_OWNER }, user);
+    } catch (error) {
+      logger.error(`Error in createHhoOwnerMoveIn Mobile: ${JSON.stringify(error)}`);
+      throw error;
+    }
   }
 
   async createHhcCompanyMoveIn(data: any, user: any) {
-    // Map determination details for HHC Company
-    const { details = {}, ...rest } = data || {};
-    const hhcDetails = {
-      // Determination details (must be set before spread operator)
-      peopleOfDetermination: details.peopleOfDetermination,
-      determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
-      termsAccepted: details.termsAccepted,
-      // Spread other details after setting determination fields
-      ...details,
-    };
+    try {
+      logger.info(`=== CREATE HHC COMPANY MOVE-IN START (MOBILE) ===`);
+      logger.info(`Unit ID: ${data.unitId}`);
+      
+      // Map determination details for HHC Company
+      const { details = {}, ...rest } = data || {};
+      const hhcDetails = {
+        // Determination details (must be set before spread operator)
+        peopleOfDetermination: details.peopleOfDetermination,
+        determination_text: details.peopleOfDetermination && details.detailsText ? details.detailsText : null,
+        termsAccepted: details.termsAccepted,
+        // Spread other details after setting determination fields
+        ...details,
+      };
 
-    return this.createMoveIn({ ...rest, details: hhcDetails, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
+      logger.info(`=== CREATE HHC COMPANY MOVE-IN END (MOBILE) ===`);
+      return this.createMoveIn({ ...rest, details: hhcDetails, requestType: MOVE_IN_USER_TYPES.HHO_COMPANY }, user);
+    } catch (error) {
+      logger.error(`Error in createHhcCompanyMoveIn Mobile: ${JSON.stringify(error)}`);
+      throw error;
+    }
   }
 
 
@@ -1133,8 +1159,30 @@ export class MoveInService {
         throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
       }
 
-      // Validate Welcome Pack and MIP configuration
-      await this.validateWelcomePackAndMIP(Number(unitId));
+      // Validate unit status conditions
+      if (unit.isActive !== true) {
+        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
+      }
+
+      if (unit.availabilityStatus !== 'Available') {
+        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
+      }
+
+      if (unit.occupancyStatus !== 'vacant') {
+        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
+      }
+
+      // Check for existing approved requests
+      const existingApprovedRequest = await MoveInRequests.getRepository()
+        .createQueryBuilder("mir")
+        .where("mir.unit.id = :unitId", { unitId })
+        .andWhere("mir.status = :approvedStatus", { approvedStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED })
+        .andWhere("mir.isActive = 1")
+        .getOne();
+
+      if (existingApprovedRequest) {
+        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
+      }
 
       const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
 
@@ -1308,6 +1356,13 @@ export class MoveInService {
       };
     } catch (error: any) {
       logger.error(`Error in createMoveIn: ${JSON.stringify(error)}`);
+      
+      // If it's already an ApiError, re-throw it as-is to preserve status code and message
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      // For other errors, wrap them
       const apiCode = Object.values(APICodes as Record<string, any>).find((item: any) => item.code === (error as any).code) || APICodes.UNKNOWN_ERROR;
       throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode.message, apiCode.code);
     }
@@ -1374,11 +1429,16 @@ export class MoveInService {
       } = data;
 
       await executeInTransaction(async (qr: any) => {
+        // Auto-transition from RFI_PENDING to RFI_SUBMITTED when user updates
+        const newStatus = existing.status === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING 
+          ? MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED 
+          : (status || (undefined as any));
+
         // Update master
         await MoveInRequests.update({ id: requestId }, {
           unit: unitId ? ({ id: unitId } as any) : (undefined as any),
           moveInDate: moveInDate ? new Date(moveInDate) : (undefined as any),
-          status: status || (undefined as any),
+          status: newStatus,
           comments: comments ?? (undefined as any),
           additionalInfo: additionalInfo ?? (undefined as any),
           user: ({ id: user?.id } as any),
@@ -1492,8 +1552,10 @@ export class MoveInService {
         const log = new MoveInRequestLogs();
         log.moveInRequest = { id: requestId } as any;
         log.requestType = existing.requestType;
-        log.status = existing.status;
-        log.changes = 'Request updated';
+        log.status = newStatus !== undefined ? newStatus : existing.status;
+        log.changes = existing.status === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING && newStatus === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED 
+          ? 'RFI response submitted by user' 
+          : 'Request updated';
         log.user = { id: user?.id } as any;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.details = JSON.stringify({ data });
@@ -1513,7 +1575,7 @@ export class MoveInService {
 
       // If user has submitted additional info (RFI Submitted), notify admin and user
       try {
-        if (status === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED && existing.status === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING && updated) {
+        if (existing.status === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING && updated?.status === MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED) {
           const moveInDateStr = updated.moveInDate
             ? new Date(updated.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' })
             : '';
@@ -1928,8 +1990,16 @@ export class MoveInService {
       throw new ApiError(httpStatus.FORBIDDEN, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.message, APICodes.REQUEST_NOT_BELONG_TO_CURRENT_USER.code);
     }
 
-    // Only requests in 'new' status can be cancelled by users
-    if (mir.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN) {
+    // Users can cancel requests in 'new', 'rfi-pending', or 'rfi-submitted' status
+    // Cannot cancel if already approved, cancelled, user-cancelled, or closed
+    const notAllowedStatuses = [
+      MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
+      MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED,
+      MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED,
+      MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED
+    ];
+
+    if (notAllowedStatuses.includes(mir.status)) {
       throw new ApiError(httpStatus.BAD_REQUEST,
         APICodes.CANNOT_CANCEL_MOBILE_STATUS.message,
         APICodes.CANNOT_CANCEL_MOBILE_STATUS.code);
@@ -2004,14 +2074,13 @@ export class MoveInService {
       // Get the main move-in request with basic details (exclude password from user)
       let query = MoveInRequests.getRepository()
         .createQueryBuilder("mv")
-        .leftJoinAndSelect("mv.user", "user", "user.isActive = true")
+        .leftJoin("mv.user", "user", "user.isActive = true")
         .addSelect([
           "user.id",
           "user.firstName", 
           "user.lastName",
           "user.email",
-          "user.dialCode",
-          "user.phoneNumber",
+          "user.mobile",
           "user.isActive",
           "user.createdAt",
           "user.updatedAt"
