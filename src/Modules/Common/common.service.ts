@@ -20,8 +20,127 @@ import config from '../../Common/Config/config';
 import axios from 'axios';
 import { integrationUrls } from "../../Common/Constants/urls";
 import { AccessCardRequests } from "../../Entities/AccessCardRequests.entity";
+import { SalesForceTokens } from "../../Entities/SalesForceTokens.entity";
+import { SalesForceTokenHistory } from "../../Entities/SalesForceTokenHistory.entity";
+
+export type SalesforceResidentRequestType = 'move-in' | 'move-out' | 'renewal';
+
+export interface SalesforceResidentPayload {
+    salutation?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    primaryMobileCountryCode?: string | null;
+    primaryMobileNumber?: string | null;
+    alternativeMobileCountryCode?: string | null;
+    alternativeMobileNumber?: string | null;
+    primaryEmail?: string | null;
+    alternateEmail?: string | null;
+    unitId: string; // Salesforce Unit Id
+    nationality?: string | null;
+    typeOfTenant?: string | null; // Tenant | HomeOwner | HHO | Company
+    moveInDate?: string | null;
+    moveOutDate?: string | null;
+    ejariStartDate?: string | null;
+    ejariEndDate?: string | null;
+    requestRaisedDate?: string | null;
+    dtcmStartDate?: string | null;
+    dtcmEndDate?: string | null;
+    requestApprovedDate?: string | null;
+    request_type: SalesforceResidentRequestType; // move-in | move-out | renewal
+    status: string; // approve | cancel | etc.
+    mobile_app_reference: string; // e.g. MIP-xxxx, MOP-xxxx
+}
 
 export class CommonService {
+    private async getStoredSalesforceToken(): Promise<string> {
+        const rec = await SalesForceTokens.createQueryBuilder('t')
+            .where('t.isActive = true')
+            .orderBy('t.createdAt', 'DESC')
+            .getOne();
+        return rec?.token || '';
+    }
+
+    private async refreshSalesforceToken(): Promise<string> {
+        const options: any = {
+            method: 'POST',
+            url: config.gateway.salesforceTokenUrl,
+            headers: {
+                'Content-Type': 'application/json',
+                [config.gateway.subscriptionKey]: config.gateway.subscriptionValue,
+            },
+        };
+        const result = await axios(options);
+        const newToken = result?.data?.access_token || '';
+        if (!newToken) return '';
+
+        const current = await SalesForceTokens.createQueryBuilder('p')
+            .where('p.isActive = true')
+            .orderBy('p.createdAt', 'DESC')
+            .getOne();
+
+        if (current?.token) {
+            try {
+                await SalesForceTokenHistory.createQueryBuilder()
+                    .insert()
+                    .values({ token: current.token })
+                    .execute();
+            } catch { }
+            await SalesForceTokens.createQueryBuilder()
+                .update(SalesForceTokens)
+                .set({ token: newToken })
+                .where('id = :id', { id: current.id })
+                .execute();
+        } else {
+            await SalesForceTokens.save({ token: newToken });
+        }
+
+        return newToken;
+    }
+
+    // No proactive probe for performance; rely on 401-triggered refresh
+    /**
+     * Push resident lifecycle data to Salesforce Scm_ResidentAPI.
+     * Reusable for move-in, move-out and renewal.
+     */
+    async sendResidentToSalesforce(payload: SalesforceResidentPayload, extraHeaders?: Record<string, string>) {
+        try {
+            // Use API Gateway Salesforce base URL
+            // Note: Do NOT start endpoint with '/' or URL() will drop any base path like '/srsalesforce/v1'
+            const base = (config.gateway?.salesforceBaseUrl || '').trim().replace(/\/$/, '');
+            const endpoint = 'Scm_ResidentAPI';
+            const url = `${base}/${endpoint}`;
+
+            // Get last stored token; fall back to configured token
+            let token = (await this.getStoredSalesforceToken()) || (config.salesforceToken || '');
+            let headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+                [config.gateway.subscriptionKey]: config.gateway.subscriptionValue,
+                ...(extraHeaders || {}),
+            };
+
+            const sanitizedPayload = JSON.parse(JSON.stringify(payload, (_k, v) => v === undefined ? null : v));
+
+            let resp;
+            logger.debug(`Salesforce Resident API request to ${url} with payload: ${JSON.stringify(sanitizedPayload)}, headers: ${JSON.stringify(headers)}`);
+            try {
+                resp = await axios.post(url, sanitizedPayload, { headers, timeout: 10_000 });
+            } catch (err: any) {
+                if (err?.response?.status === 401) {
+                    token = await this.refreshSalesforceToken();
+                    headers.Authorization = `Bearer ${token}`;
+                    resp = await axios.post(url, sanitizedPayload, { headers, timeout: 10_000 });
+                } else {
+                    throw err;
+                }
+            }
+            logger.debug(`Salesforce Resident API success: status=${resp.status}`);
+            return { status: resp.status, data: resp.data };
+        } catch (error: any) {
+            logger.error(`Salesforce Resident API error: ${error?.message || error}`);
+            return { status: error?.response?.status || 500, data: error?.response?.data };
+        }
+    }
     /**
      * Deactivate access card requests tied to the unit for the given customer user.
      * - Cancels pending requests directly.
