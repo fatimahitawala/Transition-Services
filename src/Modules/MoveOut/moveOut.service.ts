@@ -7,7 +7,7 @@ import { getPaginationInfo } from "../../Common/Utils/paginationUtils";
 import { checkAdminPermission, checkIsSecurity } from "../../Common/Utils/adminAccess";
 import { Units, getUnitInformation } from "../../Entities/Units.entity";
 import { UnitBookings } from "../../Entities/UnitBookings.entity";
-import { MOVE_IN_AND_OUT_REQUEST_STATUS, MOVE_IN_USER_TYPES, MOVE_REQUEST_STATUS, OccupancyStatus } from "../../Entities/EntityTypes";
+import { MOVE_IN_AND_OUT_REQUEST_STATUS, MOVE_IN_USER_TYPES, OccupancyStatus } from "../../Entities/EntityTypes";
 import { addNotification, addAdminNotification } from "../../Common/Utils/notification";
 import { UserRoles } from "../../Entities/UserRoles.entity";
 import { MoveInRequests } from "../../Entities/MoveInRequests.entity";
@@ -1455,7 +1455,7 @@ export class MoveOutService {
             .andWhere("arrUser.id = :userId", { userId })
             .andWhere("arrUnit.id = :unitId", { unitId })
             .andWhere("arr.moveInRequest = :moveInRequestId", { moveInRequestId: moveInRequest.id })
-            .andWhere("arr.status = :status", { status: MOVE_REQUEST_STATUS.APPROVED })
+            .andWhere("arr.status = :status", { status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED })
             .orderBy("arr.updatedAt", "DESC")
             .getOne();
 
