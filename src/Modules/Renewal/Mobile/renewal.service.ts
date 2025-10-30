@@ -12,7 +12,7 @@ import { Users } from '../../../Entities/Users.entity';
 import { Units } from '../../../Entities/Units.entity';
 import { OccupancyRequestTemplates } from '../../../Entities/OccupancyRequestTemplates.entity';
 import { FileUploads } from '../../../Entities/FileUploads.entity';
-import { ACCOUNT_RENEWAL_USER_TYPES, MOVE_REQUEST_STATUS, MOVE_IN_AND_OUT_REQUEST_STATUS, TransitionRequestActionByTypes, TRANSITION_DOCUMENT_TYPES, OCUPANCY_REQUEST_TYPES } from '../../../Entities/EntityTypes';
+import { ACCOUNT_RENEWAL_USER_TYPES,  MOVE_IN_AND_OUT_REQUEST_STATUS, TransitionRequestActionByTypes, TRANSITION_DOCUMENT_TYPES, OCUPANCY_REQUEST_TYPES } from '../../../Entities/EntityTypes';
 import ApiError from '../../../Common/Utils/ApiError';
 import { APICodes } from '../../../Common/Constants';
 import { logger } from '../../../Common/Utils/logger';
@@ -237,7 +237,7 @@ export class RenewalService {
       where: {
         unit: { id: unitId },
         user: { id: userId },
-        status: MOVE_REQUEST_STATUS.APPROVED,
+        status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
         isActive: true
       }
     });
@@ -407,7 +407,7 @@ export class RenewalService {
         renewalRequest.requestType = ACCOUNT_RENEWAL_USER_TYPES.TENANT;
         renewalRequest.user = { id: user.id } as any;
         renewalRequest.unit = { id: unitId } as any;
-        renewalRequest.status = MOVE_REQUEST_STATUS.OPEN; // Mobile requests need approval
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN; // Mobile requests need approval
         renewalRequest.moveInDate = tenancyContractEndDate; // Store end date as moveInDate
         renewalRequest.createdBy = user.id;
         renewalRequest.updatedBy = user.id;
@@ -434,7 +434,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = savedRequest; // Use entity instance
         log.requestType = ACCOUNT_RENEWAL_USER_TYPES.TENANT;
-        log.status = MOVE_REQUEST_STATUS.OPEN;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = "";
@@ -513,7 +513,7 @@ export class RenewalService {
         renewalRequest.requestType = ACCOUNT_RENEWAL_USER_TYPES.HHO_OWNER;
         renewalRequest.user = { id: user.id } as any;
         renewalRequest.unit = { id: unitId } as any;
-        renewalRequest.status = MOVE_REQUEST_STATUS.OPEN; // Mobile requests need approval
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN; // Mobile requests need approval
         renewalRequest.moveInDate = dtcmPermitEndDate; // Store end date as moveInDate
         renewalRequest.createdBy = user.id;
         renewalRequest.updatedBy = user.id;
@@ -535,7 +535,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = savedRequest; // Use entity instance
         log.requestType = ACCOUNT_RENEWAL_USER_TYPES.HHO_OWNER;
-        log.status = MOVE_REQUEST_STATUS.OPEN;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = "";
@@ -616,7 +616,7 @@ export class RenewalService {
         renewalRequest.requestType = ACCOUNT_RENEWAL_USER_TYPES.HHO_COMPANY;
         renewalRequest.user = { id: user.id } as any;
         renewalRequest.unit = { id: unitId } as any;
-        renewalRequest.status = MOVE_REQUEST_STATUS.OPEN; // Mobile requests need approval
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN; // Mobile requests need approval
         renewalRequest.moveInDate = leaseContractEndDate; // Store end date as moveInDate
         renewalRequest.createdBy = user.id;
         renewalRequest.updatedBy = user.id;
@@ -640,7 +640,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = savedRequest; // Use entity instance
         log.requestType = ACCOUNT_RENEWAL_USER_TYPES.HHO_COMPANY;
-        log.status = MOVE_REQUEST_STATUS.OPEN;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = "";
@@ -708,7 +708,7 @@ export class RenewalService {
         }
 
         // Mobile users can only edit in RFI_PENDING status (as per BRD)
-        if (renewalRequest.status !== MOVE_REQUEST_STATUS.RFI_PENDING) {
+        if (renewalRequest.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
             APICodes.RENEWAL_REQUEST_NOT_EDITABLE.message,
@@ -738,7 +738,7 @@ export class RenewalService {
         if (body.tenancyContractEndDate) {
           renewalRequest.moveInDate = body.tenancyContractEndDate;
         }
-        renewalRequest.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED; // Change to RFI_SUBMITTED
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED; // Change to RFI_SUBMITTED
         renewalRequest.updatedBy = user.id;
         await renewalRequest.save();
 
@@ -751,7 +751,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = renewalRequest;
         log.requestType = renewalRequest.requestType;
-        log.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = JSON.stringify(body);
@@ -802,7 +802,7 @@ export class RenewalService {
           );
         }
 
-        if (renewalRequest.status !== MOVE_REQUEST_STATUS.RFI_PENDING) {
+        if (renewalRequest.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
             APICodes.RENEWAL_REQUEST_NOT_EDITABLE.message,
@@ -825,7 +825,7 @@ export class RenewalService {
         if (body.dtcmPermitEndDate) {
           renewalRequest.moveInDate = body.dtcmPermitEndDate;
         }
-        renewalRequest.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         renewalRequest.updatedBy = user.id;
         await renewalRequest.save();
 
@@ -838,7 +838,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = renewalRequest;
         log.requestType = renewalRequest.requestType;
-        log.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = JSON.stringify(body);
@@ -897,7 +897,7 @@ export class RenewalService {
           );
         }
 
-        if (renewalRequest.status !== MOVE_REQUEST_STATUS.RFI_PENDING) {
+        if (renewalRequest.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
             APICodes.RENEWAL_REQUEST_NOT_EDITABLE.message,
@@ -922,7 +922,7 @@ export class RenewalService {
         if (body.leaseContractEndDate) {
           renewalRequest.moveInDate = body.leaseContractEndDate;
         }
-        renewalRequest.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         renewalRequest.updatedBy = user.id;
         await renewalRequest.save();
 
@@ -935,7 +935,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = renewalRequest;
         log.requestType = renewalRequest.requestType;
-        log.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = JSON.stringify(body);
@@ -999,9 +999,9 @@ export class RenewalService {
 
         // Users can only cancel requests that are in certain statuses
         const cancellableStatuses = [
-          MOVE_REQUEST_STATUS.OPEN,
-          MOVE_REQUEST_STATUS.RFI_PENDING,
-          MOVE_REQUEST_STATUS.RFI_SUBMITTED
+          MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN,
+          MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING,
+          MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED
         ];
 
         if (!cancellableStatuses.includes(renewalRequest.status)) {
@@ -1013,7 +1013,7 @@ export class RenewalService {
         }
 
         // Update status to USER_CANCELLED
-        renewalRequest.status = MOVE_REQUEST_STATUS.USER_CANCELLED;
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED;
         renewalRequest.comments = `${comments || ''}`.trim();
         renewalRequest.updatedBy = user.id;
         await renewalRequest.save();
@@ -1022,7 +1022,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = renewalRequest;
         log.requestType = renewalRequest.requestType;
-        log.status = MOVE_REQUEST_STATUS.USER_CANCELLED;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = `User Cancellation Reason: ${reason}`;
@@ -1079,7 +1079,7 @@ export class RenewalService {
         }
 
         // Can only submit RFI if status is RFI_PENDING
-        if (renewalRequest.status !== MOVE_REQUEST_STATUS.RFI_PENDING) {
+        if (renewalRequest.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
             'Renewal request is not in RFI pending status. Only requests with RFI pending status can be submitted.',
@@ -1088,7 +1088,7 @@ export class RenewalService {
         }
 
         // Update status to RFI_SUBMITTED
-        renewalRequest.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         renewalRequest.comments = `${comments || ''}`.trim();
         renewalRequest.additionalInfo = additionalInfo || '';
         renewalRequest.updatedBy = user.id;
@@ -1098,14 +1098,14 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = renewalRequest;
         log.requestType = renewalRequest.requestType;
-        log.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = JSON.stringify({
           comments: comments,
           additionalInfo: additionalInfo,
-          previousStatus: MOVE_REQUEST_STATUS.RFI_PENDING,
-          newStatus: MOVE_REQUEST_STATUS.RFI_SUBMITTED
+          previousStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING,
+          newStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED
         });
         log.comments = 'RFI response submitted by customer';
         log.details = JSON.stringify({
