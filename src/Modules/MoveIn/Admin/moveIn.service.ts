@@ -446,6 +446,7 @@ export class MoveInService {
     try {
       return await Units.getRepository()
         .createQueryBuilder("ut")
+        .addSelect("ut.isActive")
         .innerJoinAndSelect("ut.masterCommunity", "mc", "mc.isActive = 1")
         .innerJoinAndSelect("ut.community", "c", "c.isActive = 1")
         .innerJoinAndSelect("ut.tower", "t", "t.isActive = 1")
@@ -1383,11 +1384,11 @@ export class MoveInService {
       logger.info(`[CHECK_UNIT_AVAILABILITY] Existing approved request check - Found: ${!!existingApprovedRequest}, RequestId: ${existingApprovedRequest?.id || 'N/A'}`);
 
       if (existingApprovedRequest) {
-        logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unitId} already has an approved move-in request: ${existingApprovedRequest.id}, RequestNo: ${existingApprovedRequest.moveInRequestNo}`);
+        logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitName || unit.unitNumber} (ID: ${unitId}) already has an approved move-in request: ${existingApprovedRequest.id}, RequestNo: ${existingApprovedRequest.moveInRequestNo}`);
         throw new ApiError(
           httpStatus.CONFLICT,
-          APICodes.UNIT_NOT_VACANT.message,
-          APICodes.UNIT_NOT_VACANT.code
+          `Unit ${unit.unitName || unit.unitNumber} already has an approved move-in request`,
+          "EC226"
         );
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY] ✓ No existing approved requests found`);
