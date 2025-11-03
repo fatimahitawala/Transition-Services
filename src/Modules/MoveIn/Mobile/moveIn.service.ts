@@ -1154,25 +1154,48 @@ export class MoveInService {
         throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
       }
 
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Starting validation for unitId: ${unitId}`);
+      
       const unit = await this.getUnitById(Number(unitId));
+      
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Unit fetched - unitId: ${unitId}, found: ${!!unit}`);
+      
       if (!unit) {
+        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] Unit not found: ${unitId}`);
         throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
       }
 
+      // Log all unit properties
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Unit details - unitId: ${unitId}, unitNumber: ${unit.unitNumber}, unitName: ${unit.unitName}`);
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Unit status values - isActive: ${unit.isActive} (type: ${typeof unit.isActive}), availabilityStatus: '${unit.availabilityStatus}', occupancyStatus: '${unit.occupancyStatus}'`);
+
       // Validate unit status conditions
-      if (unit.isActive !== true) {
-        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
+      // Check 1: isActive
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Checking isActive - Value: ${unit.isActive}, Expected: truthy (1 or true)`);
+      if (!unit.isActive) {
+        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitName || unit.unitNumber} (ID: ${unitId}) is not active - Value: ${unit.isActive}, Type: ${typeof unit.isActive}`);
+        throw new ApiError(httpStatus.BAD_REQUEST, `Unit ${unit.unitName || unit.unitNumber} is not active`, "EC223");
       }
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓ isActive check passed - Value: ${unit.isActive}`);
 
+      // Check 2: availabilityStatus
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Checking availabilityStatus - Value: '${unit.availabilityStatus}', Expected: 'Available'`);
       if (unit.availabilityStatus !== 'Available') {
-        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
+        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitName || unit.unitNumber} (ID: ${unitId}) availability status is not 'Available': '${unit.availabilityStatus}'`);
+        throw new ApiError(httpStatus.BAD_REQUEST, `Unit ${unit.unitName || unit.unitNumber} is not available for move-in. Status: ${unit.availabilityStatus}`, "EC224");
       }
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓ availabilityStatus check passed - Value: '${unit.availabilityStatus}'`);
 
+      // Check 3: occupancyStatus
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Checking occupancyStatus - Value: '${unit.occupancyStatus}', Expected: 'vacant'`);
       if (unit.occupancyStatus !== 'vacant') {
-        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
+        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitName || unit.unitNumber} (ID: ${unitId}) occupancy status is not 'vacant': '${unit.occupancyStatus}'`);
+        throw new ApiError(httpStatus.BAD_REQUEST, `Unit ${unit.unitName || unit.unitNumber} is not vacant. Current occupancy: ${unit.occupancyStatus}`, "EC225");
       }
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓ occupancyStatus check passed - Value: '${unit.occupancyStatus}'`);
 
-      // Check for existing approved requests
+      // Check 4: existing approved request
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Checking for existing approved move-in requests for unitId: ${unitId}`);
       const existingApprovedRequest = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
@@ -1180,9 +1203,15 @@ export class MoveInService {
         .andWhere("mir.isActive = 1")
         .getOne();
 
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Existing approved request check - Found: ${!!existingApprovedRequest}, RequestId: ${existingApprovedRequest?.id || 'N/A'}`);
+
       if (existingApprovedRequest) {
-        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
+        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitName || unit.unitNumber} (ID: ${unitId}) already has an approved move-in request: ${existingApprovedRequest.id}, RequestNo: ${existingApprovedRequest.moveInRequestNo}`);
+        throw new ApiError(httpStatus.CONFLICT, `Unit ${unit.unitName || unit.unitNumber} already has an approved move-in request`, "EC226");
       }
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓ No existing approved requests found`);
+
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓✓✓ ALL VALIDATIONS PASSED for unitId: ${unitId}`);
 
       const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
 
@@ -1743,6 +1772,7 @@ export class MoveInService {
     try {
       return await Units.getRepository()
         .createQueryBuilder("u")
+        .addSelect("u.isActive")
         .leftJoinAndMapOne("u.tower", "u.tower", "t", "t.isActive = 1")
         .leftJoinAndMapOne("u.community", "u.community", "c", "c.isActive = 1")
         .leftJoinAndMapOne("u.masterCommunity", "u.masterCommunity", "mc", "mc.isActive = 1")
