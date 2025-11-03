@@ -42,10 +42,11 @@ export class MoveInService {
       // Get unit information with community hierarchy
       const unit = await Units.getRepository()
         .createQueryBuilder('unit')
+        .addSelect('unit.isActive')
         .leftJoinAndSelect('unit.masterCommunity', 'masterCommunity')
         .leftJoinAndSelect('unit.community', 'community')
         .leftJoinAndSelect('unit.tower', 'tower')
-        .where('unit.id = :unitId AND unit.isActive = true', { unitId })
+        .where('unit.id = :unitId', { unitId })
         .getOne();
 
       if (!unit) {
@@ -53,6 +54,15 @@ export class MoveInService {
           httpStatus.NOT_FOUND,
           'Unit not found',
           'UNIT_NOT_FOUND'
+        );
+      }
+
+      // Check if unit is active
+      if (!unit.isActive) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Unit ${unit.unitName || unit.unitNumber} is not active`,
+          'EC223'
         );
       }
 
