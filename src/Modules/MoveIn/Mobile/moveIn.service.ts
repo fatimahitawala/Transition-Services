@@ -237,10 +237,9 @@ export class MoveInService {
 
       const unitId = moveInRequest.unit?.id;
       let primary = null;
-      let cc: string[] = [];
+      let cc: string[] = []; // Always empty - no CC emails needed
 
-      // Get unit owner email from unit_bookings (needed for CC in tenant/HHO/HHC requests)
-      const ownerInfo = await this.getUnitOwnerFromBookings(unitId);
+      // NOTE: CC functionality completely removed - no CC emails for any request type
 
       switch (moveInRequest.requestType) {
         case MOVE_IN_USER_TYPES.OWNER: {
@@ -257,7 +256,7 @@ export class MoveInService {
         }
         
         case MOVE_IN_USER_TYPES.TENANT: {
-          // For tenant requests: primary = tenant, CC = unit owner
+          // For tenant requests: primary = tenant, no CC
           const tenantDetails = await MoveInRequestDetailsTenant.getRepository()
             .createQueryBuilder("tenant")
             .where("tenant.move_in_request_id = :requestId", { requestId: moveInRequest.id })
@@ -270,19 +269,13 @@ export class MoveInService {
               lastName: tenantDetails.lastName || '',
               email: tenantDetails.email
             };
-            logger.info(`Mobile Tenant request: Primary email set to tenant (${tenantDetails.email})`);
-            
-            // Add unit owner as CC
-            if (ownerInfo && ownerInfo.email) {
-              cc.push(ownerInfo.email);
-              logger.info(`Mobile Tenant request: Unit owner email added to CC (${ownerInfo.email})`);
-            }
+            logger.info(`Mobile Tenant request: Primary email set to tenant (${tenantDetails.email}) - No CC`);
           }
           break;
         }
         
         case MOVE_IN_USER_TYPES.HHO_OWNER: {
-          // For HHO owner requests: primary = HHO owner, CC = unit owner
+          // For HHO owner requests: primary = HHO owner, no CC
           const hhoDetails = await MoveInRequestDetailsHhoOwner.getRepository()
             .createQueryBuilder("hho")
             .where("hho.move_in_request_id = :requestId", { requestId: moveInRequest.id })
@@ -295,19 +288,13 @@ export class MoveInService {
               lastName: hhoDetails.ownerLastName || '',
               email: hhoDetails.email
             };
-            logger.info(`Mobile HHO Owner request: Primary email set to HHO owner (${hhoDetails.email})`);
-            
-            // Add unit owner as CC
-            if (ownerInfo && ownerInfo.email && ownerInfo.email !== hhoDetails.email) {
-              cc.push(ownerInfo.email);
-              logger.info(`Mobile HHO Owner request: Unit owner email added to CC (${ownerInfo.email})`);
-            }
+            logger.info(`Mobile HHO Owner request: Primary email set to HHO owner (${hhoDetails.email}) - No CC`);
           }
           break;
         }
         
         case MOVE_IN_USER_TYPES.HHO_COMPANY: {
-          // For HHC company requests: primary = companyEmail, CC = unit owner
+          // For HHC company requests: primary = companyEmail, no CC
           const companyDetails = await MoveInRequestDetailsHhcCompany.getRepository()
             .createQueryBuilder("company")
             .where("company.move_in_request_id = :requestId", { requestId: moveInRequest.id })
@@ -320,13 +307,7 @@ export class MoveInService {
               lastName: '',
               email: companyDetails.companyEmail
             };
-            logger.info(`Mobile HHC Company request: Primary email set to company (${companyDetails.companyEmail})`);
-            
-            // Add unit owner as CC
-            if (ownerInfo && ownerInfo.email) {
-              cc.push(ownerInfo.email);
-              logger.info(`Mobile HHC Company request: Unit owner email added to CC (${ownerInfo.email})`);
-            }
+            logger.info(`Mobile HHC Company request: Primary email set to company (${companyDetails.companyEmail}) - No CC`);
           }
           break;
         }
@@ -1173,24 +1154,24 @@ export class MoveInService {
       // Check 1: isActive
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Checking isActive - Value: ${unit.isActive}, Expected: truthy (1 or true)`);
       if (!unit.isActive) {
-        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitName || unit.unitNumber} (ID: ${unitId}) is not active - Value: ${unit.isActive}, Type: ${typeof unit.isActive}`);
-        throw new ApiError(httpStatus.BAD_REQUEST, `Unit ${unit.unitName || unit.unitNumber} is not active`, "EC223");
+        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) is not active - Value: ${unit.isActive}, Type: ${typeof unit.isActive}`);
+        throw new ApiError(httpStatus.BAD_REQUEST, `Unit ${unit.unitNumber} is not active`, "EC223");
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓ isActive check passed - Value: ${unit.isActive}`);
 
       // Check 2: availabilityStatus
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Checking availabilityStatus - Value: '${unit.availabilityStatus}', Expected: 'Available'`);
       if (unit.availabilityStatus !== 'Available') {
-        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitName || unit.unitNumber} (ID: ${unitId}) availability status is not 'Available': '${unit.availabilityStatus}'`);
-        throw new ApiError(httpStatus.BAD_REQUEST, `Unit ${unit.unitName || unit.unitNumber} is not available for move-in. Status: ${unit.availabilityStatus}`, "EC224");
+        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) availability status is not 'Available': '${unit.availabilityStatus}'`);
+        throw new ApiError(httpStatus.BAD_REQUEST, `Unit ${unit.unitNumber} is not available for move-in. Status: ${unit.availabilityStatus}`, "EC224");
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓ availabilityStatus check passed - Value: '${unit.availabilityStatus}'`);
 
       // Check 3: occupancyStatus
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Checking occupancyStatus - Value: '${unit.occupancyStatus}', Expected: 'vacant'`);
       if (unit.occupancyStatus !== 'vacant') {
-        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitName || unit.unitNumber} (ID: ${unitId}) occupancy status is not 'vacant': '${unit.occupancyStatus}'`);
-        throw new ApiError(httpStatus.BAD_REQUEST, `Unit ${unit.unitName || unit.unitNumber} is not vacant. Current occupancy: ${unit.occupancyStatus}`, "EC225");
+        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) occupancy status is not 'vacant': '${unit.occupancyStatus}'`);
+        throw new ApiError(httpStatus.BAD_REQUEST, `Unit ${unit.unitNumber} is not vacant. Current occupancy: ${unit.occupancyStatus}`, "EC225");
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓ occupancyStatus check passed - Value: '${unit.occupancyStatus}'`);
 
@@ -1206,8 +1187,8 @@ export class MoveInService {
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Existing approved request check - Found: ${!!existingApprovedRequest}, RequestId: ${existingApprovedRequest?.id || 'N/A'}`);
 
       if (existingApprovedRequest) {
-        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitName || unit.unitNumber} (ID: ${unitId}) already has an approved move-in request: ${existingApprovedRequest.id}, RequestNo: ${existingApprovedRequest.moveInRequestNo}`);
-        throw new ApiError(httpStatus.CONFLICT, `Unit ${unit.unitName || unit.unitNumber} already has an approved move-in request`, "EC226");
+        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) already has an approved move-in request: ${existingApprovedRequest.id}, RequestNo: ${existingApprovedRequest.moveInRequestNo}`);
+        throw new ApiError(httpStatus.CONFLICT, `Unit ${unit.unitNumber} already has an approved move-in request`, "EC226");
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓ No existing approved requests found`);
 
@@ -1298,17 +1279,11 @@ export class MoveInService {
 
       logger.info(`MOVE-IN CREATED: ${createdMaster?.moveInRequestNo} for unit ${unitId} by user ${user?.id}`);
 
-      // Send confirmation email for mobile request creation (skip for owner requests)
-      if (requestType !== MOVE_IN_USER_TYPES.OWNER) {
-        try {
-          await this.sendMobileRequestConfirmationEmail(createdMaster, user);
-        } catch (emailError) {
-          logger.error(`Failed to send mobile request confirmation email for ${createdMaster?.moveInRequestNo}:`, emailError);
-          // Don't fail the request creation if email fails
-        }
-      } else {
-        logger.info(`Skipping confirmation email for owner move-in request ${createdMaster?.moveInRequestNo}`);
-      }
+      // NOTE: Emails are NOT sent from mobile service
+      // Only approval emails are sent by Admin service when admin approves the request
+      logger.info(`Mobile request submitted - no email sent (approval email will be sent by Admin when approved)`);
+      
+      // Removed confirmation email trigger - mobile only submits requests, admin sends approval emails
 
       // In-app notifications: Admin + Customer on submission
       try {
@@ -1928,8 +1903,11 @@ export class MoveInService {
       log.comments = cancellationRemarks || null;
       await log.save();
 
-      // Send cancellation notifications
-      await this.sendCancellationNotifications(requestId, request.moveInRequestNo, cancellationRemarks, request);
+      // NOTE: Cancellation emails are NOT sent from mobile service
+      // Only approval emails should be sent by Admin service
+      logger.info(`Mobile request cancelled - no email sent (only admin sends approval emails)`);
+      
+      // Removed cancellation email trigger - mobile does not send any emails
 
       // In-app notifications for Customer Cancelled (to admin and customer)
       try {
