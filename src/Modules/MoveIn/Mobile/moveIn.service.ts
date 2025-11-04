@@ -1150,7 +1150,6 @@ export class MoveInService {
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Unit details - unitId: ${unitId}, unitNumber: ${unit.unitNumber}, unitName: ${unit.unitName}`);
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Unit status values - isActive: ${unit.isActive} (type: ${typeof unit.isActive}), availabilityStatus: '${unit.availabilityStatus}', occupancyStatus: '${unit.occupancyStatus}'`);
 
-      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Checking isActive - Value: ${unit.isActive}, Expected: truthy (1 or true)`);
       // MOBILE: NO VALIDATION - Accept requests regardless of unit status
       // Admin will validate all conditions during approval
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] SKIPPING ALL STATUS VALIDATIONS - Mobile accepts all requests regardless of unit status`);
