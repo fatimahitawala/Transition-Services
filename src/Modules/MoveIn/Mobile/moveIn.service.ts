@@ -1150,44 +1150,14 @@ export class MoveInService {
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Unit details - unitId: ${unitId}, unitNumber: ${unit.unitNumber}, unitName: ${unit.unitName}`);
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Unit status values - isActive: ${unit.isActive} (type: ${typeof unit.isActive}), availabilityStatus: '${unit.availabilityStatus}', occupancyStatus: '${unit.occupancyStatus}'`);
 
-      // Validate unit status conditions
-      // Check 1: isActive
-      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Checking isActive - Value: ${unit.isActive}, Expected: truthy (1 or true)`);
-      if (!unit.isActive) {
-        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) is not active - Value: ${unit.isActive}, Type: ${typeof unit.isActive}`);
-        throw new ApiError(httpStatus.BAD_REQUEST, `Unit ${unit.unitNumber} is not active`, "EC223");
-      }
-      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓ isActive check passed - Value: ${unit.isActive}`);
-
-      // Check 2: availabilityStatus - SKIPPED in mobile (only checked in Admin)
-      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Skipping availabilityStatus check - Value: '${unit.availabilityStatus}' (mobile does not validate this)`);
-
-      // Check 3: occupancyStatus
-      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Checking occupancyStatus - Value: '${unit.occupancyStatus}', Expected: 'vacant'`);
-      if (unit.occupancyStatus !== 'vacant') {
-        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) occupancy status is not 'vacant': '${unit.occupancyStatus}'`);
-        throw new ApiError(httpStatus.BAD_REQUEST, `Unit ${unit.unitNumber} is not vacant`, "EC225");
-      }
-      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓ occupancyStatus check passed - Value: '${unit.occupancyStatus}'`);
-
-      // Check 4: existing approved request
-      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Checking for existing approved move-in requests for unitId: ${unitId}`);
-      const existingApprovedRequest = await MoveInRequests.getRepository()
-        .createQueryBuilder("mir")
-        .where("mir.unit.id = :unitId", { unitId })
-        .andWhere("mir.status = :approvedStatus", { approvedStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED })
-        .andWhere("mir.isActive = 1")
-        .getOne();
-
-      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Existing approved request check - Found: ${!!existingApprovedRequest}, RequestId: ${existingApprovedRequest?.id || 'N/A'}`);
-
-      if (existingApprovedRequest) {
-        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) already has an approved move-in request: ${existingApprovedRequest.id}, RequestNo: ${existingApprovedRequest.moveInRequestNo}`);
-        throw new ApiError(httpStatus.CONFLICT, `Unit ${unit.unitNumber} already has an approved move-in request`, "EC226");
-      }
-      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓ No existing approved requests found`);
-
-      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓✓✓ ALL VALIDATIONS PASSED for unitId: ${unitId}`);
+      // MOBILE: NO VALIDATION - Accept requests regardless of unit status
+      // Admin will validate all conditions during approval
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] SKIPPING ALL STATUS VALIDATIONS - Mobile accepts all requests regardless of unit status`);
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] - isActive: ${unit.isActive} (NOT validated)`);
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] - availabilityStatus: '${unit.availabilityStatus}' (NOT validated)`);
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] - occupancyStatus: '${unit.occupancyStatus}' (NOT validated)`);
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] - existingApprovedRequest: (NOT validated)`);
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓✓✓ Mobile request accepted for unitId: ${unitId}`);
 
       const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
 
