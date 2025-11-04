@@ -1364,7 +1364,7 @@ export class MoveInService {
         logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) availability status is not 'Available': '${unit.availabilityStatus}'`);
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          `Unit ${unit.unitNumber} is not available for move-in. Status: ${unit.availabilityStatus}`,
+          `Unit ${unit.unitNumber} is not available for move-in`,
           "EC224"
         );
       }
@@ -1376,7 +1376,7 @@ export class MoveInService {
         logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) occupancy status is not 'vacant': '${unit.occupancyStatus}'`);
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          `Unit ${unit.unitNumber} is not vacant. Current occupancy: ${unit.occupancyStatus}`,
+          `Unit ${unit.unitNumber} is not vacant`,
           "EC225"
         );
       }
