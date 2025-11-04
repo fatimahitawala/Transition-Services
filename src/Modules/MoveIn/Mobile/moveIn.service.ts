@@ -1159,13 +1159,8 @@ export class MoveInService {
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓ isActive check passed - Value: ${unit.isActive}`);
 
-      // Check 2: availabilityStatus
-      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Checking availabilityStatus - Value: '${unit.availabilityStatus}', Expected: 'Available'`);
-      if (unit.availabilityStatus !== 'Available') {
-        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) availability status is not 'Available': '${unit.availabilityStatus}'`);
-        throw new ApiError(httpStatus.BAD_REQUEST, `Unit ${unit.unitNumber} is not available for move-in`, "EC224");
-      }
-      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓ availabilityStatus check passed - Value: '${unit.availabilityStatus}'`);
+      // Check 2: availabilityStatus - SKIPPED in mobile (only checked in Admin)
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Skipping availabilityStatus check - Value: '${unit.availabilityStatus}' (mobile does not validate this)`);
 
       // Check 3: occupancyStatus
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Checking occupancyStatus - Value: '${unit.occupancyStatus}', Expected: 'vacant'`);
