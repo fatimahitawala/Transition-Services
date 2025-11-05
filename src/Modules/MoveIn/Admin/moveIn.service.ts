@@ -2617,6 +2617,7 @@ export class MoveInService {
         requestId: requestId,
         requestNumber: requestNumber,
         status: 'Approved',
+        requestType: moveInRequest.requestType,
         unitDetails: {
           unitNumber: moveInRequest.unit?.unitNumber || '',
           unitName: moveInRequest.unit?.unitName || '',
