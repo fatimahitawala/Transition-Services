@@ -23,9 +23,12 @@ import { OccupancyRequestWelcomePack } from "../../../Entities/OccupancyRequestW
 import { OccupancyRequestTemplates } from "../../../Entities/OccupancyRequestTemplates.entity";
 import { OccupancyRequestEmailRecipients } from "../../../Entities/OccupancyRequestEmailRecipients.entity";
 import { IsNull } from "typeorm";
+import { Users } from "../../../Entities/Users.entity";
+import { CommonService } from "../../Common/common.service";
 
 export class MoveInService {
   private emailService: EmailService;
+  private commonService = new CommonService();
 
   constructor() {
     this.emailService = new EmailService();
@@ -422,6 +425,66 @@ export class MoveInService {
       } else {
         logger.error(`=== EMAIL NOTIFICATION SKIPPED ===`);
         logger.error(`createdMaster is null/undefined - no email will be sent`);
+      }
+
+      // Push to Salesforce for admin-created auto-approved move-ins
+      try {
+        if (createdMaster && [
+          MOVE_IN_USER_TYPES.OWNER,
+          MOVE_IN_USER_TYPES.TENANT,
+          MOVE_IN_USER_TYPES.HHO_OWNER,
+          MOVE_IN_USER_TYPES.HHO_COMPANY,
+        ].includes(requestType as any) && createdMaster.status === MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
+          const userRec = await Users.getRepository().findOne({ where: { id: (createdMaster as any)?.user?.id || userId } });
+          const unitRec = await Units.getRepository().createQueryBuilder('u')
+            .select(['u.id', 'u.unitName', 'u.unitNumber', 'u.salesForceId'])
+            .where('u.id = :id', { id: unitId })
+            .getOne();
+
+          const cc = (userRec?.dialCode?.dialCode || '').toString();
+          const normCC = cc ? (cc.startsWith('+') ? cc : `+${cc}`) : null;
+
+          const typeOfTenantMap: Record<string, string> = {
+            owner: 'HomeOwner',
+            tenant: 'Tenant',
+            hho_owner: 'HHO',
+            hho_company: 'Company',
+            hho: 'HHO',
+            company: 'Company',
+          };
+
+          const reqTypeKey = String(requestType || '').toLowerCase();
+
+          const payload = {
+            salutation: (userRec as any)?.honorific || null,
+            firstName: (userRec as any)?.firstName || null,
+            lastName: (userRec as any)?.lastName || null,
+            primaryMobileCountryCode: normCC,
+            primaryMobileNumber: (userRec as any)?.mobile || null,
+            alternativeMobileCountryCode: null,
+            alternativeMobileNumber: (userRec as any)?.alternativeMobile || null,
+            primaryEmail: (userRec as any)?.email || null,
+            alternateEmail: (userRec as any)?.alternativeEmail || null,
+            unitId: (unitRec as any)?.salesForceId || '',
+            nationality: (userRec as any)?.nationality?.name || (userRec as any)?.nationality || null,
+            typeOfTenant: typeOfTenantMap[reqTypeKey] || null,
+            moveInDate: (createdMaster as any)?.moveInDate ? new Date((createdMaster as any).moveInDate).toISOString().slice(0, 10) : null,
+            moveOutDate: null,
+            ejariStartDate: (createdDetails as any)?.tenancyContractStartDate ? new Date((createdDetails as any).tenancyContractStartDate).toISOString().slice(0, 10) : null,
+            ejariEndDate: (createdDetails as any)?.tenancyContractEndDate ? new Date((createdDetails as any).tenancyContractEndDate).toISOString().slice(0, 10) : null,
+            requestRaisedDate: (createdMaster as any)?.createdAt ? new Date((createdMaster as any).createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+            dtcmStartDate: (createdDetails as any)?.dtcmStartDate ? new Date((createdDetails as any).dtcmStartDate).toISOString().slice(0, 10) : null,
+            dtcmEndDate: (createdDetails as any)?.dtcmExpiryDate ? new Date((createdDetails as any).dtcmExpiryDate).toISOString().slice(0, 10) : null,
+            requestApprovedDate: new Date().toISOString().slice(0, 10),
+            request_type: 'move-in' as const,
+            status: 'approve',
+            mobile_app_reference: (createdMaster as any)?.moveInRequestNo,
+          };
+
+          await this.commonService.sendResidentToSalesforce(payload);
+        }
+      } catch (e) {
+        logger.error(`Salesforce push (admin-create move-in approval) failed: ${e}`);
       }
 
       logger.info(`MOVE-IN CREATED BY ADMIN: ${createdMaster?.moveInRequestNo} for unit ${unitId} by admin ${user?.id}`);
@@ -1654,6 +1717,52 @@ export class MoveInService {
     }
   }
 
+  // Collect Ejari/DTCM dates from corresponding detail tables for Salesforce payload
+  private async getMoveInDatesForSalesforce(
+    requestId: number,
+    requestType: MOVE_IN_USER_TYPES
+  ): Promise<{ ejariStartDate: string | null; ejariEndDate: string | null; dtcmStartDate: string | null; dtcmEndDate: string | null }> {
+    const toDate = (d?: Date | string | null) => d ? new Date(d as any).toISOString().slice(0, 10) : null;
+
+    try {
+      if (requestType === MOVE_IN_USER_TYPES.TENANT) {
+        const row = await MoveInRequestDetailsTenant.getRepository()
+          .createQueryBuilder('t')
+          .leftJoin('t.moveInRequest', 'mir')
+          .select(['t.tenancyContractStartDate', 't.tenancyContractEndDate'])
+          .where('mir.id = :requestId', { requestId })
+          .getOne();
+        return {
+          ejariStartDate: toDate((row as any)?.tenancyContractStartDate || null),
+          ejariEndDate: toDate((row as any)?.tenancyContractEndDate || null),
+          dtcmStartDate: null,
+          dtcmEndDate: null,
+        };
+      }
+
+      if (requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
+        const row = await MoveInRequestDetailsHhcCompany.getRepository()
+          .createQueryBuilder('c')
+          .leftJoin('c.moveInRequest', 'mir')
+          .select(['c.dtcmStartDate', 'c.dtcmExpiryDate'])
+          .where('mir.id = :requestId', { requestId })
+          .getOne();
+        return {
+          ejariStartDate: null,
+          ejariEndDate: null,
+          dtcmStartDate: toDate((row as any)?.dtcmStartDate || null),
+          dtcmEndDate: toDate((row as any)?.dtcmExpiryDate || null),
+        };
+      }
+
+      // OWNER and HHO_OWNER flows do not carry Ejari/DTCM dates
+      return { ejariStartDate: null, ejariEndDate: null, dtcmStartDate: null, dtcmEndDate: null };
+    } catch (e) {
+      logger.error(`Failed to read move-in detail dates for Salesforce payload: ${e}`);
+      return { ejariStartDate: null, ejariEndDate: null, dtcmStartDate: null, dtcmEndDate: null };
+    }
+  }
+
   // ==================== STATUS MANAGEMENT METHODS ====================
 
   /**
@@ -1822,6 +1931,56 @@ export class MoveInService {
 
       // Send approval email notifications
       await this.sendApprovalNotifications(requestId, moveInRequest.moveInRequestNo);
+
+      // Push to Salesforce on approval
+      try {
+        const userRec = moveInRequest.user || (await Users.getRepository().findOne({ where: { id: (moveInRequest as any)?.user?.id } }));
+        const unitRec = moveInRequest.unit || (await Units.getRepository().findOne({ where: { id: (moveInRequest as any)?.unit?.id } }));
+        const { ejariStartDate, ejariEndDate, dtcmStartDate, dtcmEndDate } = await this.getMoveInDatesForSalesforce(requestId, moveInRequest.requestType);
+
+        const cc = (userRec?.dialCode?.dialCode || '').toString();
+        const normCC = cc ? (cc.startsWith('+') ? cc : `+${cc}`) : null;
+
+        const typeOfTenantMap: Record<string, string> = {
+          owner: 'HomeOwner',
+          tenant: 'Tenant',
+          hho_owner: 'HHO',
+          hho_company: 'Company',
+          hho: 'HHO',
+          company: 'Company',
+        };
+        const reqTypeKey = String(moveInRequest.requestType || '').toLowerCase();
+
+        const payload = {
+          salutation: (userRec as any)?.honorific || null,
+          firstName: (userRec as any)?.firstName || null,
+          lastName: (userRec as any)?.lastName || null,
+          primaryMobileCountryCode: normCC,
+          primaryMobileNumber: (userRec as any)?.mobile || null,
+          alternativeMobileCountryCode: null,
+          alternativeMobileNumber: (userRec as any)?.alternativeMobile || null,
+          primaryEmail: (userRec as any)?.email || null,
+          alternateEmail: (userRec as any)?.alternativeEmail || null,
+          unitId: (unitRec as any)?.salesForceId || '',
+          nationality: (userRec as any)?.nationality?.name || (userRec as any)?.nationality || null,
+          typeOfTenant: typeOfTenantMap[reqTypeKey] || null,
+          moveInDate: moveInRequest.moveInDate ? new Date(moveInRequest.moveInDate).toISOString().slice(0, 10) : null,
+          moveOutDate: null,
+          ejariStartDate,
+          ejariEndDate,
+          requestRaisedDate: (moveInRequest as any)?.createdAt ? new Date((moveInRequest as any).createdAt).toISOString().slice(0, 10) : null,
+          dtcmStartDate,
+          dtcmEndDate,
+          requestApprovedDate: new Date().toISOString().slice(0, 10),
+          request_type: 'move-in' as const,
+          status: 'approve',
+          mobile_app_reference: moveInRequest.moveInRequestNo,
+        } as const;
+
+        await this.commonService.sendResidentToSalesforce(payload);
+      } catch (e) {
+        logger.error(`Salesforce push (move-in approval) failed: ${e}`);
+      }
 
       logger.info(`Move-in request ${requestId} approved by admin ${user?.id}`);
 
