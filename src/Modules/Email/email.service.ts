@@ -1410,10 +1410,10 @@ export class EmailService {
             const typeMap: Record<string, string> = {
                 'owner': 'Owner',
                 'tenant': 'Tenant',
-                'hho-owner': 'HHO Owner',
                 'hho_owner': 'HHO Owner',
-                'hhc-company': 'HHC Company',
-                'hhc_company': 'HHC Company'
+                'hho-owner': 'HHO Owner',
+                'hho_company': 'HHO Company',
+                'hho-company': 'HHO Company'
             };
             userTypeFormatted = typeMap[data.requestType.toLowerCase()] || 
                 data.requestType.replace(/-/g, ' ').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -1427,10 +1427,16 @@ export class EmailService {
         let leaseEndDate = 'N/A';
         
         try {
+            logger.info(`Fetching lease details for requestId: ${data.requestId}, requestType: ${data.requestType}`);
+            
             if (data.requestType === 'tenant') {
-                const tenantDetails = await MoveInRequestDetailsTenant.findOne({
-                    where: { moveInRequest: { id: data.requestId } }
-                });
+                const tenantDetails = await AppDataSource.getRepository(MoveInRequestDetailsTenant)
+                    .createQueryBuilder('tenant')
+                    .leftJoin('tenant.moveInRequest', 'request')
+                    .where('request.id = :requestId', { requestId: data.requestId })
+                    .getOne();
+                    
+                logger.info(`Tenant details found: ${!!tenantDetails}`);
                 if (tenantDetails) {
                     if (tenantDetails.tenancyContractStartDate) {
                         leaseStartDate = new Date(tenantDetails.tenancyContractStartDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -1438,22 +1444,30 @@ export class EmailService {
                     if (tenantDetails.tenancyContractEndDate) {
                         leaseEndDate = new Date(tenantDetails.tenancyContractEndDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
                     }
+                    logger.info(`Tenant lease dates - Start: ${leaseStartDate}, End: ${leaseEndDate}`);
                 }
-            } else if (data.requestType === 'hhc-company' || data.requestType === 'hhc_company') {
-                const companyDetails = await MoveInRequestDetailsHhcCompany.findOne({
-                    where: { moveInRequest: { id: data.requestId } }
-                });
+            } else if (data.requestType === 'hho_company' || data.requestType === 'hho-company') {
+                const companyDetails = await AppDataSource.getRepository(MoveInRequestDetailsHhcCompany)
+                    .createQueryBuilder('company')
+                    .leftJoin('company.moveInRequest', 'request')
+                    .where('request.id = :requestId', { requestId: data.requestId })
+                    .getOne();
+                    
+                logger.info(`HHO Company details found: ${!!companyDetails}`);
                 if (companyDetails) {
+                    logger.info(`HHO Company raw dates - leaseStartDate: ${companyDetails.leaseStartDate}, leaseEndDate: ${companyDetails.leaseEndDate}`);
                     if (companyDetails.leaseStartDate) {
                         leaseStartDate = new Date(companyDetails.leaseStartDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
                     }
                     if (companyDetails.leaseEndDate) {
                         leaseEndDate = new Date(companyDetails.leaseEndDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
                     }
+                    logger.info(`HHO Company formatted lease dates - Start: ${leaseStartDate}, End: ${leaseEndDate}`);
                 }
             }
         } catch (error) {
-            logger.warn(`Error fetching lease details for recipient email: ${error}`);
+            logger.error(`Error fetching lease details for recipient email: ${error}`);
+            logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack'}`);
         }
 
         return `<!doctype html>
