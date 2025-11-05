@@ -238,10 +238,20 @@ export class MoveInService {
 
       // Business Logic Validations for Owner, Tenant, HHO-Unit, and HHO-Company Move-in Requests
       if (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
-        // 1. Allow multiple OPEN requests; block only if an APPROVED request already exists
+        // 1. Check MIP template availability FIRST before other validations
+        const mipCheck = await this.checkMIPAndWelcomePack(Number(unitId));
+        if (!mipCheck.hasMIP) {
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            APICodes.MIP_NOT_CONFIGURED.message,
+            APICodes.MIP_NOT_CONFIGURED.code
+          );
+        }
+
+        // 2. Allow multiple OPEN requests; block only if an APPROVED request already exists
         await this.checkUnitAvailabilityForNewRequest(Number(unitId));
 
-        // 2. Overlap: allow overlaps for OPEN/PENDING; only block if an APPROVED request exists
+        // 3. Overlap: allow overlaps for OPEN/PENDING; only block if an APPROVED request exists
         const overlapCheck = await this.checkOverlappingRequests(Number(unitId), new Date(moveInDate));
         if (overlapCheck.hasOverlap) {
           throw new ApiError(
@@ -1703,6 +1713,16 @@ export class MoveInService {
         );
       }
 
+      // Check MIP template availability FIRST before other validations
+      const mipCheck = await this.checkMIPAndWelcomePack(moveInRequest.unit.id);
+      if (!mipCheck.hasMIP) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          APICodes.MIP_NOT_CONFIGURED.message,
+          APICodes.MIP_NOT_CONFIGURED.code
+        );
+      }
+
       // Validate unit availability status before approval
       const isUnitAvailable = await this.checkUnitAvailabilityForNewRequest(moveInRequest.unit.id);
       if (!isUnitAvailable) {
@@ -1720,16 +1740,6 @@ export class MoveInService {
           httpStatus.CONFLICT,
           APICodes.OVERLAPPING_REQUESTS.message,
           APICodes.OVERLAPPING_REQUESTS.code
-        );
-      }
-
-      // Check MIP template availability
-      const mipCheck = await this.checkMIPAndWelcomePack(moveInRequest.unit.id);
-      if (!mipCheck.hasMIP) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          APICodes.MIP_NOT_CONFIGURED.message,
-          APICodes.MIP_NOT_CONFIGURED.code
         );
       }
 
