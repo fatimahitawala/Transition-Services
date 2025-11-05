@@ -241,10 +241,20 @@ export class MoveInService {
 
       // Business Logic Validations for Owner, Tenant, HHO-Unit, and HHO-Company Move-in Requests
       if (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
-        // 1. Allow multiple OPEN requests; block only if an APPROVED request already exists
+        // 1. Check MIP template availability FIRST before other validations
+        const mipCheck = await this.checkMIPAndWelcomePack(Number(unitId));
+        if (!mipCheck.hasMIP) {
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            APICodes.MIP_NOT_CONFIGURED.message,
+            APICodes.MIP_NOT_CONFIGURED.code
+          );
+        }
+
+        // 2. Allow multiple OPEN requests; block only if an APPROVED request already exists
         await this.checkUnitAvailabilityForNewRequest(Number(unitId));
 
-        // 2. Overlap: allow overlaps for OPEN/PENDING; only block if an APPROVED request exists
+        // 3. Overlap: allow overlaps for OPEN/PENDING; only block if an APPROVED request exists
         const overlapCheck = await this.checkOverlappingRequests(Number(unitId), new Date(moveInDate));
         if (overlapCheck.hasOverlap) {
           throw new ApiError(
@@ -1415,8 +1425,8 @@ export class MoveInService {
         logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) is not active - Value: ${unit.isActive}, Type: ${typeof unit.isActive}`);
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          `Unit ${unit.unitNumber} is not active`,
-          "EC223"
+          `Unit ${unit.unitNumber} not available`,
+          APICodes.UNIT_NOT_VACANT.code
         );
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY] ✓ isActive check passed - Value: ${unit.isActive}`);
@@ -1427,8 +1437,8 @@ export class MoveInService {
         logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) availability status is not 'Available': '${unit.availabilityStatus}'`);
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          `Unit ${unit.unitNumber} is not available for move-in`,
-          "EC224"
+          `Unit ${unit.unitNumber} not available`,
+          APICodes.UNIT_NOT_VACANT.code
         );
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY] ✓ availabilityStatus check passed - Value: '${unit.availabilityStatus}'`);
@@ -1439,8 +1449,8 @@ export class MoveInService {
         logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) occupancy status is not 'vacant': '${unit.occupancyStatus}'`);
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          `Unit ${unit.unitNumber} is not vacant`,
-          "EC225"
+          `Unit ${unit.unitNumber} not available`,
+          APICodes.UNIT_NOT_VACANT.code
         );
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY] ✓ occupancyStatus check passed - Value: '${unit.occupancyStatus}'`);
@@ -1460,8 +1470,8 @@ export class MoveInService {
         logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) already has an approved move-in request: ${existingApprovedRequest.id}, RequestNo: ${existingApprovedRequest.moveInRequestNo}`);
         throw new ApiError(
           httpStatus.CONFLICT,
-          `Unit ${unit.unitNumber} already has an approved move-in request`,
-          "EC226"
+          `Unit ${unit.unitNumber} not available`,
+          APICodes.UNIT_NOT_VACANT.code
         );
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY] ✓ No existing approved requests found`);
@@ -1812,6 +1822,16 @@ export class MoveInService {
         );
       }
 
+      // Check MIP template availability FIRST before other validations
+      const mipCheck = await this.checkMIPAndWelcomePack(moveInRequest.unit.id);
+      if (!mipCheck.hasMIP) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          APICodes.MIP_NOT_CONFIGURED.message,
+          APICodes.MIP_NOT_CONFIGURED.code
+        );
+      }
+
       // Validate unit availability status before approval
       const isUnitAvailable = await this.checkUnitAvailabilityForNewRequest(moveInRequest.unit.id);
       if (!isUnitAvailable) {
@@ -1829,16 +1849,6 @@ export class MoveInService {
           httpStatus.CONFLICT,
           APICodes.OVERLAPPING_REQUESTS.message,
           APICodes.OVERLAPPING_REQUESTS.code
-        );
-      }
-
-      // Check MIP template availability
-      const mipCheck = await this.checkMIPAndWelcomePack(moveInRequest.unit.id);
-      if (!mipCheck.hasMIP) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          APICodes.MIP_NOT_CONFIGURED.message,
-          APICodes.MIP_NOT_CONFIGURED.code
         );
       }
 
