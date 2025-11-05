@@ -30,6 +30,8 @@ import ApiError from '../../Common/Utils/ApiError';
 import config from '../../Common/Config/config';
 import { OccupancyRequestTemplates } from '../../Entities/OccupancyRequestTemplates.entity';
 import { OccupancyRequestWelcomePack } from '../../Entities/OccupancyRequestWelcomePack.entity';
+import { MoveInRequestDetailsTenant } from '../../Entities/MoveInRequestDetailsTenant.entity';
+import { MoveInRequestDetailsHhcCompany } from '../../Entities/MoveInRequestDetailsHhcCompany.entity';
 import { OCUPANCY_REQUEST_TYPES } from '../../Entities/EntityTypes/transition';
 import { AppDataSource } from '../../Common/data-source';
 import { IsNull } from 'typeorm';
@@ -858,7 +860,7 @@ export class EmailService {
             }
 
             // Create detailed email body with header image and move-in permit content
-            const emailBody = this.createDetailedApprovalEmailBody(data, welcomePackUrl);
+            const emailBody = await this.createDetailedApprovalEmailBody(data, welcomePackUrl);
 
             // Generate subject
             const subject = this.getEmailSubject('approved', data.requestNumber, data.isRecipientEmail, data);
@@ -1279,10 +1281,10 @@ export class EmailService {
      * @param {MoveInEmailData} data - Complete email data for content generation
      * @returns {string} - Comprehensive HTML email body
      */
-    private createDetailedApprovalEmailBody(data: MoveInEmailData, welcomePackUrl: string = ''): string {
+    private async createDetailedApprovalEmailBody(data: MoveInEmailData, welcomePackUrl: string = ''): Promise<string> {
         // Check if this is a recipient email (MIP recipients) and use different template
         if (data.isRecipientEmail) {
-            return this.createRecipientEmailBody(data);
+            return await this.createRecipientEmailBody(data);
         }
 
         // Original user email template
@@ -1386,7 +1388,7 @@ export class EmailService {
      * @param {MoveInEmailData} data - Complete email data for content generation
      * @returns {string} - HTML email body for recipient notification
      */
-    private createRecipientEmailBody(data: MoveInEmailData): string {
+    private async createRecipientEmailBody(data: MoveInEmailData): Promise<string> {
         // Format dates
         const moveInDateFormatted = data.moveInDate ? 
             new Date(data.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) : 
@@ -1402,25 +1404,56 @@ export class EmailService {
             data.unitDetails.masterCommunityName
         ].filter(Boolean).join(', ');
 
-        // Format user type
-        const userTypeFormatted = data.requestType ? 
-            data.requestType.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 
-            'N/A';
+        // Format user type with proper capitalization
+        let userTypeFormatted = 'N/A';
+        if (data.requestType) {
+            const typeMap: Record<string, string> = {
+                'owner': 'Owner',
+                'tenant': 'Tenant',
+                'hho-owner': 'HHO Owner',
+                'hho_owner': 'HHO Owner',
+                'hhc-company': 'HHC Company',
+                'hhc_company': 'HHC Company'
+            };
+            userTypeFormatted = typeMap[data.requestType.toLowerCase()] || 
+                data.requestType.replace(/-/g, ' ').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
 
         // Get applicant name
         const applicantName = `${data.userDetails.firstName} ${data.userDetails.lastName}`.trim();
 
-        // Get lease dates from additionalInfo if available
+        // Fetch lease dates from database based on request type
         let leaseStartDate = 'N/A';
         let leaseEndDate = 'N/A';
         
-        if (data.additionalInfo) {
-            if (data.additionalInfo.leaseStartDate) {
-                leaseStartDate = new Date(data.additionalInfo.leaseStartDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+        try {
+            if (data.requestType === 'tenant') {
+                const tenantDetails = await MoveInRequestDetailsTenant.findOne({
+                    where: { moveInRequest: { id: data.requestId } }
+                });
+                if (tenantDetails) {
+                    if (tenantDetails.tenancyContractStartDate) {
+                        leaseStartDate = new Date(tenantDetails.tenancyContractStartDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+                    }
+                    if (tenantDetails.tenancyContractEndDate) {
+                        leaseEndDate = new Date(tenantDetails.tenancyContractEndDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+                    }
+                }
+            } else if (data.requestType === 'hhc-company' || data.requestType === 'hhc_company') {
+                const companyDetails = await MoveInRequestDetailsHhcCompany.findOne({
+                    where: { moveInRequest: { id: data.requestId } }
+                });
+                if (companyDetails) {
+                    if (companyDetails.leaseStartDate) {
+                        leaseStartDate = new Date(companyDetails.leaseStartDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+                    }
+                    if (companyDetails.leaseEndDate) {
+                        leaseEndDate = new Date(companyDetails.leaseEndDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+                    }
+                }
             }
-            if (data.additionalInfo.leaseEndDate) {
-                leaseEndDate = new Date(data.additionalInfo.leaseEndDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-            }
+        } catch (error) {
+            logger.warn(`Error fetching lease details for recipient email: ${error}`);
         }
 
         return `<!doctype html>
