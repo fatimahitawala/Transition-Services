@@ -1951,6 +1951,10 @@ export class MoveInService {
   private async ensureCancelableByOwner(requestId: number, user: any) {
     const mir = await MoveInRequests.getRepository()
       .createQueryBuilder('mir')
+      .leftJoinAndSelect('mir.unit', 'unit')
+      .leftJoinAndSelect('unit.tower', 'tower')
+      .leftJoinAndSelect('unit.community', 'community')
+      .leftJoinAndSelect('unit.masterCommunity', 'masterCommunity')
       .leftJoinAndSelect('mir.user', 'user')
       .where('mir.id = :requestId AND mir.isActive = true', { requestId })
       .getOne();
