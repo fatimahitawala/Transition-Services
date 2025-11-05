@@ -1514,8 +1514,12 @@ export class EmailService {
                 </tr>
                 <tr>
                   <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
-                    <strong style="display:inline-block;width:180px;color:#333;">Property details</strong>
-                    <span>${propertyDetails}</span>
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="width:180px;color:#333;font-weight:bold;vertical-align:top;">Property details</td>
+                        <td style="color:#555;vertical-align:top;">${propertyDetails}</td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
                 <tr>
