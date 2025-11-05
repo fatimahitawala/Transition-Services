@@ -1608,8 +1608,8 @@ export class EmailService {
                 // For recipient emails: "Move in request Raised : request id"
                 return `Move in request Raised : ${requestNumber}`;
             } else {
-                // For user emails: "Move In Permit Reference no. MIP-10: Application approved"
-                return `Move In Permit Reference no. ${requestNumber}: Application approved`;
+                // For user emails: "Move In Permit Reference No. MIP-10: Application Approved"
+                return `Move In Permit Reference No. ${requestNumber}: Application Approved`;
             }
         }
 
