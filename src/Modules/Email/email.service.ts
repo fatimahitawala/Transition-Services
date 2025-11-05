@@ -1280,6 +1280,12 @@ export class EmailService {
      * @returns {string} - Comprehensive HTML email body
      */
     private createDetailedApprovalEmailBody(data: MoveInEmailData, welcomePackUrl: string = ''): string {
+        // Check if this is a recipient email (MIP recipients) and use different template
+        if (data.isRecipientEmail) {
+            return this.createRecipientEmailBody(data);
+        }
+
+        // Original user email template
         // Get recipient name
         const recipientName = `${data.userDetails.firstName} ${data.userDetails.lastName}`.trim() || 'homeowner';
 
@@ -1356,6 +1362,163 @@ export class EmailService {
               <span style="float:right;">Reference: ${data.requestNumber}</span>
             </td>
           </tr>-->
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+    }
+
+    /**
+     * CREATE RECIPIENT EMAIL BODY FOR MIP RECIPIENTS
+     * ===============================================
+     * Creates a simple notification email body for community management team
+     * Notifies them about a new Move In Permit issuance
+     * 
+     * Features:
+     * - Simple, professional format
+     * - All key MIP details
+     * - No attachments required
+     * - Designed for internal team notification
+     * 
+     * @param {MoveInEmailData} data - Complete email data for content generation
+     * @returns {string} - HTML email body for recipient notification
+     */
+    private createRecipientEmailBody(data: MoveInEmailData): string {
+        // Format dates
+        const moveInDateFormatted = data.moveInDate ? 
+            new Date(data.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) : 
+            'N/A';
+        
+        const mipIssueDate = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+
+        // Format property details
+        const propertyDetails = [
+            data.unitDetails.unitNumber,
+            data.unitDetails.towerName,
+            data.unitDetails.communityName,
+            data.unitDetails.masterCommunityName
+        ].filter(Boolean).join(', ');
+
+        // Format user type
+        const userTypeFormatted = data.requestType ? 
+            data.requestType.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 
+            'N/A';
+
+        // Get applicant name
+        const applicantName = `${data.userDetails.firstName} ${data.userDetails.lastName}`.trim();
+
+        // Get lease dates from additionalInfo if available
+        let leaseStartDate = 'N/A';
+        let leaseEndDate = 'N/A';
+        
+        if (data.additionalInfo) {
+            if (data.additionalInfo.leaseStartDate) {
+                leaseStartDate = new Date(data.additionalInfo.leaseStartDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+            }
+            if (data.additionalInfo.leaseEndDate) {
+                leaseEndDate = new Date(data.additionalInfo.leaseEndDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+            }
+        }
+
+        return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Move In Permit Issued - Notification</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial, Helvetica, sans-serif;color:#333;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f4f6f8;padding:20px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="background:#ffffff;border-radius:6px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background:#0b63a5;padding:20px 24px;color:#ffffff;">
+              <h1 style="margin:0;font-size:18px;font-weight:600;">Sobha Community Management</h1>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:24px;">
+              <p style="margin:0 0 18px 0;font-size:15px;">Dear Team,</p>
+
+              <p style="margin:0 0 18px 0;font-size:15px;line-height:1.6;">
+                This is to notify you that a new Move In Permit (MIP) has been issued.
+              </p>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 24px 0;">
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">MIP reference no.</strong>
+                    <span>${data.requestNumber}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">User type</strong>
+                    <span>${userTypeFormatted}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">Property details</strong>
+                    <span>${propertyDetails}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">Applicant name</strong>
+                    <span>${applicantName}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">Occupant name</strong>
+                    <span>${applicantName}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">Move in date</strong>
+                    <span>${moveInDateFormatted}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">Move out date</strong>
+                    <span>N/A</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">Start date (lease)</strong>
+                    <span>${leaseStartDate}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">End date (lease)</strong>
+                    <span>${leaseEndDate}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;">
+                    <strong style="display:inline-block;width:180px;color:#333;">MIP date of issue</strong>
+                    <span>${mipIssueDate}</span>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 4px 0;font-size:15px;">Kind regards,</p>
+              <p style="margin:0;font-size:15px;font-weight:600;">Sobha Community Management</p>
+            </td>
+          </tr>
 
         </table>
       </td>
