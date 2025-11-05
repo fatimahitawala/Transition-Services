@@ -618,6 +618,7 @@ export class MoveInService {
         entity.name = details.name; // Now map directly to the name field
         entity.companyName = details.company;
         entity.companyEmail = details.companyEmail;
+        entity.countryCode = details.countryCode;
         entity.operatorOfficeNumber = details.operatorOfficeNumber;
         entity.tradeLicenseNumber = details.tradeLicenseNumber;
         entity.tradeLicenseExpiryDate = details.tradeLicenseExpiryDate;
@@ -798,6 +799,7 @@ export class MoveInService {
         name: rest.name,
         company: rest.company, // Keep as 'company' since createDetailsRecord expects this field name
         companyEmail: rest.companyEmail,
+        countryCode: rest.countryCode,
         operatorOfficeNumber: rest.operatorOfficeNumber,
         tradeLicenseNumber: rest.tradeLicenseNumber,
         tradeLicenseExpiryDate: rest.tradeLicenseExpiryDate,
@@ -3054,6 +3056,7 @@ export class MoveInService {
           name: data.name,
           companyName: data.company,
           companyEmail: data.companyEmail,
+          countryCode: data.countryCode,
           operatorOfficeNumber: data.operatorOfficeNumber,
           tradeLicenseNumber: data.tradeLicenseNumber,
           tradeLicenseExpiryDate: data.tradeLicenseExpiryDate,
