@@ -1352,8 +1352,8 @@ export class MoveInService {
         logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) is not active - Value: ${unit.isActive}, Type: ${typeof unit.isActive}`);
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          `Unit ${unit.unitNumber} is not active`,
-          "EC223"
+          `Unit ${unit.unitNumber} not available`,
+          APICodes.UNIT_NOT_VACANT.code
         );
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY] ✓ isActive check passed - Value: ${unit.isActive}`);
@@ -1364,8 +1364,8 @@ export class MoveInService {
         logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) availability status is not 'Available': '${unit.availabilityStatus}'`);
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          `Unit ${unit.unitNumber} is not available for move-in`,
-          "EC224"
+          `Unit ${unit.unitNumber} not available`,
+          APICodes.UNIT_NOT_VACANT.code
         );
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY] ✓ availabilityStatus check passed - Value: '${unit.availabilityStatus}'`);
@@ -1376,8 +1376,8 @@ export class MoveInService {
         logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) occupancy status is not 'vacant': '${unit.occupancyStatus}'`);
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          `Unit ${unit.unitNumber} is not vacant`,
-          "EC225"
+          `Unit ${unit.unitNumber} not available`,
+          APICodes.UNIT_NOT_VACANT.code
         );
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY] ✓ occupancyStatus check passed - Value: '${unit.occupancyStatus}'`);
@@ -1397,8 +1397,8 @@ export class MoveInService {
         logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) already has an approved move-in request: ${existingApprovedRequest.id}, RequestNo: ${existingApprovedRequest.moveInRequestNo}`);
         throw new ApiError(
           httpStatus.CONFLICT,
-          `Unit ${unit.unitNumber} already has an approved move-in request`,
-          "EC226"
+          `Unit ${unit.unitNumber} not available`,
+          APICodes.UNIT_NOT_VACANT.code
         );
       }
       logger.info(`[CHECK_UNIT_AVAILABILITY] ✓ No existing approved requests found`);
