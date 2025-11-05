@@ -103,6 +103,15 @@ export class CommonService {
      * Reusable for move-in, move-out and renewal.
      */
     async sendResidentToSalesforce(payload: SalesforceResidentPayload, extraHeaders?: Record<string, string>) {
+        // Correlation for easier log search
+        const cid = `SFDC-RES-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        // Build non-PII log meta for quick filtering
+        const logMeta = {
+            unitId: payload?.unitId,
+            requestType: payload?.request_type,
+            status: payload?.status,
+            ref: payload?.mobile_app_reference,
+        };
         try {
             // Use API Gateway Salesforce base URL
             // Note: Do NOT start endpoint with '/' or URL() will drop any base path like '/srsalesforce/v1'
@@ -119,26 +128,55 @@ export class CommonService {
                 ...(extraHeaders || {}),
             };
 
+            // For logging only: redact sensitive values
+            const headersForLog = {
+                ...headers,
+                Authorization: headers?.Authorization ? `Bearer ***${(token || '').slice(-6)}` : undefined,
+            };
+
+            // Payload normalization with undefined -> null
             const sanitizedPayload = JSON.parse(JSON.stringify(payload, (_k, v) => v === undefined ? null : v));
 
+            // Log request with URL and meta (no PII)
+            logger.info(`[${cid}] Salesforce Resident API -> POST ${url} | meta=${JSON.stringify(logMeta)} | headers=${JSON.stringify(Object.keys(headersForLog))}`);
+
             let resp;
-            logger.debug(`Salesforce Resident API request to ${url} with payload: ${JSON.stringify(sanitizedPayload)}, headers: ${JSON.stringify(headers)}`);
             try {
                 resp = await axios.post(url, sanitizedPayload, { headers, timeout: 10_000 });
             } catch (err: any) {
+                // Unauthorized: attempt token refresh once
                 if (err?.response?.status === 401) {
+                    logger.warn(`[${cid}] Salesforce Resident API 401 unauthorized. Refreshing token and retrying... | url=${url} | meta=${JSON.stringify(logMeta)}`);
                     token = await this.refreshSalesforceToken();
                     headers.Authorization = `Bearer ${token}`;
-                    resp = await axios.post(url, sanitizedPayload, { headers, timeout: 10_000 });
+                    try {
+                        resp = await axios.post(url, sanitizedPayload, { headers, timeout: 10_000 });
+                    } catch (retryErr: any) {
+                        const e = retryErr || {};
+                        const status = e?.response?.status;
+                        const data = e?.response?.data;
+                        logger.error(`[${cid}] Salesforce Resident API retry failed | url=${url} | status=${status} | meta=${JSON.stringify(logMeta)} | err=${e?.message}`);
+                        if (status) logger.error(`[${cid}] Salesforce Resident API retry response body | status=${status} | body=${JSON.stringify(data)}`);
+                        throw retryErr;
+                    }
                 } else {
+                    // Non-401 failures
+                    const status = err?.response?.status;
+                    const data = err?.response?.data;
+                    logger.error(`[${cid}] Salesforce Resident API request failed | url=${url} | status=${status} | meta=${JSON.stringify(logMeta)} | err=${err?.message}`);
+                    if (status) logger.error(`[${cid}] Salesforce Resident API response body | status=${status} | body=${JSON.stringify(data)}`);
                     throw err;
                 }
             }
-            logger.debug(`Salesforce Resident API success: status=${resp.status}`);
+
+            logger.info(`[${cid}] Salesforce Resident API success | url=${url} | status=${resp.status} | meta=${JSON.stringify(logMeta)}`);
             return { status: resp.status, data: resp.data };
         } catch (error: any) {
-            logger.error(`Salesforce Resident API error: ${error?.message || error}`);
-            return { status: error?.response?.status || 500, data: error?.response?.data };
+            const status = error?.response?.status || 500;
+            const body = error?.response?.data;
+            logger.error(`[${cid}] Salesforce Resident API error | status=${status} | meta=${JSON.stringify(logMeta)} | err=${error?.message || error}`);
+            if (status && body) logger.error(`[${cid}] Salesforce Resident API error body | status=${status} | body=${JSON.stringify(body)}`);
+            return { status, data: body };
         }
     }
     /**
