@@ -210,22 +210,45 @@ export class MoveOutService {
         return out;
     }
 
+    // Decode template if it appears to be Base64 (similar to MIP handling)
+    private decodeTemplateIfBase64(content: string): string {
+        try {
+            const trimmed = (content || '').trim();
+            const looksLikeHtml = trimmed.startsWith('<') || trimmed.startsWith('<!');
+            const looksLikeBase64 = !looksLikeHtml && /^[A-Za-z0-9+/=\r\n]+$/.test(trimmed.substring(0, 100));
+            if (looksLikeBase64) {
+                try {
+                    const decoded = Buffer.from(trimmed, 'base64').toString('utf-8');
+                    // If decoding produced something that looks like HTML, use it
+                    if (decoded.trim().startsWith('<')) {
+                        return decoded;
+                    }
+                } catch (e) {
+                    logger.warn('Move-Out template Base64 decoding failed; using raw string');
+                }
+            }
+            return content;
+        } catch {
+            return content;
+        }
+    }
+
     // Fetch Move-Out permit HTML template from DB with hierarchy fallback
     private async getMoveOutPermitTemplate(masterCommunityId: number, communityId: number, towerId?: number | null): Promise<string | null> {
         // 1) Tower
         if (towerId) {
             const rec = await OccupancyRequestTemplates.findOne({ where: { masterCommunityId, communityId, towerId: towerId || undefined, templateType: OCUPANCY_REQUEST_TYPES.MOVE_OUT, isActive: true } });
-            if (rec?.templateString) return rec.templateString;
+            if (rec?.templateString) return this.decodeTemplateIfBase64(rec.templateString);
         }
         // 2) Community
         {
             const rec = await OccupancyRequestTemplates.findOne({ where: { masterCommunityId, communityId, towerId: IsNull(), templateType: OCUPANCY_REQUEST_TYPES.MOVE_OUT, isActive: true } });
-            if (rec?.templateString) return rec.templateString;
+            if (rec?.templateString) return this.decodeTemplateIfBase64(rec.templateString);
         }
         // 3) Master Community
         {
             const rec = await OccupancyRequestTemplates.findOne({ where: { masterCommunityId, communityId: IsNull(), towerId: IsNull(), templateType: OCUPANCY_REQUEST_TYPES.MOVE_OUT, isActive: true } });
-            if (rec?.templateString) return rec.templateString;
+            if (rec?.templateString) return this.decodeTemplateIfBase64(rec.templateString);
         }
         return null;
     }
