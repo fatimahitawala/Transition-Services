@@ -4,7 +4,7 @@ import { logger } from "../../Common/Utils/logger";
 import { APICodes } from "../../Common/Constants";
 import { MoveOutRequests } from "../../Entities/MoveOutRequests.entity";
 import { getPaginationInfo } from "../../Common/Utils/paginationUtils";
-import { checkAdminPermission, checkIsSecurity } from "../../Common/Utils/adminAccess";
+import { checkAdminPermission, checkIsSecurity, checkIsSuperAdmin, checkIsCommunityadmin } from "../../Common/Utils/adminAccess";
 import { Units, getUnitInformation } from "../../Entities/Units.entity";
 import { UnitBookings } from "../../Entities/UnitBookings.entity";
 import { MOVE_IN_AND_OUT_REQUEST_STATUS, MOVE_IN_USER_TYPES, OccupancyStatus } from "../../Entities/EntityTypes";
@@ -964,17 +964,30 @@ export class MoveOutService {
 
     async closeMoveOutRequestBySecurity(body: any, requestId: number, user: any) {
         try {
-            const isSecurity = await checkIsSecurity(user);
-            if (!isSecurity) {
-                throw new ApiError(httpStatus.FORBIDDEN, APICodes.INSUFFICIENT_USER_PRIVILEGE.message, APICodes.INSUFFICIENT_USER_PRIVILEGE.code);
-            }
-
+            // Load the request first to derive scope (community) for permission checks
             const moveOutRequest = await MoveOutRequests.getRepository().findOne({
                 where: { id: requestId }
             });
 
             if (!moveOutRequest) {
                 throw new ApiError(httpStatus.NOT_FOUND, APICodes.REQUEST_NOT_FOUND.message, APICodes.REQUEST_NOT_FOUND.code);
+            }
+
+            // Permission: allow Security, Super Admin, or Community Admin for the unit's community
+            const [isSecurity, isSuperAdmin] = await Promise.all([
+                checkIsSecurity(user),
+                checkIsSuperAdmin(user),
+            ]);
+            let isCommunityAdmin = false;
+            try {
+                const communityId = (moveOutRequest as any)?.unit?.community?.id;
+                if (communityId) {
+                    isCommunityAdmin = await checkIsCommunityadmin(user, Number(communityId));
+                }
+            } catch (_) { /* noop */ }
+
+            if (!isSecurity && !isSuperAdmin && !isCommunityAdmin) {
+                throw new ApiError(httpStatus.FORBIDDEN, APICodes.INSUFFICIENT_USER_PRIVILEGE.message, APICodes.INSUFFICIENT_USER_PRIVILEGE.code);
             }
 
             if (moveOutRequest.status === MOVE_IN_AND_OUT_REQUEST_STATUS.CLOSED) {
@@ -1003,7 +1016,9 @@ export class MoveOutService {
                 const hist = new MoveOutHistories();
                 (hist as any).request = { id: moveOutRequest.id };
                 hist.action = 'closed';
-                hist.actionByType = TransitionRequestActionByTypes.SECURITY;
+                hist.actionByType = isSuperAdmin
+                    ? TransitionRequestActionByTypes.SUPER_ADMIN
+                    : (isCommunityAdmin ? TransitionRequestActionByTypes.COMMUNITY_ADMIN : TransitionRequestActionByTypes.SECURITY);
                 hist.remarks = body?.reason || '';
                 hist.createdBy = user.id;
                 await hist.save();
