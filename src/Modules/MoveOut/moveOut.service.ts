@@ -620,6 +620,7 @@ export class MoveOutService {
                 .innerJoinAndSelect("ur.role", "role", "role.isActive = true")
                 .where("user.id = :userId", { userId })
                 .andWhere("unit.id = :unitId", { unitId })
+                .andWhere("role.roleType = :roleType", { roleType: 'user' })
                 .select(["role.slug as slug"]);
 
             const userRoleResult = await userRole.getRawOne();
@@ -1456,17 +1457,30 @@ export class MoveOutService {
             .innerJoinAndSelect("ur.role", "role", "role.isActive = true")
             .where("user.id = :userId", { userId })
             .andWhere("unit.id = :unitId", { unitId })
+            .andWhere("role.roleType = :roleType", { roleType: 'user' })
             .select(["role.slug as slug"]);
 
         const userRoleResult = await userRole.getRawOne();
 
-        const allowedRoles = Object.values(MOVE_IN_USER_TYPES) as MOVE_IN_USER_TYPES[];
+        // Map role slugs from Roles table to MOVE_IN_USER_TYPES values
+        const slug = (userRoleResult?.slug || "").toString().toLowerCase();
+        const slugToUserType: Record<string, MOVE_IN_USER_TYPES> = {
+            owner: MOVE_IN_USER_TYPES.OWNER,
+            tenant: MOVE_IN_USER_TYPES.TENANT,
+            // Historical/seeded slugs for HHO
+            hho: MOVE_IN_USER_TYPES.HHO_OWNER,
+            hhc: MOVE_IN_USER_TYPES.HHO_COMPANY,
+            // Defensive: if slugs ever stored with hyphens
+            "hho-owner": MOVE_IN_USER_TYPES.HHO_OWNER,
+            "hho-company": MOVE_IN_USER_TYPES.HHO_COMPANY,
+        };
 
-        if (!userRoleResult?.slug || !allowedRoles.includes(userRoleResult.slug as MOVE_IN_USER_TYPES)) {
+        const mapped = slugToUserType[slug];
+        if (!slug) {
             throw new ApiError(httpStatus.BAD_REQUEST, APICodes.ROLE_NOT_FOUND.message, APICodes.ROLE_NOT_FOUND.code);
         }
-
-        return userRoleResult.slug as MOVE_IN_USER_TYPES;
+        // Return mapped enum if available; otherwise return original slug
+        return (mapped || (slug as unknown)) as MOVE_IN_USER_TYPES;
     }
 
     private async getMoveInAndRenewalRequests(userId: number, unitId: number): Promise<{ moveInRequest: MoveInRequests, accountRenewalRequest: AccountRenewalRequests | null }> {
