@@ -2173,7 +2173,6 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               - name
  *               - company
  *               - companyEmail
- *               - operatorCountryCode
  *               - operatorOfficeNumber
  *               - tradeLicenseNumber
  *               - tradeLicenseExpiryDate
@@ -2224,16 +2223,6 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *                 type: string
  *                 format: email
  *                 example: "abccompany@gmail.com"
- *               countryCode:
- *                 type: string
- *                 maxLength: 10
- *                 description: Country dial code for mobile number
- *                 example: "+971"
- *               operatorCountryCode:
- *                 type: string
- *                 maxLength: 10
- *                 description: Country dial code for operator office number
- *                 example: "+971"
  *               operatorOfficeNumber:
  *                 type: string
  *                 example: "+971 122345678"
@@ -2288,6 +2277,10 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *                 format: date
  *                 description: DTCM expiry date (optional)
  *                 example: "2025-11-24"
+ *               countryCode:
+ *                 type: string
+ *                 description: Country code
+ *                 example: "+971"
  *               comments:
  *                 type: string
  *                 nullable: true
@@ -2313,7 +2306,6 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *                 company: "1212"
  *                 companyEmail: "aminda.w@techcarrot.ae"
  *                 countryCode: "+971"
- *                 operatorCountryCode: "+971"
  *                 operatorOfficeNumber: "1221212"
  *                 tradeLicenseNumber: "12212121"
  *                 tradeLicenseExpiryDate: "2025-10-31"
@@ -2346,7 +2338,6 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *                 company: "1212"
  *                 companyEmail: "aminda.w@techcarrot.ae"
  *                 countryCode: "+971"
- *                 operatorCountryCode: "+971"
  *                 operatorOfficeNumber: "1221212"
  *                 tradeLicenseNumber: "12212121"
  *                 tradeLicenseExpiryDate: "2025-10-31"
@@ -2845,7 +2836,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *               - leaseStartDate
  *               - leaseEndDate
  *               - details
- *               - operatorCountryCode
+ *               - countryCode
  *             properties:
  *               unitId:
  *                 type: integer
@@ -2902,13 +2893,7 @@ router.post('/request/process', auth.auth(), validate(moveInValidation.moveInUni
  *                 example: "info@techcorp.com"
  *               countryCode:
  *                 type: string
- *                 maxLength: 10
- *                 description: Country dial code for mobile number
- *                 example: "+971"
- *               operatorCountryCode:
- *                 type: string
- *                 maxLength: 10
- *                 description: Country dial code for operator office number
+ *                 description: Country dial code
  *                 example: "+971"
  *               operatorOfficeNumber:
  *                 type: string

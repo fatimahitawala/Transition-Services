@@ -732,7 +732,6 @@ paths:
                 - name
                 - company
                 - companyEmail
-                - operatorCountryCode
                 - operatorOfficeNumber
                 - tradeLicenseNumber
                 - tradeLicenseExpiryDate
@@ -796,13 +795,7 @@ paths:
                   example: "abccompany@gmail.com"
                 countryCode:
                   type: string
-                  maxLength: 10
-                  description: Country dial code for mobile number (optional)
-                  example: "+971"
-                operatorCountryCode:
-                  type: string
-                  maxLength: 10
-                  description: Country dial code for operator office number
+                  description: Country code for phone number
                   example: "+971"
                 operatorOfficeNumber:
                   type: string
