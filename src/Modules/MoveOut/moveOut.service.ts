@@ -965,7 +965,6 @@ export class MoveOutService {
 
     async closeMoveOutRequestBySecurity(body: any, requestId: number, user: any) {
         try {
-            // Load the request first to derive scope (community) for permission checks
             const moveOutRequest = await MoveOutRequests.getRepository().findOne({
                 where: { id: requestId }
             });
@@ -986,7 +985,6 @@ export class MoveOutService {
                     isCommunityAdmin = await checkIsCommunityadmin(user, Number(communityId));
                 }
             } catch (_) { /* noop */ }
-
             if (!isSecurity && !isSuperAdmin && !isCommunityAdmin) {
                 throw new ApiError(httpStatus.FORBIDDEN, APICodes.INSUFFICIENT_USER_PRIVILEGE.message, APICodes.INSUFFICIENT_USER_PRIVILEGE.code);
             }
