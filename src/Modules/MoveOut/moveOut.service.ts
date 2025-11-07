@@ -413,12 +413,13 @@ export class MoveOutService {
         const masterCommunityName = unit?.masterCommunity?.name || '';
         const unitNumber = unit?.unitNumber || '';
         const propertyAddress = [unit?.unitName, unitNumber].filter(Boolean).join(', ');
+        const formattedMoveOutDate = moveOutDate ? new Date(moveOutDate).toISOString().slice(0, 10) : '';
         return {
             "<request_ID>": requestNo,
             "<request_id>": requestNo,
             "<request_no>": requestNo,
             "<reference_id>": requestNo,
-            "<move_out_date>": moveOutDate,
+            "<move_out_date>": formattedMoveOutDate,
             "<resident_type>": residentType || '',
             "<unit_number>": unitNumber,
             "<unitNumber>": unitNumber,
@@ -640,13 +641,31 @@ export class MoveOutService {
                     "<permit_date>": permitDate
                 }
                 // Push/app notification (align to existing templates)
-                addNotification(userId, 'move_out_request_approved', { "<request_no>": result.moveOutRequestNo, "<reference_id>": result.moveOutRequestNo, "<request_id>": result.moveOutRequestNo })
+                try {
+                    const userDetails = await this.buildMoveOutDetailsPayload(
+                        unitId,
+                        result.moveOutRequestNo,
+                        body?.moveOutDate || result?.moveOutDate,
+                        userRoleResult?.slug
+                    );
+                    addNotification(
+                        userId,
+                        'move_out_request_approved',
+                        userDetails
+                    )
+                } catch (e) { }
                 // Notify Security Team on approval (non-blocking)
                 try {
+                    const adminDetails = await this.buildMoveOutDetailsPayload(
+                        unitId,
+                        result.moveOutRequestNo,
+                        body?.moveOutDate || result?.moveOutDate,
+                        userRoleResult?.slug
+                    );
                     await addAdminNotification(
                         user.id,
                         'move_out_request_approved_security',
-                        { "<request_no>": result.moveOutRequestNo, "<move_out_date>": result.moveOutDate },
+                        adminDetails,
                         { unit_id: unitId }
                     );
                 } catch (e) { }
@@ -953,7 +972,18 @@ export class MoveOutService {
                 await addNotification(userId, 'move_out_customer_cancelled_to_user', details);
             } catch (e) { }
             try {
-                await addAdminNotification(userId, 'move_out_request_cancelled_by_user_to_admin', { "<request_no>": moveOutRequest.moveOutRequestNo, "<move_out_date>": moveOutRequest.moveOutDate }, { unit_id: moveOutRequest.unit.id });
+                const adminDetails = await this.buildMoveOutDetailsPayload(
+                    moveOutRequest.unit.id,
+                    moveOutRequest.moveOutRequestNo,
+                    moveOutRequest.moveOutDate,
+                    moveOutRequest.requestType
+                );
+                await addAdminNotification(
+                    userId,
+                    'move_out_request_cancelled_by_user_to_admin',
+                    adminDetails,
+                    { unit_id: moveOutRequest.unit.id }
+                );
             } catch (e) { }
             return moveOutRequest;
         } catch (error) {
@@ -1009,7 +1039,18 @@ export class MoveOutService {
                 await addNotification(userId, 'move_out_request_closure_to_user', details);
             } catch (e) { }
             try {
-                await addAdminNotification(user.id, 'move_out_request_closed_by_security_to_admin', { "<request_no>": moveOutRequest.moveOutRequestNo, "<move_out_date>": moveOutRequest.moveOutDate }, { unit_id: moveOutRequest.unit.id });
+                const adminDetails = await this.buildMoveOutDetailsPayload(
+                    moveOutRequest.unit.id,
+                    moveOutRequest.moveOutRequestNo,
+                    moveOutRequest.moveOutDate,
+                    moveOutRequest.requestType
+                );
+                await addAdminNotification(
+                    user.id,
+                    'move_out_request_closed_by_security_to_admin',
+                    adminDetails,
+                    { unit_id: moveOutRequest.unit.id }
+                );
             } catch (e) { }
             try {
                 const hist = new MoveOutHistories();
