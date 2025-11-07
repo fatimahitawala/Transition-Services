@@ -237,10 +237,9 @@ export class MoveInService {
 
       const unitId = moveInRequest.unit?.id;
       let primary = null;
-      let cc: string[] = [];
+      let cc: string[] = []; // Always empty - no CC emails needed
 
-      // Get unit owner email from unit_bookings (needed for CC in tenant/HHO/HHC requests)
-      const ownerInfo = await this.getUnitOwnerFromBookings(unitId);
+      // NOTE: CC functionality completely removed - no CC emails for any request type
 
       switch (moveInRequest.requestType) {
         case MOVE_IN_USER_TYPES.OWNER: {
@@ -257,7 +256,7 @@ export class MoveInService {
         }
         
         case MOVE_IN_USER_TYPES.TENANT: {
-          // For tenant requests: primary = tenant, CC = unit owner
+          // For tenant requests: primary = tenant, no CC
           const tenantDetails = await MoveInRequestDetailsTenant.getRepository()
             .createQueryBuilder("tenant")
             .where("tenant.move_in_request_id = :requestId", { requestId: moveInRequest.id })
@@ -270,19 +269,13 @@ export class MoveInService {
               lastName: tenantDetails.lastName || '',
               email: tenantDetails.email
             };
-            logger.info(`Mobile Tenant request: Primary email set to tenant (${tenantDetails.email})`);
-            
-            // Add unit owner as CC
-            if (ownerInfo && ownerInfo.email) {
-              cc.push(ownerInfo.email);
-              logger.info(`Mobile Tenant request: Unit owner email added to CC (${ownerInfo.email})`);
-            }
+            logger.info(`Mobile Tenant request: Primary email set to tenant (${tenantDetails.email}) - No CC`);
           }
           break;
         }
         
         case MOVE_IN_USER_TYPES.HHO_OWNER: {
-          // For HHO owner requests: primary = HHO owner, CC = unit owner
+          // For HHO owner requests: primary = HHO owner, no CC
           const hhoDetails = await MoveInRequestDetailsHhoOwner.getRepository()
             .createQueryBuilder("hho")
             .where("hho.move_in_request_id = :requestId", { requestId: moveInRequest.id })
@@ -295,19 +288,13 @@ export class MoveInService {
               lastName: hhoDetails.ownerLastName || '',
               email: hhoDetails.email
             };
-            logger.info(`Mobile HHO Owner request: Primary email set to HHO owner (${hhoDetails.email})`);
-            
-            // Add unit owner as CC
-            if (ownerInfo && ownerInfo.email && ownerInfo.email !== hhoDetails.email) {
-              cc.push(ownerInfo.email);
-              logger.info(`Mobile HHO Owner request: Unit owner email added to CC (${ownerInfo.email})`);
-            }
+            logger.info(`Mobile HHO Owner request: Primary email set to HHO owner (${hhoDetails.email}) - No CC`);
           }
           break;
         }
         
         case MOVE_IN_USER_TYPES.HHO_COMPANY: {
-          // For HHC company requests: primary = companyEmail, CC = unit owner
+          // For HHC company requests: primary = companyEmail, no CC
           const companyDetails = await MoveInRequestDetailsHhcCompany.getRepository()
             .createQueryBuilder("company")
             .where("company.move_in_request_id = :requestId", { requestId: moveInRequest.id })
@@ -320,13 +307,7 @@ export class MoveInService {
               lastName: '',
               email: companyDetails.companyEmail
             };
-            logger.info(`Mobile HHC Company request: Primary email set to company (${companyDetails.companyEmail})`);
-            
-            // Add unit owner as CC
-            if (ownerInfo && ownerInfo.email) {
-              cc.push(ownerInfo.email);
-              logger.info(`Mobile HHC Company request: Unit owner email added to CC (${ownerInfo.email})`);
-            }
+            logger.info(`Mobile HHC Company request: Primary email set to company (${companyDetails.companyEmail}) - No CC`);
           }
           break;
         }
@@ -1154,35 +1135,29 @@ export class MoveInService {
         throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
       }
 
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Starting validation for unitId: ${unitId}`);
+      
       const unit = await this.getUnitById(Number(unitId));
+      
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Unit fetched - unitId: ${unitId}, found: ${!!unit}`);
+      
       if (!unit) {
+        logger.error(`[CHECK_UNIT_AVAILABILITY_MOBILE] Unit not found: ${unitId}`);
         throw new ApiError(httpStatus.NOT_FOUND, APICodes.UNIT_NOT_FOUND.message, APICodes.UNIT_NOT_FOUND.code);
       }
 
-      // Validate unit status conditions
-      if (unit.isActive !== true) {
-        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
-      }
+      // Log all unit properties
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Unit details - unitId: ${unitId}, unitNumber: ${unit.unitNumber}, unitName: ${unit.unitName}`);
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] Unit status values - isActive: ${unit.isActive} (type: ${typeof unit.isActive}), availabilityStatus: '${unit.availabilityStatus}', occupancyStatus: '${unit.occupancyStatus}'`);
 
-      if (unit.availabilityStatus !== 'Available') {
-        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
-      }
-
-      if (unit.occupancyStatus !== 'vacant') {
-        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
-      }
-
-      // Check for existing approved requests
-      const existingApprovedRequest = await MoveInRequests.getRepository()
-        .createQueryBuilder("mir")
-        .where("mir.unit.id = :unitId", { unitId })
-        .andWhere("mir.status = :approvedStatus", { approvedStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED })
-        .andWhere("mir.isActive = 1")
-        .getOne();
-
-      if (existingApprovedRequest) {
-        throw new ApiError(httpStatus.CONFLICT, APICodes.UNIT_NOT_VACANT.message, APICodes.UNIT_NOT_VACANT.code);
-      }
+      // MOBILE: NO VALIDATION - Accept requests regardless of unit status
+      // Admin will validate all conditions during approval
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] SKIPPING ALL STATUS VALIDATIONS - Mobile accepts all requests regardless of unit status`);
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] - isActive: ${unit.isActive} (NOT validated)`);
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] - availabilityStatus: '${unit.availabilityStatus}' (NOT validated)`);
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] - occupancyStatus: '${unit.occupancyStatus}' (NOT validated)`);
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] - existingApprovedRequest: (NOT validated)`);
+      logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓✓✓ Mobile request accepted for unitId: ${unitId}`);
 
       const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
 
@@ -1269,17 +1244,11 @@ export class MoveInService {
 
       logger.info(`MOVE-IN CREATED: ${createdMaster?.moveInRequestNo} for unit ${unitId} by user ${user?.id}`);
 
-      // Send confirmation email for mobile request creation (skip for owner requests)
-      if (requestType !== MOVE_IN_USER_TYPES.OWNER) {
-        try {
-          await this.sendMobileRequestConfirmationEmail(createdMaster, user);
-        } catch (emailError) {
-          logger.error(`Failed to send mobile request confirmation email for ${createdMaster?.moveInRequestNo}:`, emailError);
-          // Don't fail the request creation if email fails
-        }
-      } else {
-        logger.info(`Skipping confirmation email for owner move-in request ${createdMaster?.moveInRequestNo}`);
-      }
+      // NOTE: Emails are NOT sent from mobile service
+      // Only approval emails are sent by Admin service when admin approves the request
+      logger.info(`Mobile request submitted - no email sent (approval email will be sent by Admin when approved)`);
+      
+      // Removed confirmation email trigger - mobile only submits requests, admin sends approval emails
 
       // In-app notifications: Admin + Customer on submission
       try {
@@ -1743,6 +1712,7 @@ export class MoveInService {
     try {
       return await Units.getRepository()
         .createQueryBuilder("u")
+        .addSelect("u.isActive")
         .leftJoinAndMapOne("u.tower", "u.tower", "t", "t.isActive = 1")
         .leftJoinAndMapOne("u.community", "u.community", "c", "c.isActive = 1")
         .leftJoinAndMapOne("u.masterCommunity", "u.masterCommunity", "mc", "mc.isActive = 1")
@@ -1898,8 +1868,11 @@ export class MoveInService {
       log.comments = cancellationRemarks || null;
       await log.save();
 
-      // Send cancellation notifications
-      await this.sendCancellationNotifications(requestId, request.moveInRequestNo, cancellationRemarks, request);
+      // NOTE: Cancellation emails are NOT sent from mobile service
+      // Only approval emails should be sent by Admin service
+      logger.info(`Mobile request cancelled - no email sent (only admin sends approval emails)`);
+      
+      // Removed cancellation email trigger - mobile does not send any emails
 
       // In-app notifications for Customer Cancelled (to admin and customer)
       try {
@@ -1978,6 +1951,10 @@ export class MoveInService {
   private async ensureCancelableByOwner(requestId: number, user: any) {
     const mir = await MoveInRequests.getRepository()
       .createQueryBuilder('mir')
+      .leftJoinAndSelect('mir.unit', 'unit')
+      .leftJoinAndSelect('unit.tower', 'tower')
+      .leftJoinAndSelect('unit.community', 'community')
+      .leftJoinAndSelect('unit.masterCommunity', 'masterCommunity')
       .leftJoinAndSelect('mir.user', 'user')
       .where('mir.id = :requestId AND mir.isActive = true', { requestId })
       .getOne();

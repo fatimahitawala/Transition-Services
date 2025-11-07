@@ -30,6 +30,8 @@ import ApiError from '../../Common/Utils/ApiError';
 import config from '../../Common/Config/config';
 import { OccupancyRequestTemplates } from '../../Entities/OccupancyRequestTemplates.entity';
 import { OccupancyRequestWelcomePack } from '../../Entities/OccupancyRequestWelcomePack.entity';
+import { MoveInRequestDetailsTenant } from '../../Entities/MoveInRequestDetailsTenant.entity';
+import { MoveInRequestDetailsHhcCompany } from '../../Entities/MoveInRequestDetailsHhcCompany.entity';
 import { OCUPANCY_REQUEST_TYPES } from '../../Entities/EntityTypes/transition';
 import { AppDataSource } from '../../Common/data-source';
 import { IsNull } from 'typeorm';
@@ -186,20 +188,20 @@ export class EmailService {
             logger.info(`Attachments: ${attachments.length} files`);
             logger.info(`HTML content length: ${text.length} characters`);
             logger.info(`HTML content preview: ${text.substring(0, 200)}...`);
-            
-            const msg: any = { 
-                from: config.email.from, 
-                to, 
-                subject, 
+
+            const msg: any = {
+                from: config.email.from,
+                to,
+                subject,
                 html: text  // Plain UTF-8 string, NOT Base64
             };
-            
+
             // Add CC if provided
             if (cc && cc.length > 0) {
                 msg.cc = cc;
                 logger.info(`CC recipients added: ${cc.join(', ')}`);
             }
-            
+
             // Add attachments if provided (enhancement over User-Services)
             if (attachments && attachments.length > 0) {
                 msg.attachments = attachments.map(att => {
@@ -207,25 +209,25 @@ export class EmailService {
                         filename: att.filename,
                         contentType: att.contentType
                     };
-                    
+
                     // Use content if provided (for generated PDFs)
                     if (att.content) {
                         attachment.content = att.content;
-                    } 
+                    }
                     // Use href for remote URLs (Azure Blob Storage)
                     else if (att.href) {
                         attachment.href = att.href;
-                    } 
+                    }
                     // Use path for local files
                     else if (att.path) {
                         attachment.path = att.path;
                     }
-                    
+
                     return attachment;
                 });
                 logger.info(`Attachments added: ${attachments.map(a => a.filename).join(', ')}`);
             }
-            
+
             const result = await transport.sendMail(msg);
             logger.info(`=== EMAIL SENT SUCCESSFULLY ===`);
             logger.info(`Message ID: ${result.messageId}`);
@@ -283,6 +285,8 @@ export class EmailService {
      */
     async sendResetPasswordEmail(to: string, details: any) {
         const subject = 'Reset Password : OTP Verification Required';
+        details.firstName = (details && details.firstName) ? details.firstName : 'User';
+        details.lastName = (details && details.lastName) ? details.lastName : '';
         const text = `<div>Dear&nbsp;${details.firstName}&nbsp;${details.lastName}<br><br>Please use the following OTP to reset your password:<br><br><strong><span style="font-size: 18px;">OTP: ${details.otp}</span></strong><br><br>This OTP is valid for a limited time and is essential to activate your account. Please enter it in the app as prompted.<br>If you encounter any issues during the reset password process or have questions about our app, feel free to reach out to our support team for assistance.<br>Best regards,<br>Team @ ONE Sobha App</div>`;
         await this.sendEmail(to, subject, text);
     };
@@ -299,6 +303,8 @@ export class EmailService {
      */
     async sendMoveInVerificationEmail(to: string, details: any) {
         const subject = 'Move In : OTP Verification Required';
+        details.firstName = (details && details.firstName) ? details.firstName : 'User';
+        details.lastName = (details && details.lastName) ? details.lastName : '';
         const text = `<div>Dear&nbsp;${details.firstName}&nbsp;${details.lastName}<br><br>Please use the following OTP to move in:<br><br><strong><span style="font-size: 18px;">OTP: ${details.otp}</span></strong><br><br>This OTP is valid for a limited time and is essential to activate your account. Please enter it in the app as prompted.<br>If you encounter any issues during the move in process or have questions about our app, feel free to reach out to our support team for assistance.<br>Best regards,<br>Team @ ONE Sobha App</div>`;
         await this.sendEmail(to, subject, text);
     };
@@ -378,12 +384,12 @@ export class EmailService {
     ): Promise<string | null> {
         try {
             const templateRepository = AppDataSource.getRepository(OccupancyRequestTemplates);
-            
+
             logger.info(`Fetching MIP email template for masterCommunity: ${masterCommunityId}, community: ${communityId}, tower: ${towerId}, status: ${status}`);
-            
+
             // Try to find template with exact match (tower → community → master community hierarchy)
             let template = null;
-            
+
             // 1. First try: Tower-specific template
             if (towerId) {
                 template = await templateRepository.findOne({
@@ -395,7 +401,7 @@ export class EmailService {
                         isActive: true
                     }
                 });
-                
+
                 if (template) {
                     logger.info(`Found tower-specific MIP template for tower: ${towerId}`);
                 }
@@ -412,7 +418,7 @@ export class EmailService {
                         isActive: true
                     }
                 });
-                
+
                 if (template) {
                     logger.info(`Found community-specific MIP template for community: ${communityId}`);
                 }
@@ -429,7 +435,7 @@ export class EmailService {
                         isActive: true
                     }
                 });
-                
+
                 if (template) {
                     logger.info(`Found master community MIP template for masterCommunity: ${masterCommunityId}`);
                 }
@@ -473,12 +479,12 @@ export class EmailService {
         try {
             logger.info(`=== WELCOME PACK RETRIEVAL START ===`);
             logger.info(`Searching for welcome pack with MC:${masterCommunityId}, C:${communityId}, T:${towerId}`);
-            
+
             const welcomePackRepository = AppDataSource.getRepository(OccupancyRequestWelcomePack);
-            
+
             // Try to find welcome pack with exact match (including tower)
             let welcomePack = null;
-            
+
             // 1. First try: Tower-specific welcome pack
             if (towerId) {
                 logger.info(`Searching for tower-specific welcome pack...`);
@@ -522,7 +528,7 @@ export class EmailService {
                     relations: ['file']
                 });
             }
-            
+
             logger.info(`Master community-level search result: ${welcomePack ? 'FOUND' : 'NOT FOUND'}`);
 
             if (welcomePack?.file) {
@@ -532,12 +538,12 @@ export class EmailService {
                     filePath: welcomePack.file.filePath,
                     fileType: welcomePack.file.fileType
                 })}`);
-                
+
                 // If file is stored in Azure Blob Storage, we need to download it
                 const fileUrl = `https://${config.storage.accountName}.blob.core.windows.net/${config.storage.containerName}/application/${welcomePack.file.filePath}`;
-                
+
                 logger.info(`Welcome pack file URL: ${fileUrl}`);
-                
+
                 return {
                     filename: welcomePack.file.fileOriginalName || 'welcome-pack.pdf',
                     href: fileUrl, // Use href for remote URLs
@@ -574,14 +580,14 @@ export class EmailService {
     private replaceTemplatePlaceholders(template: string, data: MoveInEmailData): string {
         const currentDate = new Date();
         const moveInDate = data.moveInDate ? new Date(data.moveInDate) : null;
-        
+
         const replacements: Record<string, string> = {
             // User Information
             '{{firstName}}': data.userDetails.firstName,
             '{{lastName}}': data.userDetails.lastName,
             '{{fullName}}': `${data.userDetails.firstName} ${data.userDetails.lastName}`,
             '{{email}}': Array.isArray(data.userDetails.email) ? data.userDetails.email.join(', ') : data.userDetails.email,
-            
+
             // Request Information
             '{{requestNumber}}': data.requestNumber,
             '{{requestId}}': data.requestId.toString(),
@@ -589,7 +595,7 @@ export class EmailService {
             '{{statusTitle}}': this.getStatusTitle(data.status),
             '{{comments}}': data.comments || '',
             '{{remarks}}': data.comments || '',
-            
+
             // Unit Information
             '{{unitNumber}}': data.unitDetails.unitNumber,
             '{{unitName}}': data.unitDetails.unitName,
@@ -597,29 +603,29 @@ export class EmailService {
             '{{communityName}}': data.unitDetails.communityName,
             '{{towerName}}': data.unitDetails.towerName || '',
             '{{propertyAddress}}': this.formatPropertyAddress(data.unitDetails),
-            
+
             // Date Information
-            '{{moveInDate}}': moveInDate ? moveInDate.toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+            '{{moveInDate}}': moveInDate ? moveInDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
             }) : '',
             '{{moveInDateShort}}': moveInDate ? moveInDate.toLocaleDateString() : '',
-            '{{currentDate}}': currentDate.toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+            '{{currentDate}}': currentDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
             }),
             '{{currentDateShort}}': currentDate.toLocaleDateString(),
             '{{currentYear}}': currentDate.getFullYear().toString(),
             '{{currentTime}}': currentDate.toLocaleTimeString(),
-            
+
             // Status-specific information
             '{{statusMessage}}': this.getStatusMessage(data.status),
             '{{nextSteps}}': this.getNextSteps(data.status),
-            
+
             // Company/App Information
             '{{companyName}}': 'ONE Sobha App',
             '{{supportEmail}}': process.env.ONE_APP_SUPPORT_EMAIL || 'support@onesobhaapp.com',
@@ -627,7 +633,7 @@ export class EmailService {
         };
 
         let processedTemplate = template;
-        
+
         // Replace all placeholders
         Object.entries(replacements).forEach(([placeholder, value]) => {
             // Use global replace with regex to replace all occurrences
@@ -682,7 +688,7 @@ export class EmailService {
             unitDetails.communityName,
             unitDetails.masterCommunityName
         ].filter(Boolean);
-        
+
         return parts.join(', ');
     }
 
@@ -809,11 +815,11 @@ export class EmailService {
             // Generate attachments only for user emails, not for recipient emails
             const attachments: EmailAttachment[] = [];
             let welcomePackUrl = '';
-            
+
             if (!data.isRecipientEmail) {
                 // Generate MIP template as PDF attachment
                 logger.info(`Generating MIP template as PDF attachment...`);
-                
+
                 try {
                     const mipTemplateHtml = await this.getMIPTemplateHTML(data);
                     const mipPdfAttachment = await this.generateMIPTemplatePDF(mipTemplateHtml, data);
@@ -839,7 +845,7 @@ export class EmailService {
                     data.unitDetails.communityId,
                     data.unitDetails.towerId
                 );
-                
+
                 if (welcomePackAttachment) {
                     attachments.push(welcomePackAttachment);
                     welcomePackUrl = welcomePackAttachment.href || welcomePackAttachment.path || '';
@@ -854,7 +860,7 @@ export class EmailService {
             }
 
             // Create detailed email body with header image and move-in permit content
-            const emailBody = this.createDetailedApprovalEmailBody(data, welcomePackUrl);
+            const emailBody = await this.createDetailedApprovalEmailBody(data, welcomePackUrl);
 
             // Generate subject
             const subject = this.getEmailSubject('approved', data.requestNumber, data.isRecipientEmail, data);
@@ -903,14 +909,14 @@ export class EmailService {
             logger.info(`Request: ${data.requestNumber}, MC:${data.unitDetails.masterCommunityId}, C:${data.unitDetails.communityId}, T:${data.unitDetails.towerId}`);
             logger.info(`User: ${data.userDetails.firstName} ${data.userDetails.lastName}, Email: ${data.userDetails.email}`);
             logger.info(`Move-in Date: ${data.moveInDate}`);
-            
+
             const templateRepository = AppDataSource.getRepository(OccupancyRequestTemplates);
             let template = null;
-            
+
             // Try to find template with exact match (tower → community → master community hierarchy)
             // Note: isActive has select: false, so we need to explicitly select it
             const selectFields = ['id', 'masterCommunityId', 'communityId', 'towerId', 'templateType', 'templateString', 'isActive'];
-            
+
             // 1. First try: Tower-specific template
             if (data.unitDetails.towerId) {
                 template = await templateRepository
@@ -922,12 +928,12 @@ export class EmailService {
                     .andWhere('template.templateType = :templateType', { templateType: OCUPANCY_REQUEST_TYPES.MOVE_IN })
                     .andWhere('template.isActive = :isActive', { isActive: true })
                     .getOne();
-                    
+
                 if (template) {
                     logger.info(`✓ Found tower-specific MIP template (ID: ${template.id})`);
                 }
             }
-            
+
             // 2. Second try: Community-level template (no tower)
             if (!template) {
                 template = await templateRepository
@@ -939,12 +945,12 @@ export class EmailService {
                     .andWhere('template.templateType = :templateType', { templateType: OCUPANCY_REQUEST_TYPES.MOVE_IN })
                     .andWhere('template.isActive = :isActive', { isActive: true })
                     .getOne();
-                    
+
                 if (template) {
                     logger.info(`✓ Found community-specific MIP template (ID: ${template.id})`);
                 }
             }
-            
+
             // 3. Third try: Master community level template
             if (!template) {
                 template = await templateRepository
@@ -956,57 +962,57 @@ export class EmailService {
                     .andWhere('template.templateType = :templateType', { templateType: OCUPANCY_REQUEST_TYPES.MOVE_IN })
                     .andWhere('template.isActive = :isActive', { isActive: true })
                     .getOne();
-                    
+
                 if (template) {
                     logger.info(`✓ Found master community MIP template (ID: ${template.id})`);
                 }
             }
-            
+
             if (!template || !template.templateString) {
                 logger.error(`✗ NO MIP TEMPLATE FOUND IN DATABASE - CANNOT GENERATE PDF`);
                 logger.error(`Searched for: MC=${data.unitDetails.masterCommunityId}, C=${data.unitDetails.communityId}, T=${data.unitDetails.towerId}`);
                 logger.error(`MIP template must be configured in database before approving move-in requests`);
                 throw new Error(`MIP template not found for MC:${data.unitDetails.masterCommunityId}, C:${data.unitDetails.communityId}, T:${data.unitDetails.towerId}`);
             }
-            
+
             logger.info(`=== MIP TEMPLATE FOUND IN DATABASE ===`);
-                logger.info(`Template ID: ${template.id}`);
-                logger.info(`Template Type: ${template.templateType}`);
-                logger.info(`Master Community ID: ${template.masterCommunityId}`);
-                logger.info(`Community ID: ${template.communityId}`);
-                logger.info(`Tower ID: ${template.towerId || 'NULL (Community level)'}`);
-                logger.info(`Template length: ${template.templateString.length} characters`);
+            logger.info(`Template ID: ${template.id}`);
+            logger.info(`Template Type: ${template.templateType}`);
+            logger.info(`Master Community ID: ${template.masterCommunityId}`);
+            logger.info(`Community ID: ${template.communityId}`);
+            logger.info(`Tower ID: ${template.towerId || 'NULL (Community level)'}`);
+            logger.info(`Template length: ${template.templateString.length} characters`);
             logger.info(`Template type check - First 50 chars: ${template.templateString.substring(0, 50)}`);
-            
+
             let templateContent = template.templateString;
-            
+
             // Check if template is Base64 encoded
-                // Base64 strings typically don't start with < or <!DOCTYPE
-                const isLikelyBase64 = !templateContent.trim().startsWith('<') && 
-                                       !templateContent.trim().startsWith('<!') &&
-                                       /^[A-Za-z0-9+/=]+$/.test(templateContent.substring(0, 100));
-                
-                if (isLikelyBase64) {
-                    try {
-                        logger.info(`⚠ Template appears to be Base64 encoded, attempting to decode...`);
-                        templateContent = Buffer.from(templateContent, 'base64').toString('utf-8');
-                        logger.info(`✓ Base64 decoded successfully (new length: ${templateContent.length} chars)`);
-                        logger.info(`Decoded preview (first 200 chars): ${templateContent.substring(0, 200)}...`);
-                    } catch (decodeError) {
-                        logger.error(`✗ Base64 decode failed:`, decodeError);
-                        logger.warn(`Using template as-is without decoding`);
-                    }
+            // Base64 strings typically don't start with < or <!DOCTYPE
+            const isLikelyBase64 = !templateContent.trim().startsWith('<') &&
+                !templateContent.trim().startsWith('<!') &&
+                /^[A-Za-z0-9+/=]+$/.test(templateContent.substring(0, 100));
+
+            if (isLikelyBase64) {
+                try {
+                    logger.info(`⚠ Template appears to be Base64 encoded, attempting to decode...`);
+                    templateContent = Buffer.from(templateContent, 'base64').toString('utf-8');
+                    logger.info(`✓ Base64 decoded successfully (new length: ${templateContent.length} chars)`);
+                    logger.info(`Decoded preview (first 200 chars): ${templateContent.substring(0, 200)}...`);
+                } catch (decodeError) {
+                    logger.error(`✗ Base64 decode failed:`, decodeError);
+                    logger.warn(`Using template as-is without decoding`);
+                }
             } else {
                 logger.info(`✓ Template appears to be plain HTML (not Base64 encoded)`);
             }
-            
+
             logger.info(`Template preview (first 200 chars): ${templateContent.substring(0, 200)}...`);
-            
+
             // Replace placeholders with actual data
             const finalHtml = this.replaceMIPPlaceholders(templateContent, data);
             logger.info(`✓ Placeholders replaced (final length: ${finalHtml.length} chars)`);
             logger.info(`Final HTML preview (first 200 chars): ${finalHtml.substring(0, 200)}...`);
-            
+
             logger.info(`=== MIP TEMPLATE HTML GENERATION COMPLETE ===`);
             return finalHtml;
         } catch (error) {
@@ -1019,7 +1025,7 @@ export class EmailService {
             throw error;
         }
     }
-    
+
     /**
      * REPLACE MIP TEMPLATE PLACEHOLDERS
      * ==================================
@@ -1029,21 +1035,21 @@ export class EmailService {
     private replaceMIPPlaceholders(template: string, data: MoveInEmailData): string {
         const currentDate = new Date();
         const moveInDate = data.moveInDate ? new Date(data.moveInDate) : null;
-        
+
         const occupantName = `${data.userDetails.firstName} ${data.userDetails.lastName}`;
         const address = `${data.unitDetails.unitNumber || ''} ${data.unitDetails.unitName || ''}`.trim();
         const community = data.unitDetails.communityName || '';
-        const moveInDateFormatted = moveInDate ? moveInDate.toLocaleDateString('en-GB', { 
+        const moveInDateFormatted = moveInDate ? moveInDate.toLocaleDateString('en-GB', {
             day: 'numeric',
             month: 'long',
             year: 'numeric'
         }) : '';
-        const dateOfIssue = currentDate.toLocaleDateString('en-GB', { 
+        const dateOfIssue = currentDate.toLocaleDateString('en-GB', {
             day: 'numeric',
             month: 'long',
             year: 'numeric'
         });
-        
+
         // ONLY the 6 placeholders used in the template
         const replacements: Record<string, string> = {
             '${data.MoveInDate}': moveInDateFormatted,
@@ -1053,13 +1059,13 @@ export class EmailService {
             '${Community}': community,
             '${DateOfIssue}': dateOfIssue
         };
-        
+
         logger.info(`Replacing MIP template placeholders...`);
         logger.info(`Placeholders to replace: ${Object.keys(replacements).length}`);
-        
+
         let processedTemplate = template;
         let replacedCount = 0;
-        
+
         // Replace all placeholders
         Object.entries(replacements).forEach(([placeholder, value]) => {
             // Escape special regex characters
@@ -1072,9 +1078,9 @@ export class EmailService {
                 logger.info(`  ✓ ${placeholder} -> ${value}`);
             }
         });
-        
+
         logger.info(`✓ Total replacements: ${replacedCount}`);
-        
+
         // Check for any remaining unreplaced placeholders
         const remainingPlaceholders = processedTemplate.match(/\$\{[^}]+\}/g);
         if (remainingPlaceholders && remainingPlaceholders.length > 0) {
@@ -1082,10 +1088,10 @@ export class EmailService {
         } else {
             logger.info(`✓ All placeholders replaced successfully`);
         }
-        
+
         return processedTemplate;
     }
-    
+
 
     /**
      * PDF GENERATION USING PUPPETEER
@@ -1113,24 +1119,24 @@ export class EmailService {
         try {
             // Import puppeteer dynamically to avoid build issues
             const puppeteer = require('puppeteer');
-            
+
             logger.info(`=== MIP PDF GENERATION START ===`);
             logger.info(`Request: ${data.requestNumber}, Status: ${data.status}`);
             logger.info(`HTML Content Length: ${htmlContent.length} characters`);
             logger.info(`HTML Preview (first 300 chars): ${htmlContent.substring(0, 300)}...`);
             logger.info(`HTML Preview (last 100 chars): ...${htmlContent.substring(htmlContent.length - 100)}`);
-            
+
             // Configure Chrome executable path from environment variable
             const launchOptions: any = {
                 headless: true,
                 args: ['--no-sandbox', '--disable-setuid-sandbox']
             };
-            
+
             // Add executablePath if EXECUTABLE_PATH is set in environment
             const chromeExecutablePath = process.env.EXECUTABLE_PATH;
             logger.info(`=== Chrome Executable Path Configuration ===`);
             logger.info(`EXECUTABLE_PATH from env: ${chromeExecutablePath || 'NOT SET'}`);
-            
+
             if (chromeExecutablePath && chromeExecutablePath.trim()) {
                 launchOptions.executablePath = chromeExecutablePath.trim();
                 logger.info(`✓ Using Chrome executable path from EXECUTABLE_PATH env variable`);
@@ -1139,20 +1145,20 @@ export class EmailService {
                 logger.info(`⚠ EXECUTABLE_PATH not set, using Puppeteer auto-detection`);
                 logger.warn(`If PDF generation fails, set EXECUTABLE_PATH in .env file`);
             }
-            
+
             // Launch Puppeteer
             logger.info(`Launching Puppeteer browser...`);
             const browser = await puppeteer.launch(launchOptions);
             logger.info(`✓ Browser launched successfully`);
-            
+
             const page = await browser.newPage();
             logger.info(`✓ New page created`);
-            
+
             // Set content and wait for images to load
             logger.info(`Setting HTML content and waiting for network idle...`);
             await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
             logger.info(`✓ HTML content set successfully`);
-            
+
             // Generate PDF
             logger.info(`Generating PDF from HTML...`);
             const pdfBuffer = await page.pdf({
@@ -1166,14 +1172,14 @@ export class EmailService {
                 }
             });
             logger.info(`✓ PDF generated successfully (${pdfBuffer.length} bytes)`);
-            
+
             await browser.close();
             logger.info(`✓ Browser closed`);
-            
+
             const filename = `${data.requestNumber}-${data.status}.pdf`;
             logger.info(`=== MIP PDF GENERATION COMPLETE ===`);
             logger.info(`Filename: ${filename}, Size: ${pdfBuffer.length} bytes`);
-            
+
             return {
                 filename: filename,
                 content: pdfBuffer,
@@ -1211,7 +1217,7 @@ export class EmailService {
     private createEmailBodyWithHeader(status: string, requestNumber: string, isRecipientEmail: boolean = false, data?: MoveInEmailData): string {
         const statusMessage = this.getStatusMessage(status);
         const moveInDateStr = data?.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
-        
+
         let heading = '';
         if (status.toLowerCase() === 'approved') {
             if (isRecipientEmail) {
@@ -1225,7 +1231,7 @@ export class EmailService {
         } else {
             heading = 'Move-in Request Update';
         }
-        
+
         return `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <!-- Header Image with Frame -->
@@ -1275,12 +1281,18 @@ export class EmailService {
      * @param {MoveInEmailData} data - Complete email data for content generation
      * @returns {string} - Comprehensive HTML email body
      */
-    private createDetailedApprovalEmailBody(data: MoveInEmailData, welcomePackUrl: string = ''): string {
+    private async createDetailedApprovalEmailBody(data: MoveInEmailData, welcomePackUrl: string = ''): Promise<string> {
+        // Check if this is a recipient email (MIP recipients) and use different template
+        if (data.isRecipientEmail) {
+            return await this.createRecipientEmailBody(data);
+        }
+
+        // Original user email template
         // Get recipient name
         const recipientName = `${data.userDetails.firstName} ${data.userDetails.lastName}`.trim() || 'homeowner';
-        
+
         // If welcome pack URL is provided, use it; otherwise show a message
-        const welcomePackButton = welcomePackUrl ? 
+        const welcomePackButton = welcomePackUrl ?
             `<a href="${welcomePackUrl}" target="_blank" rel="noopener"
                    style="display:inline-block;background:#0b63a5;color:#ffffff;padding:10px 16px;border-radius:4px;text-decoration:none;font-weight:600;">
                   Click here to view the Welcome Pack
@@ -1288,7 +1300,7 @@ export class EmailService {
             `<p style="margin:0 0 18px 0;font-size:15px;line-height:1.5;color:#666;">
                 Welcome Pack is attached to this email.
               </p>`;
-        
+
         return `<!doctype html>
 <html>
 <head>
@@ -1361,6 +1373,212 @@ export class EmailService {
 </html>`;
     }
 
+    /**
+     * CREATE RECIPIENT EMAIL BODY FOR MIP RECIPIENTS
+     * ===============================================
+     * Creates a simple notification email body for community management team
+     * Notifies them about a new Move In Permit issuance
+     * 
+     * Features:
+     * - Simple, professional format
+     * - All key MIP details
+     * - No attachments required
+     * - Designed for internal team notification
+     * 
+     * @param {MoveInEmailData} data - Complete email data for content generation
+     * @returns {string} - HTML email body for recipient notification
+     */
+    private async createRecipientEmailBody(data: MoveInEmailData): Promise<string> {
+        // Format dates
+        const moveInDateFormatted = data.moveInDate ? 
+            new Date(data.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) : 
+            'N/A';
+        
+        const mipIssueDate = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+
+        // Format property details
+        const propertyDetails = [
+            data.unitDetails.unitNumber,
+            data.unitDetails.towerName,
+            data.unitDetails.communityName,
+            data.unitDetails.masterCommunityName
+        ].filter(Boolean).join(', ');
+
+        // Format user type with proper capitalization
+        let userTypeFormatted = 'N/A';
+        if (data.requestType) {
+            const typeMap: Record<string, string> = {
+                'owner': 'Owner',
+                'tenant': 'Tenant',
+                'hho_owner': 'HHO Owner',
+                'hho-owner': 'HHO Owner',
+                'hho_company': 'HHO Company',
+                'hho-company': 'HHO Company'
+            };
+            userTypeFormatted = typeMap[data.requestType.toLowerCase()] || 
+                data.requestType.replace(/-/g, ' ').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        // Get applicant name
+        const applicantName = `${data.userDetails.firstName} ${data.userDetails.lastName}`.trim();
+
+        // Fetch lease dates from database based on request type
+        let leaseStartDate = 'N/A';
+        let leaseEndDate = 'N/A';
+        
+        try {
+            logger.info(`Fetching lease details for requestId: ${data.requestId}, requestType: ${data.requestType}`);
+            
+            if (data.requestType === 'tenant') {
+                const tenantDetails = await AppDataSource.getRepository(MoveInRequestDetailsTenant)
+                    .createQueryBuilder('tenant')
+                    .leftJoin('tenant.moveInRequest', 'request')
+                    .where('request.id = :requestId', { requestId: data.requestId })
+                    .getOne();
+                    
+                logger.info(`Tenant details found: ${!!tenantDetails}`);
+                if (tenantDetails) {
+                    if (tenantDetails.tenancyContractStartDate) {
+                        leaseStartDate = new Date(tenantDetails.tenancyContractStartDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+                    }
+                    if (tenantDetails.tenancyContractEndDate) {
+                        leaseEndDate = new Date(tenantDetails.tenancyContractEndDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+                    }
+                    logger.info(`Tenant lease dates - Start: ${leaseStartDate}, End: ${leaseEndDate}`);
+                }
+            } else if (data.requestType === 'hho_company' || data.requestType === 'hho-company') {
+                const companyDetails = await AppDataSource.getRepository(MoveInRequestDetailsHhcCompany)
+                    .createQueryBuilder('company')
+                    .leftJoin('company.moveInRequest', 'request')
+                    .where('request.id = :requestId', { requestId: data.requestId })
+                    .getOne();
+                    
+                logger.info(`HHO Company details found: ${!!companyDetails}`);
+                if (companyDetails) {
+                    logger.info(`HHO Company raw dates - leaseStartDate: ${companyDetails.leaseStartDate}, leaseEndDate: ${companyDetails.leaseEndDate}`);
+                    if (companyDetails.leaseStartDate) {
+                        leaseStartDate = new Date(companyDetails.leaseStartDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+                    }
+                    if (companyDetails.leaseEndDate) {
+                        leaseEndDate = new Date(companyDetails.leaseEndDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+                    }
+                    logger.info(`HHO Company formatted lease dates - Start: ${leaseStartDate}, End: ${leaseEndDate}`);
+                }
+            }
+        } catch (error) {
+            logger.error(`Error fetching lease details for recipient email: ${error}`);
+            logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack'}`);
+        }
+
+        return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Move In Permit Issued - Notification</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial, Helvetica, sans-serif;color:#333;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f4f6f8;padding:20px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="background:#ffffff;border-radius:6px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background:#0b63a5;padding:20px 24px;color:#ffffff;">
+              <h1 style="margin:0;font-size:18px;font-weight:600;">Sobha Community Management</h1>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:24px;">
+              <p style="margin:0 0 18px 0;font-size:15px;">Dear Team,</p>
+
+              <p style="margin:0 0 18px 0;font-size:15px;line-height:1.6;">
+                This is to notify you that a new Move In Permit (MIP) has been issued.
+              </p>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 24px 0;">
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">MIP reference no.</strong>
+                    <span>${data.requestNumber}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">User type</strong>
+                    <span>${userTypeFormatted}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="width:180px;color:#333;font-weight:bold;vertical-align:top;">Property details</td>
+                        <td style="color:#555;vertical-align:top;">${propertyDetails}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">Applicant name</strong>
+                    <span>${applicantName}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">Occupant name</strong>
+                    <span>${applicantName}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">Move in date</strong>
+                    <span>${moveInDateFormatted}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">Move out date</strong>
+                    <span>N/A</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">Start date (lease)</strong>
+                    <span>${leaseStartDate}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;border-bottom:1px solid #e8e8e8;">
+                    <strong style="display:inline-block;width:180px;color:#333;">End date (lease)</strong>
+                    <span>${leaseEndDate}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0;font-size:14px;color:#555;">
+                    <strong style="display:inline-block;width:180px;color:#333;">MIP date of issue</strong>
+                    <span>${mipIssueDate}</span>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 4px 0;font-size:15px;">Kind regards,</p>
+              <p style="margin:0;font-size:15px;font-weight:600;">Sobha Community Management</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+    }
+
 
     /**
      * STATUS MESSAGE GENERATOR
@@ -1402,17 +1620,17 @@ export class EmailService {
      */
     private getEmailSubject(status: string, requestNumber: string, isRecipientEmail: boolean = false, data?: MoveInEmailData): string {
         const moveInDateStr = data?.moveInDate ? new Date(data.moveInDate).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
-        
+
         if (status.toLowerCase() === 'approved') {
             if (isRecipientEmail) {
                 // For recipient emails: "Move in request Raised : request id"
                 return `Move in request Raised : ${requestNumber}`;
             } else {
-                // For user emails: "Move In Permit Reference no. MIP-10: Application approved"
-                return `Move In Permit Reference no. ${requestNumber}: Application approved`;
+                // For user emails: "Move In Permit Reference No. MIP-10: Application Approved"
+                return `Move In Permit Reference No. ${requestNumber}: Application Approved`;
             }
         }
-        
+
         // For other statuses, use the original format
         switch (status.toLowerCase()) {
             case 'rfi-pending':

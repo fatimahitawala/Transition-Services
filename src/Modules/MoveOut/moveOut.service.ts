@@ -7,7 +7,7 @@ import { getPaginationInfo } from "../../Common/Utils/paginationUtils";
 import { checkAdminPermission, checkIsSecurity, checkIsSuperAdmin, checkIsCommunityadmin } from "../../Common/Utils/adminAccess";
 import { Units, getUnitInformation } from "../../Entities/Units.entity";
 import { UnitBookings } from "../../Entities/UnitBookings.entity";
-import { MOVE_IN_AND_OUT_REQUEST_STATUS, MOVE_IN_USER_TYPES, MOVE_REQUEST_STATUS, OccupancyStatus } from "../../Entities/EntityTypes";
+import { MOVE_IN_AND_OUT_REQUEST_STATUS, MOVE_IN_USER_TYPES, OccupancyStatus } from "../../Entities/EntityTypes";
 import { addNotification, addAdminNotification } from "../../Common/Utils/notification";
 import { UserRoles } from "../../Entities/UserRoles.entity";
 import { MoveInRequests } from "../../Entities/MoveInRequests.entity";
@@ -23,9 +23,12 @@ import config from "../../Common/Config/config";
 import { OccupancyRequestTemplates } from "../../Entities/OccupancyRequestTemplates.entity";
 import { OCUPANCY_REQUEST_TYPES } from "../../Entities/EntityTypes/transition";
 import { IsNull } from "typeorm";
+import { CommonService } from "../Common/common.service";
+import { Users } from "../../Entities/Users.entity";
 
 export class MoveOutService {
     private emailService = new EmailService();
+    private commonService = new CommonService();
 
     // Build absolute blob URL from stored relative path
     //
@@ -207,22 +210,45 @@ export class MoveOutService {
         return out;
     }
 
+    // Decode template if it appears to be Base64 (similar to MIP handling)
+    private decodeTemplateIfBase64(content: string): string {
+        try {
+            const trimmed = (content || '').trim();
+            const looksLikeHtml = trimmed.startsWith('<') || trimmed.startsWith('<!');
+            const looksLikeBase64 = !looksLikeHtml && /^[A-Za-z0-9+/=\r\n]+$/.test(trimmed.substring(0, 100));
+            if (looksLikeBase64) {
+                try {
+                    const decoded = Buffer.from(trimmed, 'base64').toString('utf-8');
+                    // If decoding produced something that looks like HTML, use it
+                    if (decoded.trim().startsWith('<')) {
+                        return decoded;
+                    }
+                } catch (e) {
+                    logger.warn('Move-Out template Base64 decoding failed; using raw string');
+                }
+            }
+            return content;
+        } catch {
+            return content;
+        }
+    }
+
     // Fetch Move-Out permit HTML template from DB with hierarchy fallback
     private async getMoveOutPermitTemplate(masterCommunityId: number, communityId: number, towerId?: number | null): Promise<string | null> {
         // 1) Tower
         if (towerId) {
             const rec = await OccupancyRequestTemplates.findOne({ where: { masterCommunityId, communityId, towerId: towerId || undefined, templateType: OCUPANCY_REQUEST_TYPES.MOVE_OUT, isActive: true } });
-            if (rec?.templateString) return rec.templateString;
+            if (rec?.templateString) return this.decodeTemplateIfBase64(rec.templateString);
         }
         // 2) Community
         {
             const rec = await OccupancyRequestTemplates.findOne({ where: { masterCommunityId, communityId, towerId: IsNull(), templateType: OCUPANCY_REQUEST_TYPES.MOVE_OUT, isActive: true } });
-            if (rec?.templateString) return rec.templateString;
+            if (rec?.templateString) return this.decodeTemplateIfBase64(rec.templateString);
         }
         // 3) Master Community
         {
             const rec = await OccupancyRequestTemplates.findOne({ where: { masterCommunityId, communityId: IsNull(), towerId: IsNull(), templateType: OCUPANCY_REQUEST_TYPES.MOVE_OUT, isActive: true } });
-            if (rec?.templateString) return rec.templateString;
+            if (rec?.templateString) return this.decodeTemplateIfBase64(rec.templateString);
         }
         return null;
     }
@@ -534,27 +560,21 @@ export class MoveOutService {
             if (action === 'approve') {
                 // moveOutDate required for approval
                 if (!body?.moveOutDate) {
-                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.APPROVAL_NOT_POSSIBLE.message, APICodes.APPROVAL_NOT_POSSIBLE.code);
+                    throw new ApiError(
+                        httpStatus.BAD_REQUEST,
+                        (APICodes.MOVE_OUT_DATE_REQUIRED || APICodes.VALIDATION_ERROR).message,
+                        (APICodes.MOVE_OUT_DATE_REQUIRED || APICodes.VALIDATION_ERROR).code,
+                    );
                 }
                 // Unit must be occupied (not VACANT)
                 if (result.occupancyStatus === OccupancyStatus.VACANT) {
-                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.APPROVAL_NOT_POSSIBLE.message, APICodes.APPROVAL_NOT_POSSIBLE.code);
+                    throw new ApiError(
+                        httpStatus.BAD_REQUEST,
+                        (APICodes.UNIT_ALREADY_VACANT || APICodes.APPROVAL_NOT_POSSIBLE).message,
+                        (APICodes.UNIT_ALREADY_VACANT || APICodes.APPROVAL_NOT_POSSIBLE).code,
+                    );
                 }
-                // Move-out date must be within 1 month of submission and not in the past
-                try {
-                    const createdAt = new Date(result.createdAt);
-                    const moveOutDate = new Date(body.moveOutDate);
-                    const today = new Date();
-                    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                    const maxDate = new Date(createdAt);
-                    maxDate.setMonth(maxDate.getMonth() + 1);
-                    if (moveOutDate < startOfToday || moveOutDate > maxDate) {
-                        throw new ApiError(httpStatus.BAD_REQUEST, APICodes.APPROVAL_NOT_POSSIBLE.message, APICodes.APPROVAL_NOT_POSSIBLE.code);
-                    }
-                } catch (e) {
-                    if (e instanceof ApiError) throw e;
-                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.APPROVAL_NOT_POSSIBLE.message, APICodes.APPROVAL_NOT_POSSIBLE.code);
-                }
+                // Note: date window validation is enforced during creation, not approval
                 if (result.status === MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
                     throw new ApiError(httpStatus.CONFLICT, APICodes.ALREADY_APPROVED.message, APICodes.ALREADY_APPROVED.code);
                 }
@@ -562,7 +582,8 @@ export class MoveOutService {
                     throw new ApiError(httpStatus.CONFLICT, APICodes.ALREADY_CLOSED_ERROR.message, APICodes.ALREADY_CLOSED_ERROR.code);
                 }
                 if (result.status === MOVE_IN_AND_OUT_REQUEST_STATUS.CANCELLED || result.status === MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED) {
-                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.APPROVAL_NOT_POSSIBLE.message, APICodes.APPROVAL_NOT_POSSIBLE.code);
+                    // Provide a clearer message instead of a generic approval not possible
+                    throw new ApiError(httpStatus.BAD_REQUEST, APICodes.ALREADY_CANCELLED_ERROR.message, APICodes.ALREADY_CANCELLED_ERROR.code);
                 }
             } else if (action === 'cancel') {
                 // cancellation remarks required
@@ -718,6 +739,56 @@ export class MoveOutService {
                         }
                     }
                 } catch (e) { logger.error(`Error generating/sending Move-Out permit emails: ${e}`); }
+
+                // Push Move-Out approval to Salesforce Resident API (non-blocking)
+                try {
+                    const userRec = await Users.getRepository().findOne({ where: { id: userId } });
+                    const unitRec = await Units.getRepository().createQueryBuilder('u')
+                        .select(['u.id', 'u.unitName', 'u.unitNumber', 'u.salesForceId'])
+                        .where('u.id = :id', { id: unitId })
+                        .getOne();
+
+                    const cc = (userRec?.dialCode?.dialCode || '').toString();
+                    const normCC = cc ? (cc.startsWith('+') ? cc : `+${cc}`) : null;
+                    const altCC = null; // not tracked separately
+
+                    const typeOfTenantMap: Record<string, string> = {
+                        owner: 'HomeOwner',
+                        tenant: 'Tenant',
+                        hho: 'HHO',
+                        company: 'Company',
+                    };
+
+                    const payload = {
+                        salutation: userRec?.honorific || null,
+                        firstName: userRec?.firstName || null,
+                        lastName: userRec?.lastName || null,
+                        primaryMobileCountryCode: normCC,
+                        primaryMobileNumber: userRec?.mobile || null,
+                        alternativeMobileCountryCode: altCC,
+                        alternativeMobileNumber: userRec?.alternativeMobile || null,
+                        primaryEmail: userRec?.email || null,
+                        alternateEmail: userRec?.alternativeEmail || null,
+                        unitId: unitRec?.salesForceId || '',
+                        nationality: userRec?.nationality?.name || null,
+                        typeOfTenant: typeOfTenantMap[(userRoleResult?.slug || '').toLowerCase()] || null,
+                        moveInDate: null,
+                        moveOutDate: (body?.moveOutDate || result?.moveOutDate) ? new Date(body?.moveOutDate || result?.moveOutDate).toISOString().slice(0, 10) : null,
+                        ejariStartDate: null,
+                        ejariEndDate: null,
+                        requestRaisedDate: result?.createdAt ? new Date(result.createdAt).toISOString().slice(0, 10) : null,
+                        dtcmStartDate: null,
+                        dtcmEndDate: null,
+                        requestApprovedDate: new Date().toISOString().slice(0, 10),
+                        request_type: 'move-out' as const,
+                        status: 'approve',
+                        mobile_app_reference: result.moveOutRequestNo,
+                    };
+
+                    await this.commonService.sendResidentToSalesforce(payload);
+                } catch (e) {
+                    logger.error(`Salesforce push (move-out approval) failed: ${e}`);
+                }
                 // History
                 try {
                     const hist = new MoveOutHistories();
@@ -894,7 +965,6 @@ export class MoveOutService {
 
     async closeMoveOutRequestBySecurity(body: any, requestId: number, user: any) {
         try {
-
             const moveOutRequest = await MoveOutRequests.getRepository().findOne({
                 where: { id: requestId }
             });
@@ -984,6 +1054,44 @@ export class MoveOutService {
             const requestUserId = Number(user.id);
             const targetUnitId = Number(body.unitId);
 
+            // Validate move-out date window at creation time (not on approval)
+            if (!body?.moveOutDate) {
+                throw new ApiError(
+                    httpStatus.BAD_REQUEST,
+                    (APICodes.MOVE_OUT_DATE_REQUIRED || APICodes.VALIDATION_ERROR).message,
+                    (APICodes.MOVE_OUT_DATE_REQUIRED || APICodes.VALIDATION_ERROR).code,
+                );
+            }
+            try {
+                const today = new Date();
+                const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                const maxDate = new Date(startOfToday);
+                maxDate.setMonth(maxDate.getMonth() + 1);
+                const moveOutDate = new Date(body.moveOutDate);
+                if (moveOutDate < startOfToday || moveOutDate > maxDate) {
+                    const earliest = startOfToday.toISOString().slice(0, 10);
+                    const latest = maxDate.toISOString().slice(0, 10);
+                    throw new ApiError(
+                        httpStatus.BAD_REQUEST,
+                        `Move-out date must be between ${earliest} and ${latest}`,
+                        (APICodes.MOVE_OUT_DATE_OUT_OF_RANGE || APICodes.APPROVAL_NOT_POSSIBLE).code,
+                    );
+                }
+            } catch (e) {
+                if (e instanceof ApiError) throw e;
+                const today = new Date();
+                const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                const maxDate = new Date(startOfToday);
+                maxDate.setMonth(maxDate.getMonth() + 1);
+                const earliest = startOfToday.toISOString().slice(0, 10);
+                const latest = maxDate.toISOString().slice(0, 10);
+                throw new ApiError(
+                    httpStatus.BAD_REQUEST,
+                    `Move-out date must be between ${earliest} and ${latest}`,
+                    (APICodes.MOVE_OUT_DATE_OUT_OF_RANGE || APICodes.APPROVAL_NOT_POSSIBLE).code,
+                );
+            }
+
             await this.ensureUnitHandoverCompleted(targetUnitId);
             const userRoleSlug = await this.getUserRoleSlugForUnit(requestUserId, targetUnitId);
             const { moveInRequest, accountRenewalRequest } = await this.getMoveInAndRenewalRequests(requestUserId, targetUnitId);
@@ -1054,6 +1162,37 @@ export class MoveOutService {
 
             if (!unitId || !userId || !moveOutDate) {
                 throw new ApiError(httpStatus.BAD_REQUEST, APICodes.INVALID_DATA.message, APICodes.INVALID_DATA.code);
+            }
+
+            // Validate move-out date window at creation time (not on approval)
+            try {
+                const today = new Date();
+                const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                const maxDate = new Date(startOfToday);
+                maxDate.setMonth(maxDate.getMonth() + 1);
+                const dateToCheck = new Date(moveOutDate);
+                if (dateToCheck < startOfToday || dateToCheck > maxDate) {
+                    const earliest = startOfToday.toISOString().slice(0, 10);
+                    const latest = maxDate.toISOString().slice(0, 10);
+                    throw new ApiError(
+                        httpStatus.BAD_REQUEST,
+                        `Move-out date must be between ${earliest} and ${latest}`,
+                        (APICodes.MOVE_OUT_DATE_OUT_OF_RANGE || APICodes.APPROVAL_NOT_POSSIBLE).code,
+                    );
+                }
+            } catch (e) {
+                if (e instanceof ApiError) throw e;
+                const today = new Date();
+                const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                const maxDate = new Date(startOfToday);
+                maxDate.setMonth(maxDate.getMonth() + 1);
+                const earliest = startOfToday.toISOString().slice(0, 10);
+                const latest = maxDate.toISOString().slice(0, 10);
+                throw new ApiError(
+                    httpStatus.BAD_REQUEST,
+                    `Move-out date must be between ${earliest} and ${latest}`,
+                    (APICodes.MOVE_OUT_DATE_OUT_OF_RANGE || APICodes.APPROVAL_NOT_POSSIBLE).code,
+                );
             }
 
             const occupantUserId = Number(userId);
@@ -1192,6 +1331,56 @@ export class MoveOutService {
                     }
                 }
             } catch (e) { logger.error(`Error generating/sending Move-Out permit (admin create): ${e}`); }
+
+            // Push Move-Out approval to Salesforce Resident API for admin-created approval
+            try {
+                const userRec = await Users.getRepository().findOne({ where: { id: Number(userId) } });
+                const unitRec = await Units.getRepository().createQueryBuilder('u')
+                    .select(['u.id', 'u.unitName', 'u.unitNumber', 'u.salesForceId'])
+                    .where('u.id = :id', { id: targetUnitId })
+                    .getOne();
+
+                const cc = (userRec?.dialCode?.dialCode || '').toString();
+                const normCC = cc ? (cc.startsWith('+') ? cc : `+${cc}`) : null;
+                const altCC = null;
+
+                const typeOfTenantMap: Record<string, string> = {
+                    owner: 'HomeOwner',
+                    tenant: 'Tenant',
+                    hho: 'HHO',
+                    company: 'Company',
+                };
+
+                const payload = {
+                    salutation: userRec?.honorific || null,
+                    firstName: userRec?.firstName || null,
+                    lastName: userRec?.lastName || null,
+                    primaryMobileCountryCode: normCC,
+                    primaryMobileNumber: userRec?.mobile || null,
+                    alternativeMobileCountryCode: altCC,
+                    alternativeMobileNumber: userRec?.alternativeMobile || null,
+                    primaryEmail: userRec?.email || null,
+                    alternateEmail: userRec?.alternativeEmail || null,
+                    unitId: unitRec?.salesForceId || '',
+                    nationality: userRec?.nationality?.name || null,
+                    typeOfTenant: typeOfTenantMap[(userRoleSlug || '').toLowerCase()] || null,
+                    moveInDate: null,
+                    moveOutDate: moveOutDate ? new Date(moveOutDate).toISOString().slice(0, 10) : null,
+                    ejariStartDate: null,
+                    ejariEndDate: null,
+                    requestRaisedDate: null,
+                    dtcmStartDate: null,
+                    dtcmEndDate: null,
+                    requestApprovedDate: new Date().toISOString().slice(0, 10),
+                    request_type: 'move-out' as const,
+                    status: 'approve',
+                    mobile_app_reference: moveOutRequest.moveOutRequestNo,
+                };
+
+                await this.commonService.sendResidentToSalesforce(payload);
+            } catch (e) {
+                logger.error(`Salesforce push (admin-create move-out approval) failed: ${e}`);
+            }
             return moveOutRequest;
         } catch (error) {
             logger.error(`Error in createMoveOutRequestByAdmin : ${JSON.stringify(error)}`);
@@ -1316,7 +1505,7 @@ export class MoveOutService {
             .andWhere("arrUser.id = :userId", { userId })
             .andWhere("arrUnit.id = :unitId", { unitId })
             .andWhere("arr.moveInRequest = :moveInRequestId", { moveInRequestId: moveInRequest.id })
-            .andWhere("arr.status = :status", { status: MOVE_REQUEST_STATUS.APPROVED })
+            .andWhere("arr.status = :status", { status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED })
             .orderBy("arr.updatedAt", "DESC")
             .getOne();
 

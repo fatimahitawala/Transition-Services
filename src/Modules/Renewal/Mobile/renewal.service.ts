@@ -12,7 +12,7 @@ import { Users } from '../../../Entities/Users.entity';
 import { Units } from '../../../Entities/Units.entity';
 import { OccupancyRequestTemplates } from '../../../Entities/OccupancyRequestTemplates.entity';
 import { FileUploads } from '../../../Entities/FileUploads.entity';
-import { ACCOUNT_RENEWAL_USER_TYPES, MOVE_REQUEST_STATUS, MOVE_IN_AND_OUT_REQUEST_STATUS, TransitionRequestActionByTypes, TRANSITION_DOCUMENT_TYPES, OCUPANCY_REQUEST_TYPES } from '../../../Entities/EntityTypes';
+import { ACCOUNT_RENEWAL_USER_TYPES, MOVE_IN_AND_OUT_REQUEST_STATUS, TransitionRequestActionByTypes, TRANSITION_DOCUMENT_TYPES, OCUPANCY_REQUEST_TYPES } from '../../../Entities/EntityTypes';
 import ApiError from '../../../Common/Utils/ApiError';
 import { APICodes } from '../../../Common/Constants';
 import { logger } from '../../../Common/Utils/logger';
@@ -23,7 +23,7 @@ import { uploadFile } from '../../../Common/Utils/azureBlobStorage';
 import { Not, In, IsNull } from 'typeorm';
 
 export class RenewalService {
-  
+
   /**
    * Get all renewal requests for mobile user
    */
@@ -34,7 +34,7 @@ export class RenewalService {
       // Debug logging
       logger.debug(`getMobileRenewal query params: ${JSON.stringify(query)}, userId: ${user?.id}`);
       unitIds = unitIds ? unitIds.split(",").filter((e: any) => e) : [];
-      
+
       let getRenewalList = AccountRenewalRequests.getRepository()
         .createQueryBuilder('arr')
         .leftJoinAndSelect('arr.unit', 'u')
@@ -237,7 +237,7 @@ export class RenewalService {
       where: {
         unit: { id: unitId },
         user: { id: userId },
-        status: MOVE_REQUEST_STATUS.APPROVED,
+        status: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED,
         isActive: true
       }
     });
@@ -339,7 +339,7 @@ export class RenewalService {
 
     for (const docType of documentTypes) {
       const fileArray = Array.isArray(files[docType]) ? files[docType] : [files[docType]];
-      
+
       for (const file of fileArray) {
         try {
           // Upload to Azure Blob Storage
@@ -354,7 +354,7 @@ export class RenewalService {
           docRecord.isActive = true;
           docRecord.createdBy = userId;
           docRecord.updatedBy = userId;
-          
+
           await AccountRenewalRequestDocuments.save(docRecord);
 
           logger.info(`Document uploaded: ${docType} for renewal request ${renewalRequestId}`);
@@ -375,12 +375,12 @@ export class RenewalService {
    */
   async createTenantRenewal(body: any, user: any) {
     try {
-      const { 
-        unitId, 
-        tenancyContractEndDate, 
-        adults, 
-        children, 
-        householdStaffs, 
+      const {
+        unitId,
+        tenancyContractEndDate,
+        adults,
+        children,
+        householdStaffs,
         pets,
         determinationComments
       } = body;
@@ -407,7 +407,7 @@ export class RenewalService {
         renewalRequest.requestType = ACCOUNT_RENEWAL_USER_TYPES.TENANT;
         renewalRequest.user = { id: user.id } as any;
         renewalRequest.unit = { id: unitId } as any;
-        renewalRequest.status = MOVE_REQUEST_STATUS.OPEN; // Mobile requests need approval
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN; // Mobile requests need approval
         renewalRequest.moveInDate = tenancyContractEndDate; // Store end date as moveInDate
         renewalRequest.createdBy = user.id;
         renewalRequest.updatedBy = user.id;
@@ -434,7 +434,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = savedRequest; // Use entity instance
         log.requestType = ACCOUNT_RENEWAL_USER_TYPES.TENANT;
-        log.status = MOVE_REQUEST_STATUS.OPEN;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = "";
@@ -472,8 +472,8 @@ export class RenewalService {
       }
       // Safely extract error code without accessing potentially circular object properties
       const errorCode = typeof error?.code === 'string' ? error.code : null;
-      const apiCode = errorCode ? 
-        Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR 
+      const apiCode = errorCode ?
+        Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR
         : APICodes.UNKNOWN_ERROR;
       // Use original error message if available, otherwise use apiCode message
       const errorMessage = error?.message || apiCode?.message || 'Unknown error occurred';
@@ -486,8 +486,8 @@ export class RenewalService {
    */
   async createHhoOwnerRenewal(body: any, user: any) {
     try {
-      const { 
-        unitId, 
+      const {
+        unitId,
         dtcmPermitEndDate
       } = body;
 
@@ -513,7 +513,7 @@ export class RenewalService {
         renewalRequest.requestType = ACCOUNT_RENEWAL_USER_TYPES.HHO_OWNER;
         renewalRequest.user = { id: user.id } as any;
         renewalRequest.unit = { id: unitId } as any;
-        renewalRequest.status = MOVE_REQUEST_STATUS.OPEN; // Mobile requests need approval
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN; // Mobile requests need approval
         renewalRequest.moveInDate = dtcmPermitEndDate; // Store end date as moveInDate
         renewalRequest.createdBy = user.id;
         renewalRequest.updatedBy = user.id;
@@ -535,7 +535,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = savedRequest; // Use entity instance
         log.requestType = ACCOUNT_RENEWAL_USER_TYPES.HHO_OWNER;
-        log.status = MOVE_REQUEST_STATUS.OPEN;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = "";
@@ -573,8 +573,8 @@ export class RenewalService {
       }
       // Safely extract error code without accessing potentially circular object properties
       const errorCode = typeof error?.code === 'string' ? error.code : null;
-      const apiCode = errorCode ? 
-        Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR 
+      const apiCode = errorCode ?
+        Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR
         : APICodes.UNKNOWN_ERROR;
       // Use original error message if available, otherwise use apiCode message
       const errorMessage = error?.message || apiCode?.message || 'Unknown error occurred';
@@ -587,10 +587,10 @@ export class RenewalService {
    */
   async createHhcCompanyRenewal(body: any, user: any) {
     try {
-      const { 
-        unitId, 
-        leaseContractEndDate, 
-        dtcmPermitEndDate, 
+      const {
+        unitId,
+        leaseContractEndDate,
+        dtcmPermitEndDate,
         permitExpiry
       } = body;
 
@@ -616,7 +616,7 @@ export class RenewalService {
         renewalRequest.requestType = ACCOUNT_RENEWAL_USER_TYPES.HHO_COMPANY;
         renewalRequest.user = { id: user.id } as any;
         renewalRequest.unit = { id: unitId } as any;
-        renewalRequest.status = MOVE_REQUEST_STATUS.OPEN; // Mobile requests need approval
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN; // Mobile requests need approval
         renewalRequest.moveInDate = leaseContractEndDate; // Store end date as moveInDate
         renewalRequest.createdBy = user.id;
         renewalRequest.updatedBy = user.id;
@@ -640,7 +640,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = savedRequest; // Use entity instance
         log.requestType = ACCOUNT_RENEWAL_USER_TYPES.HHO_COMPANY;
-        log.status = MOVE_REQUEST_STATUS.OPEN;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = "";
@@ -678,8 +678,8 @@ export class RenewalService {
       }
       // Safely extract error code without accessing potentially circular object properties
       const errorCode = typeof error?.code === 'string' ? error.code : null;
-      const apiCode = errorCode ? 
-        Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR 
+      const apiCode = errorCode ?
+        Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR
         : APICodes.UNKNOWN_ERROR;
       // Use original error message if available, otherwise use apiCode message
       const errorMessage = error?.message || apiCode?.message || 'Unknown error occurred';
@@ -708,7 +708,7 @@ export class RenewalService {
         }
 
         // Mobile users can only edit in RFI_PENDING status (as per BRD)
-        if (renewalRequest.status !== MOVE_REQUEST_STATUS.RFI_PENDING) {
+        if (renewalRequest.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
             APICodes.RENEWAL_REQUEST_NOT_EDITABLE.message,
@@ -738,7 +738,7 @@ export class RenewalService {
         if (body.tenancyContractEndDate) {
           renewalRequest.moveInDate = body.tenancyContractEndDate;
         }
-        renewalRequest.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED; // Change to RFI_SUBMITTED
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED; // Change to RFI_SUBMITTED
         renewalRequest.updatedBy = user.id;
         await renewalRequest.save();
 
@@ -751,7 +751,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = renewalRequest;
         log.requestType = renewalRequest.requestType;
-        log.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = JSON.stringify(body);
@@ -802,7 +802,7 @@ export class RenewalService {
           );
         }
 
-        if (renewalRequest.status !== MOVE_REQUEST_STATUS.RFI_PENDING) {
+        if (renewalRequest.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
             APICodes.RENEWAL_REQUEST_NOT_EDITABLE.message,
@@ -825,7 +825,7 @@ export class RenewalService {
         if (body.dtcmPermitEndDate) {
           renewalRequest.moveInDate = body.dtcmPermitEndDate;
         }
-        renewalRequest.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         renewalRequest.updatedBy = user.id;
         await renewalRequest.save();
 
@@ -838,7 +838,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = renewalRequest;
         log.requestType = renewalRequest.requestType;
-        log.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = JSON.stringify(body);
@@ -869,8 +869,8 @@ export class RenewalService {
         }
         // Safely extract error code without accessing potentially circular object properties
         const errorCode = typeof error?.code === 'string' ? error.code : null;
-        const apiCode = errorCode ? 
-          Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR 
+        const apiCode = errorCode ?
+          Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR
           : APICodes.UNKNOWN_ERROR;
         throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
       }
@@ -897,7 +897,7 @@ export class RenewalService {
           );
         }
 
-        if (renewalRequest.status !== MOVE_REQUEST_STATUS.RFI_PENDING) {
+        if (renewalRequest.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
             APICodes.RENEWAL_REQUEST_NOT_EDITABLE.message,
@@ -922,7 +922,7 @@ export class RenewalService {
         if (body.leaseContractEndDate) {
           renewalRequest.moveInDate = body.leaseContractEndDate;
         }
-        renewalRequest.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         renewalRequest.updatedBy = user.id;
         await renewalRequest.save();
 
@@ -935,7 +935,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = renewalRequest;
         log.requestType = renewalRequest.requestType;
-        log.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = JSON.stringify(body);
@@ -966,8 +966,8 @@ export class RenewalService {
         }
         // Safely extract error code without accessing potentially circular object properties
         const errorCode = typeof error?.code === 'string' ? error.code : null;
-        const apiCode = errorCode ? 
-          Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR 
+        const apiCode = errorCode ?
+          Object.values(APICodes as Record<string, any>).find((item: any) => item.code === errorCode) || APICodes.UNKNOWN_ERROR
           : APICodes.UNKNOWN_ERROR;
         throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, apiCode?.message || 'Unknown error occurred', apiCode?.code || 'EC001');
       }
@@ -981,7 +981,7 @@ export class RenewalService {
     return executeInTransaction(async (queryRunner: any) => {
       try {
         const { reason, comments } = body;
-        
+
         logger.info(`RENEWAL | CANCEL REQUEST | MOBILE | REQUEST: ${requestId} | USER: ${user.id}`);
 
         const renewalRequest = await AccountRenewalRequests.findOne({
@@ -999,9 +999,9 @@ export class RenewalService {
 
         // Users can only cancel requests that are in certain statuses
         const cancellableStatuses = [
-          MOVE_REQUEST_STATUS.OPEN,
-          MOVE_REQUEST_STATUS.RFI_PENDING,
-          MOVE_REQUEST_STATUS.RFI_SUBMITTED
+          MOVE_IN_AND_OUT_REQUEST_STATUS.OPEN,
+          MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING,
+          MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED
         ];
 
         if (!cancellableStatuses.includes(renewalRequest.status)) {
@@ -1013,7 +1013,7 @@ export class RenewalService {
         }
 
         // Update status to USER_CANCELLED
-        renewalRequest.status = MOVE_REQUEST_STATUS.USER_CANCELLED;
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED;
         renewalRequest.comments = `${comments || ''}`.trim();
         renewalRequest.updatedBy = user.id;
         await renewalRequest.save();
@@ -1022,7 +1022,7 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = renewalRequest;
         log.requestType = renewalRequest.requestType;
-        log.status = MOVE_REQUEST_STATUS.USER_CANCELLED;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.USER_CANCELLED;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = `User Cancellation Reason: ${reason}`;
@@ -1062,7 +1062,7 @@ export class RenewalService {
     return executeInTransaction(async (queryRunner: any) => {
       try {
         const { comments, additionalInfo } = body;
-        
+
         logger.info(`RENEWAL | SUBMIT RFI | MOBILE | REQUEST: ${requestId} | USER: ${user.id}`);
 
         const renewalRequest = await AccountRenewalRequests.findOne({
@@ -1079,7 +1079,7 @@ export class RenewalService {
         }
 
         // Can only submit RFI if status is RFI_PENDING
-        if (renewalRequest.status !== MOVE_REQUEST_STATUS.RFI_PENDING) {
+        if (renewalRequest.status !== MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
             'Renewal request is not in RFI pending status. Only requests with RFI pending status can be submitted.',
@@ -1088,7 +1088,7 @@ export class RenewalService {
         }
 
         // Update status to RFI_SUBMITTED
-        renewalRequest.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        renewalRequest.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         renewalRequest.comments = `${comments || ''}`.trim();
         renewalRequest.additionalInfo = additionalInfo || '';
         renewalRequest.updatedBy = user.id;
@@ -1098,14 +1098,14 @@ export class RenewalService {
         const log = new AccountRenewalRequestLogs();
         log.accountRenewalRequest = renewalRequest;
         log.requestType = renewalRequest.requestType;
-        log.status = MOVE_REQUEST_STATUS.RFI_SUBMITTED;
+        log.status = MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED;
         log.actionBy = TransitionRequestActionByTypes.USER;
         log.user = { id: user.id } as any;
         log.changes = JSON.stringify({
           comments: comments,
           additionalInfo: additionalInfo,
-          previousStatus: MOVE_REQUEST_STATUS.RFI_PENDING,
-          newStatus: MOVE_REQUEST_STATUS.RFI_SUBMITTED
+          previousStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_PENDING,
+          newStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.RFI_SUBMITTED
         });
         log.comments = 'RFI response submitted by customer';
         log.details = JSON.stringify({
@@ -1168,7 +1168,7 @@ export class RenewalService {
 
         const uploadedTypes = Object.keys(files || {});
         const invalidTypes = uploadedTypes.filter(type => !allowedDocumentTypes.includes(type as TRANSITION_DOCUMENT_TYPES));
-        
+
         if (invalidTypes.length > 0) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
@@ -1186,7 +1186,7 @@ export class RenewalService {
 
         const uploadedTypes = Object.keys(files || {});
         const invalidTypes = uploadedTypes.filter(type => !allowedDocumentTypes.includes(type as TRANSITION_DOCUMENT_TYPES));
-        
+
         if (invalidTypes.length > 0) {
           throw new ApiError(
             httpStatus.BAD_REQUEST,
@@ -1212,7 +1212,7 @@ export class RenewalService {
 
         for (const docType of documentTypes) {
           const fileArray = Array.isArray(files[docType]) ? files[docType] : [files[docType]];
-          
+
           for (const file of fileArray) {
             try {
               // Upload to Azure Blob Storage
@@ -1237,7 +1237,7 @@ export class RenewalService {
               docRecord.isActive = true;
 
               const savedDoc = await docRecord.save();
-              
+
               uploadedDocuments.push({
                 id: savedDoc.id,
                 documentType: docType,

@@ -23,9 +23,12 @@ import { OccupancyRequestWelcomePack } from "../../../Entities/OccupancyRequestW
 import { OccupancyRequestTemplates } from "../../../Entities/OccupancyRequestTemplates.entity";
 import { OccupancyRequestEmailRecipients } from "../../../Entities/OccupancyRequestEmailRecipients.entity";
 import { IsNull } from "typeorm";
+import { Users } from "../../../Entities/Users.entity";
+import { CommonService } from "../../Common/common.service";
 
 export class MoveInService {
   private emailService: EmailService;
+  private commonService = new CommonService();
 
   constructor() {
     this.emailService = new EmailService();
@@ -42,10 +45,11 @@ export class MoveInService {
       // Get unit information with community hierarchy
       const unit = await Units.getRepository()
         .createQueryBuilder('unit')
+        .addSelect('unit.isActive')
         .leftJoinAndSelect('unit.masterCommunity', 'masterCommunity')
         .leftJoinAndSelect('unit.community', 'community')
         .leftJoinAndSelect('unit.tower', 'tower')
-        .where('unit.id = :unitId AND unit.isActive = true', { unitId })
+        .where('unit.id = :unitId', { unitId })
         .getOne();
 
       if (!unit) {
@@ -53,6 +57,15 @@ export class MoveInService {
           httpStatus.NOT_FOUND,
           'Unit not found',
           'UNIT_NOT_FOUND'
+        );
+      }
+
+      // Check if unit is active
+      if (!unit.isActive) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Unit ${unit.unitNumber} is not active`,
+          'EC223'
         );
       }
 
@@ -228,10 +241,20 @@ export class MoveInService {
 
       // Business Logic Validations for Owner, Tenant, HHO-Unit, and HHO-Company Move-in Requests
       if (requestType === MOVE_IN_USER_TYPES.OWNER || requestType === MOVE_IN_USER_TYPES.TENANT || requestType === MOVE_IN_USER_TYPES.HHO_OWNER || requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
-        // 1. Allow multiple OPEN requests; block only if an APPROVED request already exists
+        // 1. Check MIP template availability FIRST before other validations
+        const mipCheck = await this.checkMIPAndWelcomePack(Number(unitId));
+        if (!mipCheck.hasMIP) {
+          throw new ApiError(
+            httpStatus.BAD_REQUEST,
+            APICodes.MIP_NOT_CONFIGURED.message,
+            APICodes.MIP_NOT_CONFIGURED.code
+          );
+        }
+
+        // 2. Allow multiple OPEN requests; block only if an APPROVED request already exists
         await this.checkUnitAvailabilityForNewRequest(Number(unitId));
 
-        // 2. Overlap: allow overlaps for OPEN/PENDING; only block if an APPROVED request exists
+        // 3. Overlap: allow overlaps for OPEN/PENDING; only block if an APPROVED request exists
         const overlapCheck = await this.checkOverlappingRequests(Number(unitId), new Date(moveInDate));
         if (overlapCheck.hasOverlap) {
           throw new ApiError(
@@ -414,6 +437,66 @@ export class MoveInService {
         logger.error(`createdMaster is null/undefined - no email will be sent`);
       }
 
+      // Push to Salesforce for admin-created auto-approved move-ins
+      try {
+        if (createdMaster && [
+          MOVE_IN_USER_TYPES.OWNER,
+          MOVE_IN_USER_TYPES.TENANT,
+          MOVE_IN_USER_TYPES.HHO_OWNER,
+          MOVE_IN_USER_TYPES.HHO_COMPANY,
+        ].includes(requestType as any) && createdMaster.status === MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED) {
+          const userRec = await Users.getRepository().findOne({ where: { id: (createdMaster as any)?.user?.id || userId } });
+          const unitRec = await Units.getRepository().createQueryBuilder('u')
+            .select(['u.id', 'u.unitName', 'u.unitNumber', 'u.salesForceId'])
+            .where('u.id = :id', { id: unitId })
+            .getOne();
+
+          const cc = (userRec?.dialCode?.dialCode || '').toString();
+          const normCC = cc ? (cc.startsWith('+') ? cc : `+${cc}`) : null;
+
+          const typeOfTenantMap: Record<string, string> = {
+            owner: 'HomeOwner',
+            tenant: 'Tenant',
+            hho_owner: 'HHO',
+            hho_company: 'Company',
+            hho: 'HHO',
+            company: 'Company',
+          };
+
+          const reqTypeKey = String(requestType || '').toLowerCase();
+
+          const payload = {
+            salutation: (userRec as any)?.honorific || null,
+            firstName: (userRec as any)?.firstName || null,
+            lastName: (userRec as any)?.lastName || null,
+            primaryMobileCountryCode: normCC,
+            primaryMobileNumber: (userRec as any)?.mobile || null,
+            alternativeMobileCountryCode: null,
+            alternativeMobileNumber: (userRec as any)?.alternativeMobile || null,
+            primaryEmail: (userRec as any)?.email || null,
+            alternateEmail: (userRec as any)?.alternativeEmail || null,
+            unitId: (unitRec as any)?.salesForceId || '',
+            nationality: (userRec as any)?.nationality?.name || (userRec as any)?.nationality || null,
+            typeOfTenant: typeOfTenantMap[reqTypeKey] || null,
+            moveInDate: (createdMaster as any)?.moveInDate ? new Date((createdMaster as any).moveInDate).toISOString().slice(0, 10) : null,
+            moveOutDate: null,
+            ejariStartDate: (createdDetails as any)?.tenancyContractStartDate ? new Date((createdDetails as any).tenancyContractStartDate).toISOString().slice(0, 10) : null,
+            ejariEndDate: (createdDetails as any)?.tenancyContractEndDate ? new Date((createdDetails as any).tenancyContractEndDate).toISOString().slice(0, 10) : null,
+            requestRaisedDate: (createdMaster as any)?.createdAt ? new Date((createdMaster as any).createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+            dtcmStartDate: (createdDetails as any)?.dtcmStartDate ? new Date((createdDetails as any).dtcmStartDate).toISOString().slice(0, 10) : null,
+            dtcmEndDate: (createdDetails as any)?.dtcmExpiryDate ? new Date((createdDetails as any).dtcmExpiryDate).toISOString().slice(0, 10) : null,
+            requestApprovedDate: new Date().toISOString().slice(0, 10),
+            request_type: 'move-in' as const,
+            status: 'approve',
+            mobile_app_reference: (createdMaster as any)?.moveInRequestNo,
+          };
+
+          await this.commonService.sendResidentToSalesforce(payload);
+        }
+      } catch (e) {
+        logger.error(`Salesforce push (admin-create move-in approval) failed: ${e}`);
+      }
+
       logger.info(`MOVE-IN CREATED BY ADMIN: ${createdMaster?.moveInRequestNo} for unit ${unitId} by admin ${user?.id}`);
 
       const response = createdMaster as MoveInRequests;
@@ -446,6 +529,7 @@ export class MoveInService {
     try {
       return await Units.getRepository()
         .createQueryBuilder("ut")
+        .addSelect("ut.isActive")
         .innerJoinAndSelect("ut.masterCommunity", "mc", "mc.isActive = 1")
         .innerJoinAndSelect("ut.community", "c", "c.isActive = 1")
         .innerJoinAndSelect("ut.tower", "t", "t.isActive = 1")
@@ -597,6 +681,7 @@ export class MoveInService {
         entity.name = details.name; // Now map directly to the name field
         entity.companyName = details.company;
         entity.companyEmail = details.companyEmail;
+        entity.countryCode = details.countryCode;
         entity.operatorOfficeNumber = details.operatorOfficeNumber;
         entity.tradeLicenseNumber = details.tradeLicenseNumber;
         entity.tradeLicenseExpiryDate = details.tradeLicenseExpiryDate;
@@ -777,6 +862,7 @@ export class MoveInService {
         name: rest.name,
         company: rest.company, // Keep as 'company' since createDetailsRecord expects this field name
         companyEmail: rest.companyEmail,
+        countryCode: rest.countryCode,
         operatorOfficeNumber: rest.operatorOfficeNumber,
         tradeLicenseNumber: rest.tradeLicenseNumber,
         tradeLicenseExpiryDate: rest.tradeLicenseExpiryDate,
@@ -1308,6 +1394,8 @@ export class MoveInService {
   // Check if unit is available for a new move-in request
   private async checkUnitAvailabilityForNewRequest(unitId: number): Promise<boolean> {
     try {
+      logger.info(`[CHECK_UNIT_AVAILABILITY] Starting validation for unitId: ${unitId}`);
+      
       // Check unit status conditions
       const unit = await Units.getRepository()
         .createQueryBuilder("unit")
@@ -1315,8 +1403,10 @@ export class MoveInService {
         .where("unit.id = :unitId", { unitId })
         .getOne();
 
+      logger.info(`[CHECK_UNIT_AVAILABILITY] Unit fetched - unitId: ${unitId}, found: ${!!unit}`);
+
       if (!unit) {
-        logger.error(`Unit not found: ${unitId}`);
+        logger.error(`[CHECK_UNIT_AVAILABILITY] Unit not found: ${unitId}`);
         throw new ApiError(
           httpStatus.NOT_FOUND,
           `Unit ${unitId} not found`,
@@ -1324,37 +1414,51 @@ export class MoveInService {
         );
       }
 
+      // Log all unit properties
+      logger.info(`[CHECK_UNIT_AVAILABILITY] Unit details - unitId: ${unitId}, unitNumber: ${unit.unitNumber}, unitName: ${unit.unitName}`);
+      logger.info(`[CHECK_UNIT_AVAILABILITY] Unit status values - isActive: ${unit.isActive} (type: ${typeof unit.isActive}), availabilityStatus: '${unit.availabilityStatus}', occupancyStatus: '${unit.occupancyStatus}'`);
+      
       // Validate unit status conditions
       logger.debug(`Unit ${unitId} debug - isActive: ${unit.isActive}, type: ${typeof unit.isActive}, availabilityStatus: ${unit.availabilityStatus}, occupancyStatus: ${unit.occupancyStatus}`);
       
+      // Check 1: isActive
+      logger.info(`[CHECK_UNIT_AVAILABILITY] Checking isActive - Value: ${unit.isActive}, Expected: true`);
       if (!unit.isActive) {
-        logger.error(`Unit ${unitId} is not active - Value: ${unit.isActive}, Type: ${typeof unit.isActive}`);
+        logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) is not active - Value: ${unit.isActive}, Type: ${typeof unit.isActive}`);
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          `Unit ${unitId} is not active`,
-          "EC223"
+          `Unit ${unit.unitNumber} not available`,
+          APICodes.UNIT_NOT_VACANT.code
         );
       }
+      logger.info(`[CHECK_UNIT_AVAILABILITY] ✓ isActive check passed - Value: ${unit.isActive}`);
 
+      // Check 2: availabilityStatus
+      logger.info(`[CHECK_UNIT_AVAILABILITY] Checking availabilityStatus - Value: '${unit.availabilityStatus}', Expected: 'Available'`);
       if (unit.availabilityStatus !== 'Available') {
-        logger.error(`Unit ${unitId} availability status is not 'Available': ${unit.availabilityStatus}`);
+        logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) availability status is not 'Available': '${unit.availabilityStatus}'`);
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          `Unit ${unitId} is not available for move-in. Status: ${unit.availabilityStatus}`,
-          "EC224"
+          `Unit ${unit.unitNumber} not available`,
+          APICodes.UNIT_NOT_VACANT.code
         );
       }
+      logger.info(`[CHECK_UNIT_AVAILABILITY] ✓ availabilityStatus check passed - Value: '${unit.availabilityStatus}'`);
 
+      // Check 3: occupancyStatus
+      logger.info(`[CHECK_UNIT_AVAILABILITY] Checking occupancyStatus - Value: '${unit.occupancyStatus}', Expected: 'vacant'`);
       if (unit.occupancyStatus !== 'vacant') {
-        logger.error(`Unit ${unitId} occupancy status is not 'vacant': ${unit.occupancyStatus}`);
+        logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) occupancy status is not 'vacant': '${unit.occupancyStatus}'`);
         throw new ApiError(
           httpStatus.BAD_REQUEST,
-          `Unit ${unitId} is not vacant. Current occupancy: ${unit.occupancyStatus}`,
-          "EC225"
+          `Unit ${unit.unitNumber} not available`,
+          APICodes.UNIT_NOT_VACANT.code
         );
       }
+      logger.info(`[CHECK_UNIT_AVAILABILITY] ✓ occupancyStatus check passed - Value: '${unit.occupancyStatus}'`);
 
-      // Check for existing approved request
+      // Check 4: existing approved request
+      logger.info(`[CHECK_UNIT_AVAILABILITY] Checking for existing approved move-in requests for unitId: ${unitId}`);
       const existingApprovedRequest = await MoveInRequests.getRepository()
         .createQueryBuilder("mir")
         .where("mir.unit.id = :unitId", { unitId })
@@ -1362,15 +1466,19 @@ export class MoveInService {
         .andWhere("mir.isActive = 1")
         .getOne();
 
+      logger.info(`[CHECK_UNIT_AVAILABILITY] Existing approved request check - Found: ${!!existingApprovedRequest}, RequestId: ${existingApprovedRequest?.id || 'N/A'}`);
+
       if (existingApprovedRequest) {
-        logger.error(`Unit ${unitId} already has an approved move-in request: ${existingApprovedRequest.id}`);
+        logger.error(`[CHECK_UNIT_AVAILABILITY] VALIDATION FAILED - Unit ${unit.unitNumber} (ID: ${unitId}) already has an approved move-in request: ${existingApprovedRequest.id}, RequestNo: ${existingApprovedRequest.moveInRequestNo}`);
         throw new ApiError(
           httpStatus.CONFLICT,
-          APICodes.UNIT_NOT_VACANT.message,
+          `Unit ${unit.unitNumber} not available`,
           APICodes.UNIT_NOT_VACANT.code
         );
       }
+      logger.info(`[CHECK_UNIT_AVAILABILITY] ✓ No existing approved requests found`);
 
+      logger.info(`[CHECK_UNIT_AVAILABILITY] ✓✓✓ ALL VALIDATIONS PASSED for unitId: ${unitId}`);
       return true;
     } catch (error: any) {
       // If it's already an ApiError (our specific validation errors), re-throw it
@@ -1621,6 +1729,52 @@ export class MoveInService {
     }
   }
 
+  // Collect Ejari/DTCM dates from corresponding detail tables for Salesforce payload
+  private async getMoveInDatesForSalesforce(
+    requestId: number,
+    requestType: MOVE_IN_USER_TYPES
+  ): Promise<{ ejariStartDate: string | null; ejariEndDate: string | null; dtcmStartDate: string | null; dtcmEndDate: string | null }> {
+    const toDate = (d?: Date | string | null) => d ? new Date(d as any).toISOString().slice(0, 10) : null;
+
+    try {
+      if (requestType === MOVE_IN_USER_TYPES.TENANT) {
+        const row = await MoveInRequestDetailsTenant.getRepository()
+          .createQueryBuilder('t')
+          .leftJoin('t.moveInRequest', 'mir')
+          .select(['t.tenancyContractStartDate', 't.tenancyContractEndDate'])
+          .where('mir.id = :requestId', { requestId })
+          .getOne();
+        return {
+          ejariStartDate: toDate((row as any)?.tenancyContractStartDate || null),
+          ejariEndDate: toDate((row as any)?.tenancyContractEndDate || null),
+          dtcmStartDate: null,
+          dtcmEndDate: null,
+        };
+      }
+
+      if (requestType === MOVE_IN_USER_TYPES.HHO_COMPANY) {
+        const row = await MoveInRequestDetailsHhcCompany.getRepository()
+          .createQueryBuilder('c')
+          .leftJoin('c.moveInRequest', 'mir')
+          .select(['c.dtcmStartDate', 'c.dtcmExpiryDate'])
+          .where('mir.id = :requestId', { requestId })
+          .getOne();
+        return {
+          ejariStartDate: null,
+          ejariEndDate: null,
+          dtcmStartDate: toDate((row as any)?.dtcmStartDate || null),
+          dtcmEndDate: toDate((row as any)?.dtcmExpiryDate || null),
+        };
+      }
+
+      // OWNER and HHO_OWNER flows do not carry Ejari/DTCM dates
+      return { ejariStartDate: null, ejariEndDate: null, dtcmStartDate: null, dtcmEndDate: null };
+    } catch (e) {
+      logger.error(`Failed to read move-in detail dates for Salesforce payload: ${e}`);
+      return { ejariStartDate: null, ejariEndDate: null, dtcmStartDate: null, dtcmEndDate: null };
+    }
+  }
+
   // ==================== STATUS MANAGEMENT METHODS ====================
 
   /**
@@ -1670,6 +1824,16 @@ export class MoveInService {
         );
       }
 
+      // Check MIP template availability FIRST before other validations
+      const mipCheck = await this.checkMIPAndWelcomePack(moveInRequest.unit.id);
+      if (!mipCheck.hasMIP) {
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          APICodes.MIP_NOT_CONFIGURED.message,
+          APICodes.MIP_NOT_CONFIGURED.code
+        );
+      }
+
       // Validate unit availability status before approval
       const isUnitAvailable = await this.checkUnitAvailabilityForNewRequest(moveInRequest.unit.id);
       if (!isUnitAvailable) {
@@ -1687,16 +1851,6 @@ export class MoveInService {
           httpStatus.CONFLICT,
           APICodes.OVERLAPPING_REQUESTS.message,
           APICodes.OVERLAPPING_REQUESTS.code
-        );
-      }
-
-      // Check MIP template availability
-      const mipCheck = await this.checkMIPAndWelcomePack(moveInRequest.unit.id);
-      if (!mipCheck.hasMIP) {
-        throw new ApiError(
-          httpStatus.BAD_REQUEST,
-          APICodes.MIP_NOT_CONFIGURED.message,
-          APICodes.MIP_NOT_CONFIGURED.code
         );
       }
 
@@ -1789,6 +1943,56 @@ export class MoveInService {
 
       // Send approval email notifications
       await this.sendApprovalNotifications(requestId, moveInRequest.moveInRequestNo);
+
+      // Push to Salesforce on approval
+      try {
+        const userRec = moveInRequest.user || (await Users.getRepository().findOne({ where: { id: (moveInRequest as any)?.user?.id } }));
+        const unitRec = moveInRequest.unit || (await Units.getRepository().findOne({ where: { id: (moveInRequest as any)?.unit?.id } }));
+        const { ejariStartDate, ejariEndDate, dtcmStartDate, dtcmEndDate } = await this.getMoveInDatesForSalesforce(requestId, moveInRequest.requestType);
+
+        const cc = (userRec?.dialCode?.dialCode || '').toString();
+        const normCC = cc ? (cc.startsWith('+') ? cc : `+${cc}`) : null;
+
+        const typeOfTenantMap: Record<string, string> = {
+          owner: 'HomeOwner',
+          tenant: 'Tenant',
+          hho_owner: 'HHO',
+          hho_company: 'Company',
+          hho: 'HHO',
+          company: 'Company',
+        };
+        const reqTypeKey = String(moveInRequest.requestType || '').toLowerCase();
+
+        const payload = {
+          salutation: (userRec as any)?.honorific || null,
+          firstName: (userRec as any)?.firstName || null,
+          lastName: (userRec as any)?.lastName || null,
+          primaryMobileCountryCode: normCC,
+          primaryMobileNumber: (userRec as any)?.mobile || null,
+          alternativeMobileCountryCode: null,
+          alternativeMobileNumber: (userRec as any)?.alternativeMobile || null,
+          primaryEmail: (userRec as any)?.email || null,
+          alternateEmail: (userRec as any)?.alternativeEmail || null,
+          unitId: (unitRec as any)?.salesForceId || '',
+          nationality: (userRec as any)?.nationality?.name || (userRec as any)?.nationality || null,
+          typeOfTenant: typeOfTenantMap[reqTypeKey] || null,
+          moveInDate: moveInRequest.moveInDate ? new Date(moveInRequest.moveInDate).toISOString().slice(0, 10) : null,
+          moveOutDate: null,
+          ejariStartDate,
+          ejariEndDate,
+          requestRaisedDate: (moveInRequest as any)?.createdAt ? new Date((moveInRequest as any).createdAt).toISOString().slice(0, 10) : null,
+          dtcmStartDate,
+          dtcmEndDate,
+          requestApprovedDate: new Date().toISOString().slice(0, 10),
+          request_type: 'move-in' as const,
+          status: 'approve',
+          mobile_app_reference: moveInRequest.moveInRequestNo,
+        } as const;
+
+        await this.commonService.sendResidentToSalesforce(payload);
+      } catch (e) {
+        logger.error(`Salesforce push (move-in approval) failed: ${e}`);
+      }
 
       logger.info(`Move-in request ${requestId} approved by admin ${user?.id}`);
 
@@ -2574,6 +2778,7 @@ export class MoveInService {
         requestId: requestId,
         requestNumber: requestNumber,
         status: 'Approved',
+        requestType: moveInRequest.requestType,
         unitDetails: {
           unitNumber: moveInRequest.unit?.unitNumber || '',
           unitName: moveInRequest.unit?.unitName || '',
@@ -3010,6 +3215,7 @@ export class MoveInService {
           name: data.name,
           companyName: data.company,
           companyEmail: data.companyEmail,
+          countryCode: data.countryCode,
           operatorOfficeNumber: data.operatorOfficeNumber,
           tradeLicenseNumber: data.tradeLicenseNumber,
           tradeLicenseExpiryDate: data.tradeLicenseExpiryDate,

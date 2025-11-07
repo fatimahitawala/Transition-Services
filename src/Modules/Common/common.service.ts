@@ -20,8 +20,165 @@ import config from '../../Common/Config/config';
 import axios from 'axios';
 import { integrationUrls } from "../../Common/Constants/urls";
 import { AccessCardRequests } from "../../Entities/AccessCardRequests.entity";
+import { SalesForceTokens } from "../../Entities/SalesForceTokens.entity";
+import { SalesForceTokenHistory } from "../../Entities/SalesForceTokenHistory.entity";
+
+export type SalesforceResidentRequestType = 'move-in' | 'move-out' | 'renewal';
+
+export interface SalesforceResidentPayload {
+    salutation?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    primaryMobileCountryCode?: string | null;
+    primaryMobileNumber?: string | null;
+    alternativeMobileCountryCode?: string | null;
+    alternativeMobileNumber?: string | null;
+    primaryEmail?: string | null;
+    alternateEmail?: string | null;
+    unitId: string; // Salesforce Unit Id
+    nationality?: string | null;
+    typeOfTenant?: string | null; // Tenant | HomeOwner | HHO | Company
+    moveInDate?: string | null;
+    moveOutDate?: string | null;
+    ejariStartDate?: string | null;
+    ejariEndDate?: string | null;
+    requestRaisedDate?: string | null;
+    dtcmStartDate?: string | null;
+    dtcmEndDate?: string | null;
+    requestApprovedDate?: string | null;
+    request_type: SalesforceResidentRequestType; // move-in | move-out | renewal
+    status: string; // approve | cancel | etc.
+    mobile_app_reference: string; // e.g. MIP-xxxx, MOP-xxxx
+}
 
 export class CommonService {
+    private async getStoredSalesforceToken(): Promise<string> {
+        const rec = await SalesForceTokens.createQueryBuilder('t')
+            .where('t.isActive = true')
+            .orderBy('t.createdAt', 'DESC')
+            .getOne();
+        return rec?.token || '';
+    }
+
+    private async refreshSalesforceToken(): Promise<string> {
+        const options: any = {
+            method: 'POST',
+            url: config.gateway.salesforceTokenUrl,
+            headers: {
+                'Content-Type': 'application/json',
+                [config.gateway.subscriptionKey]: config.gateway.subscriptionValue,
+            },
+        };
+        const result = await axios(options);
+        const newToken = result?.data?.access_token || '';
+        if (!newToken) return '';
+
+        const current = await SalesForceTokens.createQueryBuilder('p')
+            .where('p.isActive = true')
+            .orderBy('p.createdAt', 'DESC')
+            .getOne();
+
+        if (current?.token) {
+            try {
+                await SalesForceTokenHistory.createQueryBuilder()
+                    .insert()
+                    .values({ token: current.token })
+                    .execute();
+            } catch { }
+            await SalesForceTokens.createQueryBuilder()
+                .update(SalesForceTokens)
+                .set({ token: newToken })
+                .where('id = :id', { id: current.id })
+                .execute();
+        } else {
+            await SalesForceTokens.save({ token: newToken });
+        }
+
+        return newToken;
+    }
+
+    // No proactive probe for performance; rely on 401-triggered refresh
+    /**
+     * Push resident lifecycle data to Salesforce Scm_ResidentAPI.
+     * Reusable for move-in, move-out and renewal.
+     */
+    async sendResidentToSalesforce(payload: SalesforceResidentPayload, extraHeaders?: Record<string, string>) {
+        // Correlation for easier log search
+        const cid = `SFDC-RES-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        // Build non-PII log meta for quick filtering
+        const logMeta = {
+            unitId: payload?.unitId,
+            requestType: payload?.request_type,
+            status: payload?.status,
+            ref: payload?.mobile_app_reference,
+        };
+        try {
+            // Use API Gateway Salesforce base URL
+            // Note: Do NOT start endpoint with '/' or URL() will drop any base path like '/srsalesforce/v1'
+            const base = (config.gateway?.salesforceBaseUrl || '').trim().replace(/\/$/, '');
+            const endpoint = 'Scm_ResidentAPI';
+            const url = `${base}/${endpoint}`;
+
+            // Get last stored token; fall back to configured token
+            let token = (await this.getStoredSalesforceToken()) || (config.salesforceToken || '');
+            let headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+                [config.gateway.subscriptionKey]: config.gateway.subscriptionValue,
+                ...(extraHeaders || {}),
+            };
+
+            // For logging only: redact sensitive values
+            const headersForLog = {
+                ...headers,
+                Authorization: headers?.Authorization ? `Bearer ***${(token || '').slice(-6)}` : undefined,
+            };
+
+            // Payload normalization with undefined -> null
+            const sanitizedPayload = JSON.parse(JSON.stringify(payload, (_k, v) => v === undefined ? null : v));
+
+            // Log request with URL and meta (no PII)
+            logger.info(`[${cid}] Salesforce Resident API -> POST ${url} | meta=${JSON.stringify(logMeta)} | headers=${JSON.stringify(Object.keys(headersForLog))}`);
+
+            let resp;
+            try {
+                resp = await axios.post(url, sanitizedPayload, { headers, timeout: 10_000 });
+            } catch (err: any) {
+                // Unauthorized: attempt token refresh once
+                if (err?.response?.status === 401) {
+                    logger.warn(`[${cid}] Salesforce Resident API 401 unauthorized. Refreshing token and retrying... | url=${url} | meta=${JSON.stringify(logMeta)}`);
+                    token = await this.refreshSalesforceToken();
+                    headers.Authorization = `Bearer ${token}`;
+                    try {
+                        resp = await axios.post(url, sanitizedPayload, { headers, timeout: 10_000 });
+                    } catch (retryErr: any) {
+                        const e = retryErr || {};
+                        const status = e?.response?.status;
+                        const data = e?.response?.data;
+                        logger.error(`[${cid}] Salesforce Resident API retry failed | url=${url} | status=${status} | meta=${JSON.stringify(logMeta)} | err=${e?.message}`);
+                        if (status) logger.error(`[${cid}] Salesforce Resident API retry response body | status=${status} | body=${JSON.stringify(data)}`);
+                        throw retryErr;
+                    }
+                } else {
+                    // Non-401 failures
+                    const status = err?.response?.status;
+                    const data = err?.response?.data;
+                    logger.error(`[${cid}] Salesforce Resident API request failed | url=${url} | status=${status} | meta=${JSON.stringify(logMeta)} | err=${err?.message}`);
+                    if (status) logger.error(`[${cid}] Salesforce Resident API response body | status=${status} | body=${JSON.stringify(data)}`);
+                    throw err;
+                }
+            }
+
+            logger.info(`[${cid}] Salesforce Resident API success | url=${url} | status=${resp.status} | meta=${JSON.stringify(logMeta)}`);
+            return { status: resp.status, data: resp.data };
+        } catch (error: any) {
+            const status = error?.response?.status || 500;
+            const body = error?.response?.data;
+            logger.error(`[${cid}] Salesforce Resident API error | status=${status} | meta=${JSON.stringify(logMeta)} | err=${error?.message || error}`);
+            if (status && body) logger.error(`[${cid}] Salesforce Resident API error body | status=${status} | body=${JSON.stringify(body)}`);
+            return { status, data: body };
+        }
+    }
     /**
      * Deactivate access card requests tied to the unit for the given customer user.
      * - Cancels pending requests directly.
