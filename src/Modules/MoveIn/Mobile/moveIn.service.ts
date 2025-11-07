@@ -1159,7 +1159,7 @@ export class MoveInService {
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] - existingApprovedRequest: (NOT validated)`);
       logger.info(`[CHECK_UNIT_AVAILABILITY_MOBILE] ✓✓✓ Mobile request accepted for unitId: ${unitId}`);
 
-      const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
+      const tempRequestNumber = this.generateRequestNumber();
 
       let createdMaster: MoveInRequests | undefined;
       let createdDetails: any = null;
@@ -1181,8 +1181,8 @@ export class MoveInService {
 
         const savedMaster = await master.save();
 
-        // Update request number to final format MIP-<unitNumber>-<id>
-        const finalRequestNumber = `MIP-${unit?.unitNumber}-${savedMaster.id}`;
+        // Update request number to final format MIP-<id>
+        const finalRequestNumber = `MIP-${savedMaster.id}`;
         await MoveInRequests.update({ id: savedMaster.id }, { moveInRequestNo: finalRequestNumber });
         savedMaster.moveInRequestNo = finalRequestNumber as any;
         createdMaster = savedMaster;
@@ -1723,9 +1723,9 @@ export class MoveInService {
     }
   }
 
-  private generateRequestNumber(unitNumber?: string | number): string {
+  private generateRequestNumber(): string {
     const suffix = `${Date.now()}`;
-    return `MIP-${unitNumber ?? 'UNIT'}-${suffix}`;
+    return `MIP-${suffix}`;
   }
 
   private async createDetailsRecord(qr: any, requestType: MOVE_IN_USER_TYPES, master: MoveInRequests, details: any, userId: number) {
@@ -1951,10 +1951,6 @@ export class MoveInService {
   private async ensureCancelableByOwner(requestId: number, user: any) {
     const mir = await MoveInRequests.getRepository()
       .createQueryBuilder('mir')
-      .leftJoinAndSelect('mir.unit', 'unit')
-      .leftJoinAndSelect('unit.tower', 'tower')
-      .leftJoinAndSelect('unit.community', 'community')
-      .leftJoinAndSelect('unit.masterCommunity', 'masterCommunity')
       .leftJoinAndSelect('mir.user', 'user')
       .where('mir.id = :requestId AND mir.isActive = true', { requestId })
       .getOne();
