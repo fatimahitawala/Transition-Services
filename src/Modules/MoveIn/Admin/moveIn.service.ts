@@ -265,7 +265,7 @@ export class MoveInService {
         }
       }
 
-      const tempRequestNumber = this.generateRequestNumber(unit?.unitNumber);
+      const tempRequestNumber = this.generateRequestNumber();
 
       let createdMaster: MoveInRequests | undefined;
       let createdDetails: any = null;
@@ -287,8 +287,8 @@ export class MoveInService {
 
         const savedMaster = await MoveInRequests.save(master);
 
-        // Update request number to final format MIP-<unitNumber>-<id>
-        const finalRequestNumber = `MIP-${unit?.unitNumber}-${savedMaster.id}`;
+        // Update request number to final format MIP-<id>
+        const finalRequestNumber = `MIP-${savedMaster.id}`;
         await MoveInRequests.update({ id: savedMaster.id }, { moveInRequestNo: finalRequestNumber });
         savedMaster.moveInRequestNo = finalRequestNumber as any;
         createdMaster = savedMaster;
@@ -545,9 +545,9 @@ export class MoveInService {
   }
 
   // Helper method to generate request number
-  private generateRequestNumber(unitNumber?: string | number): string {
+  private generateRequestNumber(): string {
     const suffix = `${Date.now()}`;
-    return `MIP-${unitNumber ?? 'UNIT'}-${suffix}`;
+    return `MIP-${suffix}`;
   }
 
   // Helper method to create details record based on request type
@@ -1414,6 +1414,15 @@ export class MoveInService {
         );
       }
 
+      logger.debug(`[CHECK_UNIT_AVAILABILITY] Raw unit payload: ${JSON.stringify({
+        id: unit.id,
+        unitNumber: unit.unitNumber,
+        unitName: unit.unitName,
+        isActive: unit.isActive,
+        availabilityStatus: unit.availabilityStatus,
+        occupancyStatus: unit.occupancyStatus
+      })}`);
+
       // Log all unit properties
       logger.info(`[CHECK_UNIT_AVAILABILITY] Unit details - unitId: ${unitId}, unitNumber: ${unit.unitNumber}, unitName: ${unit.unitName}`);
       logger.info(`[CHECK_UNIT_AVAILABILITY] Unit status values - isActive: ${unit.isActive} (type: ${typeof unit.isActive}), availabilityStatus: '${unit.availabilityStatus}', occupancyStatus: '${unit.occupancyStatus}'`);
@@ -1465,6 +1474,8 @@ export class MoveInService {
         .andWhere("mir.status = :approvedStatus", { approvedStatus: MOVE_IN_AND_OUT_REQUEST_STATUS.APPROVED })
         .andWhere("mir.isActive = 1")
         .getOne();
+
+      logger.debug(`[CHECK_UNIT_AVAILABILITY] Existing approved request payload: ${existingApprovedRequest ? JSON.stringify({ id: existingApprovedRequest.id, status: existingApprovedRequest.status, moveInRequestNo: existingApprovedRequest.moveInRequestNo }) : 'none'}`);
 
       logger.info(`[CHECK_UNIT_AVAILABILITY] Existing approved request check - Found: ${!!existingApprovedRequest}, RequestId: ${existingApprovedRequest?.id || 'N/A'}`);
 
