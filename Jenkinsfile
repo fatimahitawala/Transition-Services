@@ -3,9 +3,9 @@ pipeline {
 
     environment {
         SCAN_DIR = "${WORKSPACE}/scan-reports"
-        PATH = "${WORKSPACE}/tools:$HOME/.local/bin:${env.PATH}"
+        PATH = "${WORKSPACE}/tools:$HOME/.local/bin:/usr/local/bin:${env.PATH}"
     }
-    
+
     stages {
 
         stage('Checkout Code') {
@@ -18,7 +18,7 @@ pipeline {
             steps {
                 sh '''
                 mkdir -p ${SCAN_DIR} ${WORKSPACE}/tools
-                echo "Directory structure:"     
+                echo "Directory structure:"
                 tree -L 3 ${WORKSPACE} || true
                 '''
             }
@@ -29,12 +29,13 @@ pipeline {
                 sh 'npm install --legacy-peer-deps || true'
             }
         }
+
         stage('Run ESLint') {
             steps {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
                     sh '''
                     npm install eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin --legacy-peer-deps
-                    npx eslint . --ext .js,.ts -f json -o scan-reports/eslint-report.json || true
+                    npx eslint . --ext .js,.ts -f json -o ${SCAN_DIR}/eslint-report.json || true
                     '''
                 }
             }
@@ -44,6 +45,7 @@ pipeline {
                 }
             }
         }
+
         stage('Install Security Tools') {
             steps {
                 sh '''
@@ -106,6 +108,45 @@ pipeline {
             }
         }
 
+        stage('SCA Dependency-Check') {
+            steps {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                    sh '''
+                    /usr/local/bin/dependency-check --project "Transition-Services" --scan . --format HTML --out ${SCAN_DIR} || true
+                    '''
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'scan-reports/dependency-check-report.html', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Start App for DAST') {
+            steps {
+                sh '''
+                nohup npm start & 
+                sleep 15  # wait for app to be ready
+                '''
+            }
+        }
+
+        stage('DAST Scan (OWASP ZAP)') {
+            steps {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                    sh '''
+                    /usr/local/bin/zap -cmd -quickurl http://localhost:3000 -quickout ${SCAN_DIR}/zap-report.xml || true
+                    '''
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'scan-reports/zap-report.xml', allowEmptyArchive: true
+                }
+            }
+        }
+
     }
 
     post {
@@ -114,3 +155,4 @@ pipeline {
         }
     }
 }
+

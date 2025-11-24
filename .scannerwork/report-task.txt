@@ -1,0 +1,6 @@
+projectKey=transition-services
+serverUrl=https://kula.techcarrot.ae:8443/projects
+serverVersion=25.10.0.114319
+dashboardUrl=https://kula.techcarrot.ae:8443/projects/dashboard?id=transition-services
+ceTaskId=d93cd427-9f85-4ea4-b181-afbdb0dabe3a
+ceTaskUrl=https://kula.techcarrot.ae:8443/projects/api/ce/task?id=d93cd427-9f85-4ea4-b181-afbdb0dabe3a
