@@ -4,6 +4,8 @@ pipeline {
     environment {
         SCAN_DIR = "${WORKSPACE}/scan-reports"
         PATH = "${WORKSPACE}/tools:$HOME/.local/bin:/usr/local/bin:${env.PATH}"
+        DC_DATA_DIR = "/var/lib/jenkins/dependency-check-data" // custom database location
+        APP_URL = "http://localhost:3000" // app URL for ZAP scan
     }
 
     stages {
@@ -17,7 +19,7 @@ pipeline {
         stage('Setup Environment') {
             steps {
                 sh '''
-                mkdir -p ${SCAN_DIR} ${WORKSPACE}/tools
+                mkdir -p ${SCAN_DIR} ${WORKSPACE}/tools ${DC_DATA_DIR}
                 echo "Directory structure:"
                 tree -L 3 ${WORKSPACE} || true
                 '''
@@ -108,11 +110,26 @@ pipeline {
             }
         }
 
+        stage('Dependency-Check Update DB') {
+            steps {
+                sh '''
+                mkdir -p ${DC_DATA_DIR}
+                /usr/local/bin/dependency-check --updateonly --data ${DC_DATA_DIR}
+                '''
+            }
+        }
+
         stage('SCA Dependency-Check') {
             steps {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
                     sh '''
-                    /usr/local/bin/dependency-check --project "Transition-Services" --scan . --format HTML --out ${SCAN_DIR} || true
+                    /usr/local/bin/dependency-check \
+                    --project "Transition-Services" \
+                    --scan ${WORKSPACE} \
+                    --format HTML \
+                    --out ${SCAN_DIR} \
+                    --data ${DC_DATA_DIR} \
+                    --enableExperimental || true
                     '''
                 }
             }
@@ -126,8 +143,27 @@ pipeline {
         stage('Start App for DAST') {
             steps {
                 sh '''
-                nohup npm start & 
-                sleep 15  # wait for app to be ready
+                nohup npm start &
+                sleep 15  # wait for app to start
+                '''
+            }
+        }
+
+        stage('Wait for App Health') {
+            steps {
+                // Wait until the app responds on port 3000 (adjust URL if needed)
+                sh '''
+                echo "Waiting for app to be ready at ${APP_URL}..."
+                for i in {1..30}; do
+                    if curl -s --head ${APP_URL} | grep "200 OK" > /dev/null; then
+                        echo "App is up!"
+                        exit 0
+                    fi
+                    echo "App not ready yet, waiting 5 seconds..."
+                    sleep 5
+                done
+                echo "App failed to start after 150 seconds"
+                exit 1
                 '''
             }
         }
@@ -136,7 +172,7 @@ pipeline {
             steps {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
                     sh '''
-                    /usr/local/bin/zap -cmd -quickurl http://localhost:3000 -quickout ${SCAN_DIR}/zap-report.xml || true
+                    /usr/local/bin/zap -cmd -quickurl ${APP_URL} -quickout ${SCAN_DIR}/zap-report.xml || true
                     '''
                 }
             }
